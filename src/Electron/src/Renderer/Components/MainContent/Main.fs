@@ -24,9 +24,6 @@ module private MainHelper =
 
     open Fable.Core
 
-    let fetchReleases () =
-        Swate.Components.Api.GitHubReleases.loadAll IPCTypes.swateReleaseRepository
-
     let loadTemplates () =
         promise {
             // let! json =
@@ -69,6 +66,10 @@ module private LazyComponents =
         Renderer.Components.MainContent.SettingsPageTarget.SettingsPage()
 
     [<ReactLazyComponent>]
+    let LazyChangelogTarget (version: string) =
+        Renderer.Components.MainContent.ChangelogTarget.ChangelogTarget(version)
+
+    [<ReactLazyComponent>]
     let LazyMarkdownEditorTarget (content: string) =
         Renderer.Components.MainContent.MarkdownEditorTargetView.MarkdownEditorTarget(content)
 
@@ -94,7 +95,10 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             prop.key requestId
                             prop.className "swt:flex swt:grow swt:min-w-0 swt:min-h-0"
                             prop.children [
-                                Swate.Components.Page.Changelog.Changelog.Changelog(MainHelper.fetchReleases, version)
+                                React.Suspense(
+                                    [ LazyComponents.LazyChangelogTarget(version) ],
+                                    fallback = LazyComponents.FullPageLoadingSpinner("Loading changelog...")
+                                )
                             ]
                         ]
                     | _, Some PageState.SettingsPage ->
