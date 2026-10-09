@@ -23,6 +23,20 @@ module IPCTypesHelper =
 
 open IPCTypesHelper
 
+[<Literal>]
+let swateReleaseRepository = "nfdi4plants/Swate"
+
+type AppVersionState = {
+    CurrentVersion: string
+    UpdateVersion: string option
+    ChangelogVersion: string option
+}
+
+type IAppVersionApi = {
+    getAppVersion: unit -> JS.Promise<AppVersionState>
+    openUpdate: unit -> JS.Promise<Result<unit, exn>>
+}
+
 type CreateArcRequest = { identifier: string; initGit: bool }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -198,6 +212,10 @@ module MainToRendererIpc =
 
     type IHasUnsavedArcChangesRendererApi = {
         arcUnsavedChangesUpdate: bool -> unit
+    }
+
+    type IAppVersionRendererApi = {
+        appVersionChanged: AppVersionState -> unit
     }
 
     type IUiSettingsRendererApi = { uiScaleChanged: float -> unit }

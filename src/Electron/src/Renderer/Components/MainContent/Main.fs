@@ -24,6 +24,9 @@ module private MainHelper =
 
     open Fable.Core
 
+    let fetchReleases () =
+        Swate.Components.Api.GitHubReleases.loadAll IPCTypes.swateReleaseRepository
+
     let loadTemplates () =
         promise {
             // let! json =
@@ -85,6 +88,8 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
                     | Some _, Some PageState.ValidationPackageBrowser -> ValidationPackageBrowserTarget()
+                    | _, Some(PageState.Changelog version) ->
+                        Swate.Components.Page.Changelog.Changelog.Changelog(MainHelper.fetchReleases, version)
                     | _, Some PageState.SettingsPage ->
                         React.Suspense(
                             [ LazyComponents.LazySettingPage() ],

@@ -19,6 +19,7 @@
     <Compile Include="Notes\NoteScaffolding.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="Services\Settings\SettingsStore.fs" />
+    <Compile Include="Services\Settings\AppVersion.fs" />
     <Compile Include="Services\Settings\UiSettings.fs" />
     <Compile Include="Services\Settings\RecentArcStore.fs" />
     <Compile Include="ArcMerge\Types.fs" />
@@ -60,6 +61,7 @@
     <Compile Include="IPC\ITemplateApi.fs" />
     <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="IPC\IUiSettingsApi.fs" />
+    <Compile Include="IPC\IAppVersionApi.fs" />
     <Compile Include="main.fs" />
     <None Include="ChokidarTest.fsx" />
   </ItemGroup>

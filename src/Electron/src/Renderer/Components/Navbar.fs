@@ -12,6 +12,7 @@ open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open Swate.Electron.Shared.IPCTypes
 open Renderer.Types
 
 type private Selector =
@@ -182,6 +183,63 @@ module private Authentication =
 type Navbar =
 
     [<ReactComponent>]
+    static member private UpdateButton() =
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let errorCtx = useErrorModalCtx ()
+        let shownChangelog = React.useRef<string option> None
+
+        let version =
+            Renderer.MainSyncedState.useMainSyncedState {
+                initial = {
+                    CurrentVersion = ""
+                    UpdateVersion = None
+                    ChangelogVersion = None
+                }
+                load = Api.ipcAppVersionApi.getAppVersion
+                subscribe =
+                    fun setVersion ->
+                        Renderer.IpcReceiver.subscribeProxyReceiver<IAppVersionRendererApi> {
+                            appVersionChanged = setVersion
+                        }
+                onError = fun error -> console.warn ("Could not load app version", error.Message)
+                dependencies = [||]
+            }
+
+        React.useEffect (
+            (fun () ->
+                match version.state.ChangelogVersion with
+                | Some current when shownChangelog.current <> Some current ->
+                    shownChangelog.current <- Some current
+                    pageStateCtx.setState (Some(PageState.Changelog current))
+                | _ -> ()
+            ),
+            [| box version.state.ChangelogVersion |]
+        )
+
+        match version.state.UpdateVersion with
+        | None -> Html.none
+        | Some available ->
+            Html.button [
+                prop.type'.button
+                prop.className "swt:btn swt:btn-primary swt:btn-sm swt:mr-2"
+                prop.title $"Download Swate {available}"
+                prop.text "Update"
+                prop.onClick (fun _ ->
+                    promise {
+                        try
+                            match! Api.ipcAppVersionApi.openUpdate () with
+                            | Ok() -> ()
+                            | Error error -> raise error
+                        with error ->
+                            errorCtx.enqueue (
+                                ErrorModalRequest.create (error.Message, title = "Could not open update")
+                            )
+                    }
+                    |> Promise.start
+                )
+            ]
+
+    [<ReactComponent>]
     static member private Separator() =
         Html.div [
             prop.className "swt:divider swt:divider-horizontal swt:mx-0"
@@ -304,6 +362,7 @@ type Navbar =
             Html.div [
                 prop.className "swt:flex swt:items-center"
                 prop.children [
+                    Navbar.UpdateButton()
                     Authentication.UserAvatar()
                     if appStateCtx.IsSome then
                         Navbar.Separator()

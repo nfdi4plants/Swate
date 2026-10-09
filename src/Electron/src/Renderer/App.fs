@@ -59,6 +59,7 @@ let private resetForClosedArc (model: Model) = {
 let private applyArcRootPath (arcRootPath: ArcRootPath) (model: Model) =
     match arcRootPath with
     | Some _ -> { model with ArcRootPath = arcRootPath }
+    | None when model.ArcRootPath.IsNone -> model
     | None -> resetForClosedArc model
 
 let private createGetOpenPathCmd requestVersion liveUpdateVersionAtStart =

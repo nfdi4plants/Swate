@@ -76,6 +76,10 @@
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="Util\Download.fs" />
+    <Compile Include="Util\SemVer.fs" />
+    <Compile Include="Util\SemVer.test.fs" />
+    <Compile Include="Api\GitHubReleases.fs" />
+    <Compile Include="Api\GitHubReleases.test.fs" />
     <Compile Include="Util\DateTimeExtensions.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\ReactHooks.fs" />
@@ -276,6 +280,8 @@
     <Compile Include="Page\ProvenanceGrouping\EditorSurface.fs" />
     <Compile Include="Page\ProvenanceGrouping\Tutorial.fs" />
     <Compile Include="Page\ProvenanceGrouping\ProvenanceGrouping.fs" />
+    <Compile Include="Page\Changelog\Changelog.fs" />
+    <Compile Include="Page\Changelog\Changelog.sample.fs" />
     <Compile Include="Page\SettingsPage\SettingsPage.fs" />
     <Compile Include="Page\Metadata\FormComponents\Helpers.fs" />
     <Compile Include="Page\Metadata\FormComponents\InputSequence.fs" />

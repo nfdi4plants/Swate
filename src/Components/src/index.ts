@@ -77,6 +77,7 @@ export { default as FileExplorer } from './dist/Page/FileExplorer/FileExplorer.f
 export { default as GitDiffViewer } from './dist/Page/GitComparison/GitDiffViewer.fs';
 export { default as GitSidebar } from './dist/Page/GitSidebar/GitSidebar.fs';
 export { default as Landing } from './dist/Page/Landing/Landing.fs';
+export { default as Changelog } from './dist/Page/Changelog/Changelog.fs';
 export { default as SettingsPage } from './dist/Page/SettingsPage/SettingsPage.fs';
 export { default as ProvenanceGrouping } from './dist/Page/ProvenanceGrouping/ProvenanceGrouping.fs';
 export { default as ValidationPackageBrowser } from './dist/Page/ValidationPackageBrowser/ValidationPackageBrowser.fs';

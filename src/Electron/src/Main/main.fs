@@ -23,6 +23,9 @@ if SquirrelStartup.started then
 app
     .whenReady()
     .``then`` (fun () ->
+        Main.Settings.AppVersion.initialize ()
+        Main.Settings.AppVersion.checkForUpdate () |> Promise.start
+
         // Restore persisted auth before any IPC handlers fire
         Main.Auth.AuthService.tryRestoreFromStorage ()
 
@@ -44,6 +47,7 @@ app
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.TemplateApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.ValidationPackageApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.UiSettingsApi.api
+        Remoting.createIpc () |> Remoting.fromValue Main.IPC.IAppVersionApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then

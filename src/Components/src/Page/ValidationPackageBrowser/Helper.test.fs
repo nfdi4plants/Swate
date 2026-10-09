@@ -5,6 +5,7 @@ open Swate.Components.Page.ValidationPackageBrowser.Helper
 open Swate.Components.Page.ValidationPackageBrowser.Types
 open Vitest
 open ARCtrl.Helper.SemVer
+open Swate.Components.Util.SemVer
 
 let private mkTag (tagName: string) : OntologyAnnotationDTO = {
     Name = Some tagName
