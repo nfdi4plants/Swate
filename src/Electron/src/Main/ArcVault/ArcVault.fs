@@ -1589,12 +1589,7 @@ module ArcVaultExtensions =
                 | None -> ()
             }
 
-            let! _ =
-                [|
-                    watcherReady
-                    this.LoadArc()
-                |]
-                |> Promise.all
+            let! _ = [| watcherReady; this.LoadArc() |] |> Promise.all
 
             return ()
         }
