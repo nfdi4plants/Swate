@@ -3,6 +3,8 @@ namespace Swate.Components
 open Feliz
 open ARCtrl
 open Fable.Core
+open Fable.Core.JsInterop
+open Browser.Types
 
 type style =
     static member resolveStyle(style: U2<string, string[]>) =
@@ -21,6 +23,7 @@ module Extensions =
     type prop with
         static member inline testid(value: string) : IReactProperty = unbox ("data-testid", value)
         static member inline data(key: string, value: string) : IReactProperty = unbox ($"data-{key}", value)
+
         static member inline dataRow(value: int) : IReactProperty = unbox ("data-row", value)
         static member inline dataColumn(value: int) : IReactProperty = unbox ("data-column", value)
 
@@ -35,6 +38,27 @@ module Extensions =
 module Keys =
     let inline mkLocalStorageKey (file: string) (component': string) (function': string) : string =
         $"swate-{file}-{component'}-{function'}"
+
+[<RequireQualifiedAccess>]
+module BrowserEvent =
+
+    let tryGetTargetElement (event: Event) : Element option =
+        let target: obj = box event.target
+
+        if isNullOrUndefined target then
+            None
+        elif isNullOrUndefined target?closest then
+            let parentElement: obj = target?parentElement
+
+            if isNullOrUndefined parentElement then
+                None
+            else
+                Some(unbox<Element> parentElement)
+        else
+            Some(unbox<Element> target)
+
+    let tryGetClosest (selector: string) event =
+        tryGetTargetElement event |> Option.bind (fun target -> target.closest selector)
 
 
 [<RequireQualifiedAccess>]
@@ -72,10 +96,16 @@ module kbdEventCode =
     [<Literal>]
     let f2 = "F2"
 
-    let key (key: string) = key.ToUpper() |> sprintf "Key%s"
+    [<Literal>]
+    let home = "Home"
 
-open Fable.Core
-open Fable.Core.JsInterop
+    [<Literal>]
+    let ``end`` = "End"
+
+    [<Literal>]
+    let space = "Space"
+
+    let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 
 [<Fable.Core.Global>]
 type console =

@@ -3,9 +3,16 @@ module Swate.Components.Primitive.ContextMenu.Types
 open Fable.Core
 open Feliz
 
-[<Global; AllowNullLiteral>]
+[<AllowNullLiteral>]
+type ContextMenuClickEvent =
+    abstract currentTarget: Browser.Types.HTMLElement
+    abstract target: Browser.Types.EventTarget
+    abstract nativeEvent: Browser.Types.MouseEvent
+    abstract preventDefault: unit -> unit
+    abstract stopPropagation: unit -> unit
+
+[<JS.Pojo; AllowNullLiteral>]
 type ContextMenuItem
-    [<ParamObjectAttribute; Emit("$0")>]
     (
         ?text: ReactElement,
         ?icon: ReactElement,
@@ -18,7 +25,7 @@ type ContextMenuItem
         ?isDivider: bool,
         ?onClick:
             {|
-                buttonEvent: Browser.Types.MouseEvent
+                buttonEvent: ContextMenuClickEvent
                 spawnData: obj
             |}
                 -> unit

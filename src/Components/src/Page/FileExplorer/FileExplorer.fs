@@ -8,21 +8,6 @@ open Feliz
 
 module private FileExplorerHelper =
 
-    let tryGetEventTargetElement (e: Browser.Types.Event) : Browser.Types.Element option =
-        let targetObj: obj = box e.target
-
-        if isNullOrUndefined targetObj then
-            None
-        elif isNullOrUndefined targetObj?closest then
-            let parentElement: obj = targetObj?parentElement
-
-            if isNullOrUndefined parentElement then
-                None
-            else
-                Some(unbox<Browser.Types.Element> parentElement)
-        else
-            Some(unbox<Browser.Types.Element> targetObj)
-
     let private copyPathToClipboard (path: string) =
         promise {
             try
@@ -244,7 +229,7 @@ type FileExplorer =
                     (fun e ->
                         let trigger =
                             e
-                            |> FileExplorerHelper.tryGetEventTargetElement
+                            |> Swate.Components.BrowserEvent.tryGetTargetElement
                             |> Option.bind (fun target -> target.closest ("[data-file-item-id]"))
 
                         match trigger, containerRef.current with

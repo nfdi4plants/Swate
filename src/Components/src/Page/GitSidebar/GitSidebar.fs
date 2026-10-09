@@ -1244,15 +1244,8 @@ type GitSidebar =
 
         Html.div [
             prop.role "listitem"
-            prop.custom ("data-index", props.Index)
-            prop.ref (fun element -> props.MeasureElementRef(Option.ofObj element))
+            yield! Virtual.rowProps (props.Index, props.VirtualStart, measureElement = props.MeasureElementRef)
             prop.className "swt:absolute swt:left-0 swt:w-full"
-            prop.style [
-                style.top 0
-                style.left 0
-                style.width (length.percent 100)
-                style.custom ("transform", $"translateY({props.VirtualStart}px)")
-            ]
             prop.children [
                 Html.div [
                     prop.testId $"GitSidebarChangeRow-{props.Index}"
