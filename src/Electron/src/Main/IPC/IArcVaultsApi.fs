@@ -1,6 +1,8 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open ARCtrl
+open ARCtrl.Contract
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -36,6 +38,15 @@ let private withLoadedArcVault<'T>
         | Some vault ->
             match vault.path, vault.arc with
             | Some _, Some _ -> return! operation vault
+            | Some _, None ->
+                match vault.ArcInitialization with
+                | Some initialization ->
+                    do! initialization
+
+                    match vault.arc with
+                    | Some _ -> return! operation vault
+                    | None -> return Error(arcNotOpenError ())
+                | None -> return Error(arcNotOpenError ())
             | _ -> return Error(arcNotOpenError ())
     }
 
@@ -683,16 +694,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    refreshFileTreeDirectory =
+    loadNextFileTreeDirectoryPage =
         fun (relativeDirectoryPath: string) -> promise {
             try
-                return!
-                    withLoadedArcVault
-                        event
-                        (fun vault -> promise {
-                            do! vault.RefreshFileTreeDirectory relativeDirectoryPath
-                            return Ok()
-                        })
+                // The File Explorer becomes usable as soon as the vault path and root snapshot exist.
+                // Large ARC metadata may still be loading at that point, and directory paging does not
+                // depend on the in-memory ARC object, so requiring vault.arc here would reject valid opens.
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(vault, _) ->
+                    do! vault.LoadNextFileTreeDirectoryPage relativeDirectoryPath
+                    return Ok()
             with e ->
                 return Error e
         }
@@ -1104,12 +1116,30 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openFile =
         fun (relativePath: string) -> promise {
             try
-                let windowId = windowIdFromIpcEvent event
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(vault, arcPath) ->
+                    let! arcfileDTO = promise {
+                        match vault.arc with
+                        | Some arc -> return FileContentDTO.fromArcByPath relativePath arc
+                        | None ->
+                            // The bounded root tree is available before the complete ARC model. Load only
+                            // the selected workbook so previews remain interactive during initialization.
+                            let normalizedPath = PathHelpers.normalizeCanonicalRelativePath relativePath
+                            let previewArc = ARC.fromFilePaths [| normalizedPath |]
+                            let contracts = previewArc.GetReadContracts()
 
-                match ARC_VAULTS.TryGetVault(windowId) with
-                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-                | Some vault when vault.arc.IsSome ->
-                    let arcfileDTO = FileContentDTO.fromArcByPath relativePath vault.arc.Value
+                            match! fullFillContractBatchAsync arcPath contracts with
+                            | Error errors ->
+                                return
+                                    raise (
+                                        exn
+                                            $"Could not load preview for '{relativePath}': {PathHelpers.formatContractErrors errors}"
+                                    )
+                            | Ok fulfilledContracts ->
+                                previewArc.SetISAFromContracts fulfilledContracts
+                                return FileContentDTO.fromArcByPath normalizedPath previewArc
+                    }
 
                     match arcfileDTO with
                     | Some dto -> return Ok dto
@@ -1129,7 +1159,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 return Ok dto
                         with e ->
                             return Error(exn $"Could not read file {relativePath}: {e.Message}")
-                | _ -> return Error(arcNotOpenError ())
             with e ->
                 return Error e
         }

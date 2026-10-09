@@ -13,6 +13,11 @@ open AuthTypes
 open FileIOTypes
 open VersionControlTypes
 
+type FileTreeSnapshot = {
+    entries: System.Collections.Generic.Dictionary<string, FileEntry>
+    directoryHasMore: System.Collections.Generic.Dictionary<string, bool>
+}
+
 module IPCTypesHelper =
 
     [<RequireQualifiedAccess>]
@@ -67,8 +72,8 @@ type IArcVaultsApi = {
     tryImportExternalFiles: ImportExternalFilesRequest -> JS.Promise<Result<ImportExternalFilesResult, exn>>
     cancelImportExternalFiles: string -> JS.Promise<Result<unit, exn>>
     getActiveFileImport: unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
-    getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
-    refreshFileTreeDirectory: string -> JS.Promise<Result<unit, exn>>
+    getFileTree: unit -> JS.Promise<Result<FileTreeSnapshot, exn>>
+    loadNextFileTreeDirectoryPage: string -> JS.Promise<Result<unit, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
@@ -174,7 +179,7 @@ module MainToRendererIpc =
     }
 
     type IFileTreeRendererApi = {
-        fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+        fileTreeUpdate: FileTreeSnapshot -> unit
     }
 
     type IFileImportRendererApi = {

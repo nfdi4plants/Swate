@@ -137,6 +137,12 @@ type FileTree =
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
+        // This map describes only the bounded prefixes already requested by this renderer.
+        // A directory is absent until its first page has been loaded.
+        let directoriesLoadingPage = React.useRef Set.empty<string>
+
+        React.useEffect ((fun () -> directoriesLoadingPage.current <- Set.empty), [| box arcScopeId |])
+
         let reconciledMaterializedState =
             reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
 
@@ -293,16 +299,31 @@ type FileTree =
             [| box fileStateCtx.state.FileTree |]
         )
 
+        let loadNextDirectoryPage (item: FileItem) =
+            match item.Path with
+            | Some path ->
+                let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
+
+                if not (directoriesLoadingPage.current.Contains normalizedPath) then
+                    directoriesLoadingPage.current <- directoriesLoadingPage.current.Add normalizedPath
+
+                    promise {
+                        try
+                            match! Api.ipcArcVaultApi.loadNextFileTreeDirectoryPage normalizedPath with
+                            | Ok _ -> ()
+                            | Error error ->
+                                console.error ($"Unable to load File Explorer directory page: {error.Message}")
+                        finally
+                            directoriesLoadingPage.current <- directoriesLoadingPage.current.Remove normalizedPath
+                    }
+                    |> Promise.start
+            | None -> ()
+
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
             match item.Path with
             | Some path when willExpand ->
                 setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
-
-                promise {
-                    let! _ = Api.ipcArcVaultApi.refreshFileTreeDirectory path
-                    return ()
-                }
-                |> Promise.start
+                loadNextDirectoryPage item
             | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
             | None -> ()
 
@@ -643,7 +664,18 @@ type FileTree =
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,
                             delegateHorizontalScrollToParent = true,
-                            truncateOverflowingItemNames = true
+                            truncateOverflowingItemNames = true,
+                            automaticallyLoadChildren = false,
+                            hasMoreChildren =
+                                (fun item ->
+                                    item.Path
+                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                    |> Option.bind (fun path ->
+                                        Map.tryFind path fileStateCtx.state.FileTreeDirectoryHasMore
+                                    )
+                                    |> Option.defaultValue false
+                                ),
+                            onLoadMoreChildren = loadNextDirectoryPage
                         )
                     ]
                 ]

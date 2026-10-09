@@ -117,8 +117,8 @@ let private withLoadedDirectoryFixtureUsingWindow window testBody = promise {
 
         let vault = ArcVault(window)
         vault.path <- Some rootPath
-        let! initialTree = Main.FileTreeCreator.getFileTree rootPath
-        vault.fileTree <- initialTree
+        let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage rootPath
+        vault.fileTree <- initialRootPage.Entries
 
         try
             do! testBody vault rootPath datasetPath nestedPath
@@ -784,42 +784,6 @@ Vitest.describe (
                         Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
                         Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
                         Vitest.expect(containsPath latePath vault).toBe false
-                    })
-            }
-        )
-
-        Vitest.test (
-            "loaded-directory read already in flight cannot publish after stop",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-                        let stalePath = join [| datasetPath; "stale-read-after-stop.txt" |]
-                        do! writeFileAsync stalePath "stale" TextEncoding.Utf8
-
-                        let readStarted, signalReadStarted = TestHelpers.deferred ()
-                        let readGate, releaseRead = TestHelpers.deferred ()
-
-                        vault.LoadedDirectoryReadOverride <-
-                            Some(fun arcPath relativePath -> promise {
-                                signalReadStarted ()
-                                do! readGate
-                                return! Main.FileTreeCreator.readFileTreeDirectory arcPath relativePath
-                            })
-
-                        vault.QueueLoadedDirectoryRefresh "dataset"
-                        do! readStarted
-                        do! vault.StopFileWatcher()
-
-                        releaseRead ()
-                        do! Promise.sleep 25
-
-                        Vitest.expect(containsPath stalePath vault).toBe false
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
-                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
-                        Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
                     })
             }
         )

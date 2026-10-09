@@ -145,9 +145,6 @@ module ArcLoadExtensions =
                 |> Array.sort
         }
 
-    let private discoverStructuralArcFilePathsAsync (arcPath: string) =
-        discoverStructuralArcFilePathsWithAsync readdirWithTypesAsync arcPath
-
     let migrateLegacyDataMapPathsAsync (arcPath: string) (paths: string[]) = promise {
         let migratedPaths = ResizeArray<string>()
 
@@ -282,7 +279,7 @@ module ArcLoadExtensions =
 
         /// Loads canonical ARC metadata through a bounded traversal of zone roots and immediate entity folders.
         static member LoadAsyncSwate(arcPath: string) = promise {
-            let! discoveredPaths = discoverStructuralArcFilePathsAsync arcPath
+            let! discoveredPaths = discoverStructuralArcFilePathsWithAsync readdirWithTypesAsync arcPath
             let! paths = migrateLegacyDataMapPathsAsync arcPath discoveredPaths
             let arc = ARC.fromFilePaths paths
             let contracts = arc.GetReadContracts()

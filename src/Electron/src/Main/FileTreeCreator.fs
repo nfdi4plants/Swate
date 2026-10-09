@@ -168,48 +168,94 @@ let private resolveFileTreeDirectory (arcPath: string) (relativeDirectoryPath: s
 
     resolvedDirectoryPath
 
-/// Reads exactly the immediate children of one ARC-relative directory.
-let readFileTreeDirectory (arcPath: string) (relativeDirectoryPath: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let normalizedArcPath = normalizeRootPath arcPath
-    let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
-    let! dirents = readdirWithTypesAsync directoryPath (ReaddirOptions(withFileTypes = true))
+type FileTreeDirectoryPage = { Entries: FileEntry[]; HasMore: bool }
 
-    let entries =
-        dirents
-        |> Array.choose (fun dirent ->
-            let name = dirent.name
-            let isDirectory = dirent.isDirectory ()
-            let fullPath = join [| directoryPath; name |] |> PathHelpers.normalizeSeparators
+/// Reads one bounded page of immediate children without materializing the complete directory listing.
+let readFileTreeDirectoryPage
+    (arcPath: string)
+    (relativeDirectoryPath: string)
+    (offset: int)
+    (pageSize: int)
+    : Fable.Core.JS.Promise<FileTreeDirectoryPage> =
+    promise {
+        if offset < 0 then
+            invalidArg (nameof offset) "Directory page offset must not be negative."
 
-            if
-                (isDirectory && shouldIgnoreDirName name)
-                || (not isDirectory && shouldIgnorePath fullPath)
-            then
-                None
-            else
-                Some(FileEntry.create (name, fullPath, isDirectory, None))
-        )
+        if pageSize < 1 then
+            invalidArg (nameof pageSize) "Directory page size must be at least one."
 
-    // TEMPORARILY DISABLED due to LFS problems:
-    // FileTree LFS enrichment calls ObjectMaterialization.ListObjects, which enumerates
-    // repository-wide object state and makes this shallow read depend on repository size.
-    //
-    // TODO: Re-enable only after VersionControlService supports bounded object-state
-    // lookup for explicit repository paths. Do not restore repository-wide ListObjects here.
-    // return! getFileEntriesWithLfsMetadata normalizedArcPath entries
-    return entries
+        let normalizedArcPath = normalizeRootPath arcPath
+        let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
+        let! directory = openDirectoryAsync directoryPath
+        let entries = ResizeArray<FileEntry>()
+        let mutable acceptedIndex = 0
+        let mutable exhausted = false
+
+        try
+            // Read one accepted entry beyond the requested page. That single look-ahead tells the
+            // renderer whether another page exists without enumerating the rest of the directory.
+            while not exhausted && entries.Count <= pageSize do
+                let! dirent = directory.read ()
+
+                if isNull (box dirent) then
+                    exhausted <- true
+                else
+                    let name = dirent.name
+                    let isDirectory = dirent.isDirectory ()
+                    let fullPath = join [| directoryPath; name |] |> PathHelpers.normalizeSeparators
+
+                    if
+                        not (
+                            (isDirectory && shouldIgnoreDirName name)
+                            || (not isDirectory && shouldIgnorePath fullPath)
+                        )
+                    then
+                        if acceptedIndex >= offset then
+                            entries.Add(FileEntry.create (name, fullPath, isDirectory, None))
+
+                        acceptedIndex <- acceptedIndex + 1
+        finally
+            directory.close () |> Promise.start
+
+        let hasMore = entries.Count > pageSize
+        let pageEntries = entries |> Seq.truncate pageSize |> Array.ofSeq
+
+        // TEMPORARILY DISABLED due to LFS problems:
+        // FileTree LFS enrichment calls ObjectMaterialization.ListObjects, which enumerates
+        // repository-wide object state and makes this bounded read depend on repository size.
+        //
+        // TODO: Re-enable only after VersionControlService supports bounded object-state
+        // lookup for explicit repository paths. Keep the enrichment helpers and their tests.
+        // let! pageEntries = getFileEntriesWithLfsMetadata normalizedArcPath pageEntries
+
+        return {
+            Entries = pageEntries
+            HasMore = hasMore
+        }
+    }
+
+type FileTreeRootPage = {
+    Entries: Dictionary<string, FileEntry>
+    HasMore: bool
 }
 
-/// Builds the bounded startup snapshot: the ARC root and its immediate children.
-let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
+/// Builds the bounded startup snapshot: the ARC root and the first page of its immediate children.
+let getFileTreeRootPage (path: string) : Fable.Core.JS.Promise<FileTreeRootPage> = promise {
     let normalizedArcPath = normalizeRootPath path
     let! rootEntry = getFileEntry normalizedArcPath
 
     if not rootEntry.isDirectory then
-        return createFileEntryTree [| rootEntry |]
+        return {
+            Entries = createFileEntryTree [| rootEntry |]
+            HasMore = false
+        }
     else
-        let! children = readFileTreeDirectory normalizedArcPath ""
-        return createFileEntryTree (Array.append [| rootEntry |] children)
+        let! page = readFileTreeDirectoryPage normalizedArcPath "" 0 100
+
+        return {
+            Entries = createFileEntryTree (Array.append [| rootEntry |] page.Entries)
+            HasMore = page.HasMore
+        }
 }
 
 /// Reconciles one directory's direct children while retaining known descendants of surviving directories.
@@ -243,4 +289,10 @@ let reconcileFileTreeDirectory
     )
 
     currentChildren |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
+    nextTree
+
+/// Adds or replaces a page without removing direct children that belong to pages not read by this request.
+let mergeFileTreeDirectoryPage (entries: FileEntry[]) (fileTree: Dictionary<string, FileEntry>) =
+    let nextTree = Dictionary<string, FileEntry>(fileTree)
+    entries |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
     nextTree

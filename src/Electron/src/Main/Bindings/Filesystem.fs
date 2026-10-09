@@ -32,6 +32,11 @@ type Dirent =
     abstract member isFile: unit -> bool
     abstract member isSymbolicLink: unit -> bool
 
+type Directory =
+    /// Resolves to null after the directory iterator has been exhausted.
+    abstract member read: unit -> JS.Promise<Dirent>
+    abstract member close: unit -> JS.Promise<unit>
+
 [<Import("mkdirSync", "fs")>]
 let mkdirSync (path: string) (options: MkdirOptions) : unit = jsNative
 
@@ -93,3 +98,6 @@ let readdirAsync (path: string) : JS.Promise<string[]> = jsNative
 
 [<Import("readdir", "fs/promises")>]
 let readdirWithTypesAsync (path: string) (options: ReaddirOptions) : JS.Promise<Dirent[]> = jsNative
+
+[<Import("opendir", "fs/promises")>]
+let openDirectoryAsync (path: string) : JS.Promise<Directory> = jsNative

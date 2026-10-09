@@ -380,7 +380,8 @@ Vitest.describe (
                                 )
 
                         let! _ = Fable.Core.JS.Constructors.Promise.all writes
-                        let! tree = FileTreeCreator.getFileTree rootPath
+                        let! rootPage = FileTreeCreator.getFileTreeRootPage rootPath
+                        let tree = rootPage.Entries
                         let names = tree.Values |> Seq.map _.name |> Seq.toArray
 
                         Vitest.expect(tree.Count).toBe (3)
@@ -395,31 +396,62 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "each shallow read loads exactly one expanded level",
+            "paged reads return only the requested bounded slice",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
                     withTempDirectory (fun rootPath -> promise {
                         let studiesPath = join [| rootPath; "studies" |]
-                        let studyPath = join [| studiesPath; "S1" |]
-                        let datasetPath = join [| studyPath; "dataset" |]
-                        do! createDirectoryAtAsync datasetPath
-                        do! writeUtf8FileAsync (join [| studyPath; "isa.study.xlsx" |]) "study"
-                        do! writeUtf8FileAsync (join [| datasetPath; "sample.txt" |]) "sample"
+                        do! createDirectoryAtAsync studiesPath
 
-                        let! studiesChildren = FileTreeCreator.readFileTreeDirectory rootPath "studies"
-                        Vitest.expect(studiesChildren |> Array.map _.name).toEqual ([| "S1" |])
+                        let writes =
+                            Array.init
+                                250
+                                (fun index ->
+                                    writeUtf8FileAsync (join [| studiesPath; sprintf "study-%03d" index |]) "study"
+                                )
 
-                        let! studyChildren = FileTreeCreator.readFileTreeDirectory rootPath "studies/S1"
-                        let childNames = studyChildren |> Array.map _.name |> Array.sort
-                        Vitest.expect(childNames).toEqual ([| "dataset"; "isa.study.xlsx" |])
+                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                        let! first = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 0 100
+                        let! second = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 100 100
+                        let! final = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 200 100
 
-                        studyChildren
-                        |> Array.iter (fun entry -> Vitest.expect(entry.largeObject).toEqual (None))
+                        Vitest.expect(first.Entries.Length).toBe 100
+                        Vitest.expect(first.HasMore).toBe true
+                        Vitest.expect(second.Entries.Length).toBe 100
+                        Vitest.expect(second.HasMore).toBe true
+                        Vitest.expect(final.Entries.Length).toBe 50
+                        Vitest.expect(final.HasMore).toBe false
 
-                        Vitest
-                            .expect(studyChildren |> Array.exists (fun entry -> entry.name = "sample.txt"))
-                            .toBe (false)
+                        let distinctPaths =
+                            Array.concat [ first.Entries; second.Entries; final.Entries ]
+                            |> Array.map _.path
+                            |> Array.distinct
+
+                        Vitest.expect(distinctPaths.Length).toBe 250
+                    })
+            }
+        )
+
+        Vitest.test (
+            "startup root loading is bounded and reports additional children",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let writes =
+                            Array.init
+                                250
+                                (fun index ->
+                                    writeUtf8FileAsync (join [| rootPath; sprintf "root-%03d.txt" index |]) "root"
+                                )
+
+                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                        let! rootPage = FileTreeCreator.getFileTreeRootPage rootPath
+
+                        // One root entry plus exactly one bounded page of direct children.
+                        Vitest.expect(rootPage.Entries.Count).toBe 101
+                        Vitest.expect(rootPage.HasMore).toBe true
                     })
             }
         )
