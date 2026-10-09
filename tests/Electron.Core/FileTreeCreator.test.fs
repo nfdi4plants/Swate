@@ -122,7 +122,8 @@ let private withTempRepository
             let runtime =
                 createRuntime rootPath VersionControlService.LakeFs.LakeFsCredentials.unconfigured (memoryBindings ())
 
-            let gitFactory = ProviderComposition.createGitFactory noAccounts
+            let gitFactory =
+                ProviderComposition.createGitFactory noAccounts WorkspaceSessionHost.windowOwnerOf
 
             let! initialized =
                 gitFactory.Initialize

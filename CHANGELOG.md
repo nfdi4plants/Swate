@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add setting to adjust UI scaling. This can also be done using the keyboard shortcuts "Ctrl + +" or "Ctrl + -" (or "⌘ + +" / "⌘ + -" on MacOS). #1165 (by @Freymaurer)
 - Add display of PDFs (read-only) in Swate using the built-in browser compatibility of Electron. #1326 (by @Rookabu)
+- A new Git sidebar setting, "Background indexing limit (MB)", decides how much of a large diff Swate reads ahead while you look at it. With a value from 1 to 63 the diff stays in memory and writes no temporary files. #1388 (by @caroott)
+- Swate keeps about 1 GB free on the drive that holds its temporary files. On a nearly full drive a new diff stays in memory, and an open diff pauses until you free some space and press Continue. #1388 (by @caroott)
+- When loading more of a diff fails, the status bar above the diff says why. #1388 (by @caroott)
+
+### 🔄 Changed
+
+- The diff of a changed file opens page by page and loads more lines as you scroll. Files of several gigabytes now open quickly, and Swate stays responsive while it reads the rest in the background. Files with many repeated lines, such as tables with repeating rows, show each edited line on its own. #1388 (by @caroott)
+- Swate needs Git 2.42 or newer. #1388 (by @caroott)
+- The Git sidebar shows "Download Changes" (formerly "Update ARC from Online") and "Upload Changes" side by side, with More Git Actions below. #1388 (by @caroott)
+
+### 🐛 Fixed
+
+- With "Download Large Files" on, "Download Changes" also downloads missing large files when there are no online changes. #1388 (by @caroott)
 
 ## 2.4.0 - 2026-10-07
 

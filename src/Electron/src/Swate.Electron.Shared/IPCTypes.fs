@@ -120,8 +120,6 @@ type IVersionControlApi = {
     switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
     createRevision: CreateRevisionRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     restorePaths: RestorePathsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
-    getWordDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
-    getBaseContent: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     refreshSynchronization: OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
     resolveConflict:
@@ -141,6 +139,20 @@ type IVersionControlApi = {
     /// Removes a stale provider lock left by a killed process, only while no operation
     /// of this session runs, then refreshes and returns the status.
     clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
+    /// Opens a paged diff of one path. A Scanning result returns a continuation for the
+    /// next openTextDiff call. The handle belongs to the calling window.
+    openTextDiff: OpenTextDiffRequestDto -> JS.Promise<Result<OperationResultDto<ResumableOpenDto>, exn>>
+    readTextDiffPage: ReadTextDiffPageRequestDto -> JS.Promise<Result<OperationResultDto<ResumablePageDto>, exn>>
+    /// Returns an earlier page again by its page id.
+    replayTextDiffPage: ReplayTextDiffPageRequestDto -> JS.Promise<Result<OperationResultDto<DiffPageDto>, exn>>
+    /// Reveals lines of a hidden equal gap from its start or its end.
+    expandTextDiff: ExpandTextDiffRequestDto -> JS.Promise<Result<OperationResultDto<ResumablePartsDto>, exn>>
+    /// Reads a further UTF-16 slice of one long line.
+    readTextDiffLine: ReadTextDiffLineRequestDto -> JS.Promise<Result<OperationResultDto<ResumableLineDto>, exn>>
+    getTextDiffSourceInfo:
+        TextDiffHandleRequestDto -> JS.Promise<Result<OperationResultDto<DiffSourceInfoPairDto>, exn>>
+    /// Closes a diff handle. Closing a handle twice succeeds.
+    closeTextDiff: TextDiffHandleRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main

@@ -52,10 +52,6 @@ let createRevision (dto: CreateRevisionRequestDto) = call (fun () -> api.createR
 
 let restorePaths (dto: RestorePathsRequestDto) = call (fun () -> api.restorePaths dto)
 
-let getWordDiff (dto: ObjectPathRequestDto) = call (fun () -> api.getWordDiff dto)
-
-let getBaseContent (dto: ObjectPathRequestDto) = call (fun () -> api.getBaseContent dto)
-
 let refreshSynchronization (dto: OperationRequestDto) =
     call (fun () -> api.refreshSynchronization dto)
 
@@ -95,3 +91,18 @@ let getRepositoryWebUrl (dto: OperationRequestDto) =
     call (fun () -> api.getRepositoryWebUrl dto)
 
 let clearStaleLock (dto: OperationRequestDto) = call (fun () -> api.clearStaleLock dto)
+
+let openTextDiff (dto: OpenTextDiffRequestDto) = call (fun () -> api.openTextDiff dto)
+
+let readTextDiffPage (dto: ReadTextDiffPageRequestDto) =
+    call (fun () -> api.readTextDiffPage dto)
+
+let replayTextDiffPage (dto: ReplayTextDiffPageRequestDto) =
+    call (fun () -> api.replayTextDiffPage dto)
+
+let expandTextDiff (dto: ExpandTextDiffRequestDto) = call (fun () -> api.expandTextDiff dto)
+
+let readTextDiffLine (dto: ReadTextDiffLineRequestDto) =
+    call (fun () -> api.readTextDiffLine dto)
+
+let closeTextDiff (dto: TextDiffHandleRequestDto) = call (fun () -> api.closeTextDiff dto)

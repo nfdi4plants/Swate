@@ -39,6 +39,9 @@ module Virtual =
     type Virtualizer<'A, 'B> =
         member this.getVirtualItems() : VirtualItem[] = jsNative
         member this.getVirtualIndexes() : int[] = jsNative
+        /// The items as the virtualizer measured them last. They change only when the virtualizer
+        /// measures again, which getTotalSize, getVirtualItems and getVirtualItemForOffset do.
+        member this.measurementsCache: VirtualItem[] = jsNative
         member this.getTotalSize() : int = jsNative
 
         [<ParamObject(1)>]
@@ -53,9 +56,34 @@ module Virtual =
         [<ParamObject(1)>]
         member this.scrollToOffset(offset: int, ?align: AlignOption, ?behavior: ScrollBehavior) : unit = jsNative
 
+        /// The item at the offset, measured with the current sizes. None while there is no item.
+        member this.getVirtualItemForOffset(offset: float) : VirtualItem option = jsNative
+
         member this.scrollRect: {| height: int; width: int |} = jsNative
-        member this.scrollOffset: int = jsNative
+
+        /// The scroll offset the virtualizer lays rows out for. It follows the scroll events of
+        /// the scroll element.
+        member this.scrollOffset
+            with get (): float = jsNative
+            and set (_: float) = jsNative
+
         member this.measureElement: VirtualMeasureElementRef = jsNative
+
+        /// Decides whether a size change of a measured item moves the scroll position. Without a
+        /// predicate, the virtualizer moves the scroll position when the item lies above the offset.
+        member this.shouldAdjustScrollPositionOnItemSizeChange
+            with get (): System.Func<VirtualItem, float, obj, bool> option = jsNative
+            and set (_: System.Func<VirtualItem, float, obj, bool> option) = jsNative
+
+/// The part of react-dom the virtualized lists need. TanStack renders its own updates through the
+/// same function.
+[<Erase>]
+type ReactDomApi =
+
+    /// Renders the updates the callback makes before it returns, so the DOM is current when the
+    /// browser paints.
+    [<ImportMember("react-dom")>]
+    static member flushSync(callback: unit -> unit) : unit = jsNative
 
 [<Erase>]
 type Virtual =
@@ -72,6 +100,7 @@ type Virtual =
             getScrollElement: unit -> option<Browser.Types.HTMLElement>,
             estimateSize: int -> int,
             // optional
+            ?getItemKey: int -> string,
             ?scrollMargin: float,
             ?scrollPaddingStart: float,
             ?scrollPaddingEnd: float,
@@ -84,6 +113,9 @@ type Virtual =
             ?paddingEnd: int,
             ?gap: int,
             ?lanes: int,
-            ?scrollEndThreshold: int
+            ?scrollEndThreshold: int,
+            // Reports the scroll offset of the scroll element to the callback and returns the
+            // function that stops the reporting.
+            ?observeElementOffset: System.Func<obj, System.Action<float, bool>, System.Action>
         ) : Virtual.Virtualizer<obj, obj> =
         jsNative

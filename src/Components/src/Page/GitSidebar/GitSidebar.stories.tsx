@@ -22,7 +22,6 @@ const noopSelectChange = (_change: unknown) =>
 const baseCallbacks = {
   OnRefresh: noop,
   OnFetch: noop,
-  OnPull: noop,
   OnPush: noop,
   OnUpdateFromOnline: noop,
   OnPrimarySaveSelection: noopWithSelection,
@@ -34,6 +33,7 @@ const baseCallbacks = {
   OnCancelPendingRemoteAction: noop,
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
   OnSaveLfsAutoTrackThreshold: noopWithThreshold,
+  OnSaveDiffIndexingLimit: noopWithThreshold,
   OnCreateBranch: noopWithArg,
   OnSwitchBranch: noopWithBranch,
   OnSelectChange: noopSelectChange,
@@ -197,6 +197,7 @@ export const CleanRepo: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -220,6 +221,7 @@ export const CleanRepoWithoutUpstream: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -246,6 +248,7 @@ export const NotPublishedYet: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     hasRemote: false,
   },
   play: async ({ canvasElement }) => {
@@ -265,6 +268,7 @@ export const ChangedFiles: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -290,6 +294,7 @@ export const MarkedSelectionWithoutLastClickedHighlight: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -321,6 +326,7 @@ export const SlowOpenDoesNotGreyRows: Story = {
     }),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -339,20 +345,21 @@ export const AdvancedActions: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     canOpenRemoteRepository: true,
     onOpenRemoteRepository: noopOpenRemoteRepository,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeEnabled();
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeEnabled();
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeEnabled();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
-    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
-    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toBeVisible();
     await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toBeVisible();
     const downloadLargeFilesCheckbox = canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox");
@@ -377,12 +384,13 @@ export const ResponsiveActionLabels: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
+    await expect(canvas.getByTestId("GitSidebarPullButtonLabel")).toHaveClass("swt:truncate");
+    await expect(canvas.getByTestId("GitSidebarPullButtonLabel")).toHaveClass(
       "swt:@max-3xs/gitSidebar:sr-only",
     );
   },
@@ -411,6 +419,7 @@ export const ConflictsPresent: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -437,6 +446,7 @@ export const LargeChangedSet: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -477,6 +487,7 @@ export const DeletedFile: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -520,6 +531,7 @@ export const ChangeStatusIconColors: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -546,6 +558,7 @@ export const LongWrappedFile: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -567,6 +580,7 @@ export const HoverDiscardChange: Story = {
     }),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     discardSelectionSpy.mockClear();
@@ -602,6 +616,7 @@ export const BusyProgressState: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -649,6 +664,7 @@ export const CancelableUploadProgressState: Story = {
     canCancelOperation: true,
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     cancelOperationSpy.mockClear();
@@ -673,6 +689,7 @@ export const ClonePhaseProgressState: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -692,6 +709,7 @@ export const BusyNoticeState: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -709,6 +727,7 @@ export const CreateBranchModal: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -736,6 +755,7 @@ export const SwitchBranchModal: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -760,6 +780,7 @@ export const CommitComposer: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -804,6 +825,7 @@ export const RemoteActionsDisabled: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     remoteActionsEnabled: false,
     remoteActionsWarning:
       "Sign in to a DataHub account to use fetch, pull, push, or update.",
@@ -811,7 +833,8 @@ export const RemoteActionsDisabled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeDisabled();
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeDisabled();
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(
@@ -830,6 +853,7 @@ export const OpenRemoteRepositoryButton: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     canOpenRemoteRepository: true,
     onOpenRemoteRepository: openRemoteRepositorySpy,
   },
@@ -852,5 +876,46 @@ export const GlobalErrorState: Story = {
     errorNotice: "Fetch failed because the remote rejected the request.",
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
+  },
+};
+
+const saveDiffIndexingLimitSpy = fn();
+
+const diffSettingsArgs = () => ({
+  status: baseStatus,
+  changedFiles: changedFiles.slice(),
+  branchOptions: branchOptions.slice(),
+  callbacks: buildCallbacks({
+    OnSaveDiffIndexingLimit: saveDiffIndexingLimitSpy,
+  }),
+  downloadLargeFiles: true,
+  lfsAutoTrackThresholdMb: 1,
+  diffIndexingLimitMb: 1024,
+});
+
+const setNumberInput = async (input: HTMLElement, value: string) => {
+  await userEvent.clear(input);
+  await userEvent.type(input, value);
+};
+
+export const SavesADiffIndexingLimitInTheMemoryRange: Story = {
+  args: diffSettingsArgs(),
+  play: async ({ canvasElement }) => {
+    saveDiffIndexingLimitSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    const input = canvas.getByTestId("GitSidebarDiffIndexingLimitInput");
+
+    await setNumberInput(input, "0");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffIndexingLimitSaveButton"));
+    await expect(canvas.getByTestId("GitSidebarErrorNotice")).toBeVisible();
+    await expect(saveDiffIndexingLimitSpy).not.toHaveBeenCalled();
+
+    await setNumberInput(input, "8");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffIndexingLimitSaveButton"));
+    await expect(saveDiffIndexingLimitSpy).toHaveBeenCalledTimes(1);
+    await expect(saveDiffIndexingLimitSpy).toHaveBeenCalledWith(8);
   },
 };

@@ -36,11 +36,13 @@
     <Compile Include="Auth\AuthService.fs" />
     <Compile Include="VersionControl\DataHubStrategies.fs" />
     <Compile Include="VersionControl\WorkspaceBindingStore.fs" />
+    <Compile Include="VersionControl\TextDiffWorkers.fs" />
     <Compile Include="VersionControl\ProviderComposition.fs" />
     <Compile Include="VersionControl\VersionControlRuntime.fs" />
     <Compile Include="VersionControl\Mappings.fs" />
     <Compile Include="VersionControl\VersionControlSettings.fs" />
     <Compile Include="VersionControl\WorkspaceSessionHost.fs" />
+    <Compile Include="VersionControl\TextDiffHandles.fs" />
     <Compile Include="FileTreeCreator.fs" />
     <Compile Include="ArcVault\Types.fs" />
     <Compile Include="ArcVault\ArcVaultHelper.fs" />
@@ -60,6 +62,7 @@
     <Compile Include="IPC\ITemplateApi.fs" />
     <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="IPC\IUiSettingsApi.fs" />
+    <Compile Include="Workers\TextDiffWorkerEntry.fs" />
     <Compile Include="main.fs" />
     <None Include="ChokidarTest.fsx" />
   </ItemGroup>

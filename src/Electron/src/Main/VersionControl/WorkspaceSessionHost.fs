@@ -217,8 +217,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         : Async<OperationResult<unit>> =
         async {
             match VersionControlSettings.validate settings with
-            | Error reason ->
-                return Failed(OperationFailure.create Validation VersionControlCodes.InvalidLfsThreshold reason)
+            | Error(code, reason) -> return Failed(OperationFailure.create Validation code reason)
             | Ok settings ->
                 match tryFindSession workspaceRoot with
                 | None ->
@@ -351,8 +350,52 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
     /// Registers an operation before any library call so a cancel that arrives before
     /// the first progress event still lands. Each operation retains its workspace root
-    /// and window id for lock cleanup and close handling.
-    member _.BeginOperation
+    /// and window id for lock cleanup and close handling. An id that a running operation
+    /// already has is refused, so a call cannot take over the entry of another one.
+    member _.TryBeginOperation
+        (
+            operationId: string,
+            workspaceRoot: string option,
+            windowId: int option,
+            mutating: bool,
+            reportProgress: OperationProgress -> unit
+        ) : Result<TrackedOperation, OperationFailure> =
+        if operations.ContainsKey operationId then
+            Error(
+                OperationFailure.create
+                    Validation
+                    VersionControlCodes.OperationIdInUse
+                    "Another running operation has the same operation id."
+            )
+        else
+            let source = OperationCancellation.Source()
+            let mutable resolveCompletion: unit -> unit = ignore
+
+            let completion: JS.Promise<unit> =
+                JS.Constructors.Promise.Create(fun resolve _ -> resolveCompletion <- fun () -> resolve ())
+
+            operations[operationId] <- {
+                WorkspaceRoot = workspaceRoot
+                WindowId = windowId
+                Mutating = mutating
+                Source = source
+                Completion = completion
+                ResolveCompletion = fun () -> resolveCompletion ()
+            }
+
+            Ok {
+                Context = OperationContext.create operationId source.Cancellation reportProgress
+                Complete =
+                    fun () ->
+                        match operations.TryGetValue operationId with
+                        | true, running ->
+                            operations.Remove operationId |> ignore
+                            running.ResolveCompletion()
+                        | _ -> ()
+            }
+
+    /// Registers an operation whose id the main process made. A duplicate id throws.
+    member this.BeginOperation
         (
             operationId: string,
             workspaceRoot: string option,
@@ -360,36 +403,22 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             mutating: bool,
             reportProgress: OperationProgress -> unit
         ) : TrackedOperation =
-        let source = OperationCancellation.Source()
-        let mutable resolveCompletion: unit -> unit = ignore
+        match this.TryBeginOperation(operationId, workspaceRoot, windowId, mutating, reportProgress) with
+        | Ok tracked -> tracked
+        | Error failure -> failwith failure.Message
 
-        let completion: JS.Promise<unit> =
-            JS.Constructors.Promise.Create(fun resolve _ -> resolveCompletion <- fun () -> resolve ())
-
-        operations[operationId] <- {
-            WorkspaceRoot = workspaceRoot
-            WindowId = windowId
-            Mutating = mutating
-            Source = source
-            Completion = completion
-            ResolveCompletion = fun () -> resolveCompletion ()
-        }
-
-        {
-            Context = OperationContext.create operationId source.Cancellation reportProgress
-            Complete =
-                fun () ->
-                    match operations.TryGetValue operationId with
-                    | true, running ->
-                        operations.Remove operationId |> ignore
-                        running.ResolveCompletion()
-                    | _ -> ()
-        }
-
-    /// Cancels a tracked operation by its operation id.
-    member _.Cancel(operationId: string) : bool =
+    /// The window that started a running operation. Operations started outside a window
+    /// and operations that are not registered have none.
+    member _.TryGetOperationWindowId(operationId: string) : int option =
         match operations.TryGetValue operationId with
-        | true, running ->
+        | true, running -> running.WindowId
+        | _ -> None
+
+    /// Cancels a tracked operation by its operation id when the window that asks started it.
+    /// Operations started outside a window match a request without a window.
+    member _.Cancel(operationId: string, windowId: int option) : bool =
+        match operations.TryGetValue operationId with
+        | true, running when running.WindowId = windowId ->
             running.Source.Cancel()
             true
         | _ -> false
@@ -452,3 +481,12 @@ let get () : WorkspaceSessionHost =
 /// Returns the host only when one was installed. Vault lifecycle hooks use it so they
 /// can tolerate failed initialization without building a host.
 let tryCurrent () = current
+
+/// Names the window that started the operation of the context, for example "window:3".
+/// The text diff pool keeps diff handles apart per window with it. An operation without a
+/// registered window, or any call before the host exists, yields "unknown".
+let windowOwnerOf (context: OperationContext) : string =
+    tryCurrent ()
+    |> Option.bind (fun host -> host.TryGetOperationWindowId context.OperationId)
+    |> Option.map (fun windowId -> $"window:{windowId}")
+    |> Option.defaultValue "unknown"

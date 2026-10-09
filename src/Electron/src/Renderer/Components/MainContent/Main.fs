@@ -120,7 +120,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ LazyComponents.ProvenanceGroupingTarget() ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
-                    | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
+                    | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
                         GitFileChoiceConflictTarget.Main choiceData

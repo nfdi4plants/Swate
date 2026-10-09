@@ -15,6 +15,10 @@ open Swate.Electron.Shared.VersionControlTypes
 /// Large copies need time to settle before Git hashes their contents again.
 let private externalChangesRefreshDelayMs = 1500
 
+/// The background indexing limit of a session, in MiB, until the main process answers with its own.
+[<Literal>]
+let DefaultDiffIndexingLimitMb = 1024
+
 [<RequireQualifiedAccess>]
 type GitRefreshState =
     | Idle
@@ -32,6 +36,7 @@ type GitBusyOperation =
     | CommittingAllChanges
     | DiscardingSelectedChanges
     | SavingGitLfsThreshold
+    | SavingDiffIndexingLimit
     | SavingGitLfsDownloadPreference
     | CreatingBranch
     | SwitchingBranch
@@ -111,6 +116,17 @@ type GitProvisionedRemote = {
 
 type GitErrorNotification = { Title: string; Message: string }
 
+/// The automatic reopen of a diff page whose worker session ended (it sat idle or a newer diff
+/// took its slot), whose preparation token went stale, or whose side turned out not to be UTF-8
+/// and needs an encoding choice without a token. Page boundaries differ between sessions, so
+/// after the open, pages are read forward until a page reaches TargetLine, the first line the
+/// user was reading. Without a target line the reopen reads until TargetPageIndex is loaded again.
+type GitDiffReopen = {
+    Generation: int
+    TargetLine: GitDiffLinePosition option
+    TargetPageIndex: int
+}
+
 type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
@@ -130,6 +146,10 @@ type GitState = {
     PendingPublishAfterRefresh: bool
     PendingPublishForPath: string option
     LfsAutoTrackThresholdMb: int
+    /// Whole MiB. A value from 1 to 63 keeps a new diff in memory with that budget. A larger value
+    /// lets the diff use temp files, and the background indexing of an open diff stops once the
+    /// pages it read add up to this size.
+    DiffIndexingLimitMb: int
     DownloadLargeFiles: bool
     RepositoryAvailability: GitRepositoryAvailability
     RefreshState: GitRefreshState
@@ -162,6 +182,10 @@ type GitState = {
     WorkspaceVersion: string option
     ActiveConflict: ConflictSessionSummaryDto option
     Services: ServiceAvailabilityDto option
+    /// The open text diff page. The page state shows a copy, and responses apply to this one.
+    DiffPage: GitDiffPageData option
+    /// Set while the diff page reopens by itself. A failure during that reopen settles the page.
+    DiffReopen: GitDiffReopen option
 } with
 
     static member Empty = {
@@ -186,6 +210,7 @@ type GitState = {
         PendingPublishAfterRefresh = false
         PendingPublishForPath = None
         LfsAutoTrackThresholdMb = 1
+        DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
         DownloadLargeFiles = false
         RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
@@ -215,6 +240,8 @@ type GitState = {
         WorkspaceVersion = None
         ActiveConflict = None
         Services = None
+        DiffPage = None
+        DiffReopen = None
     }
 
 type GitRefreshResult = {
@@ -489,8 +516,49 @@ type private RoutedFailure =
     | UpdateAcceptanceRequired of dialog: GitSidebarConfirmationDialog * observedTarget: string
     | Error of string
 
+/// Requests of the diff page and the responses of the text diff calls. Each one names the
+/// generation of the page it belongs to.
+[<RequireQualifiedAccess>]
+type GitDiffMsg =
+    | LoadNext of generation: int
+    /// Starts the background read of every page after the loaded ones. The pages arrive one
+    /// request at a time and are evicted within the window limits, so the viewer learns the extent
+    /// of the whole diff.
+    | Index of generation: int
+    | Expand of generation: int * gapId: string * fromStart: bool
+    | LoadLineSlice of generation: int * side: DiffSideDto * line: float * offsetUtf16: float
+    /// Asks for the text in front of the displayed slice of a line, which starts at displayedStart.
+    | LoadLineBefore of generation: int * side: DiffSideDto * line: float * displayedStart: float
+    /// Asks for the rows of an evicted page. The visible pages are the pages the viewer shows
+    /// at that moment, and eviction keeps them.
+    | Replay of generation: int * pageId: string * visiblePages: string list
+    | ChooseEncoding of generation: int * side: DiffSideDto * encoding: string
+    /// The page state changed. Any page other than a diff page means the user left the diff.
+    | PageStateObserved of PageState option
+    | OpenCompleted of
+        generation: int *
+        request: OpenTextDiffRequestDto *
+        result: Result<OperationResultDto<ResumableOpenDto>, string>
+    | PageCompleted of
+        generation: int *
+        request: ReadTextDiffPageRequestDto *
+        result: Result<OperationResultDto<ResumablePageDto>, string>
+    | ReplayCompleted of
+        generation: int *
+        request: ReplayTextDiffPageRequestDto *
+        result: Result<OperationResultDto<DiffPageDto>, string>
+    | ExpandCompleted of
+        generation: int *
+        request: ExpandTextDiffRequestDto *
+        result: Result<OperationResultDto<ResumablePartsDto>, string>
+    | LineCompleted of
+        generation: int *
+        request: ReadTextDiffLineRequestDto *
+        result: Result<OperationResultDto<ResumableLineDto>, string>
+
 type Msg =
     | ResetWorkflow
+    | DiffPageMsg of GitDiffMsg
     | SetCurrentProgress of VersionControlProgressDto option
     | OperationStarted of OperationRequestDto
     | ArcPathChanged of ArcRootPath
@@ -515,9 +583,9 @@ type Msg =
         sessionId: int *
         result: Result<ConfirmMergeResolutionOutcome, ConfirmMergeResolutionError>
     | SaveLfsAutoTrackThresholdRequested of int
+    | SaveDiffIndexingLimitRequested of int
     | SaveDownloadLargeFilesRequested of bool
     | FetchRequested
-    | PullRequested
     | PushRequested
     | CancelCurrentOperationRequested
     | CancelCurrentOperationCompleted of sessionId: int * operationKey: OperationRequestDto * Result<bool, string>
@@ -551,6 +619,16 @@ type Msg =
     | WriteInstallPromptAnswered of sessionId: int * WriteRequest * componentName: string * bool
     | WriteInstallCompleted of sessionId: int * WriteRequest * Result<OperationResultDto<DependencyStatusDto>, string>
 
+/// The text diff calls of the main process, kept in one record so tests can replace them.
+type GitTextDiffClient = {
+    openTextDiff: OpenTextDiffRequestDto -> JS.Promise<Result<OperationResultDto<ResumableOpenDto>, string>>
+    readTextDiffPage: ReadTextDiffPageRequestDto -> JS.Promise<Result<OperationResultDto<ResumablePageDto>, string>>
+    replayTextDiffPage: ReplayTextDiffPageRequestDto -> JS.Promise<Result<OperationResultDto<DiffPageDto>, string>>
+    expandTextDiff: ExpandTextDiffRequestDto -> JS.Promise<Result<OperationResultDto<ResumablePartsDto>, string>>
+    readTextDiffLine: ReadTextDiffLineRequestDto -> JS.Promise<Result<OperationResultDto<ResumableLineDto>, string>>
+    closeTextDiff: TextDiffHandleRequestDto -> JS.Promise<Result<OperationResultDto<unit>, string>>
+}
+
 /// What the renderer needs from the main process. Every function returns the
 /// structured result of the library, so the workflow routes on categories and codes.
 /// Calls that can be canceled take the request with the operation id the workflow
@@ -563,8 +641,10 @@ type GitDependencies = {
     getStoragePolicySettings:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, string>>
     setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, string>>
-    loadDiffPage: GitSidebarChange -> JS.Promise<Result<PageState, string>>
     loadConflictPage: ConflictSessionSummaryDto -> string -> string -> JS.Promise<Result<PageState, string>>
+    /// Replaces the page state with the result of the function, applied to the page state the
+    /// app holds when the update runs.
+    updatePageState: (PageState option -> PageState option) -> unit
     initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
     createRemoteProject: string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
@@ -591,6 +671,7 @@ type GitDependencies = {
     pruneStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     deduplicateStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, string>>
+    textDiff: GitTextDiffClient
     hasUsableAccount: unit -> bool
     delay: int -> JS.Promise<unit>
     newOperationId: unit -> string
@@ -614,6 +695,7 @@ let busyNoticeFromOperation =
     | GitBusyOperation.CommittingAllChanges -> Some "Committing all changes"
     | GitBusyOperation.DiscardingSelectedChanges -> Some "Discarding selected changes"
     | GitBusyOperation.SavingGitLfsThreshold -> Some "Saving Git LFS threshold"
+    | GitBusyOperation.SavingDiffIndexingLimit -> Some "Saving background indexing limit"
     | GitBusyOperation.SavingGitLfsDownloadPreference -> Some "Saving Git LFS download preference"
     | GitBusyOperation.CreatingBranch -> Some "Creating branch"
     | GitBusyOperation.SwitchingBranch -> Some "Switching branch"
@@ -986,6 +1068,9 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
                 LfsAutoTrackThresholdMb =
                     settings.AutoPolicyThresholdMb
                     |> Option.defaultValue GitState.Empty.LfsAutoTrackThresholdMb
+                DiffIndexingLimitMb =
+                    settings.DiffIndexingLimitMb
+                    |> Option.defaultValue GitState.Empty.DiffIndexingLimitMb
                 DownloadLargeFiles = settings.MaterializeLargeObjects
           }
         | Error _ -> modelWithBranches
@@ -1048,10 +1133,12 @@ let buildUpdatedLfsSettings
     (state: GitState)
     (thresholdMb: int option)
     (downloadLargeFiles: bool option)
+    (diffIndexingLimitMb: int option)
     : StoragePolicySettingsDto =
     {
         AutoPolicyThresholdMb = Some(thresholdMb |> Option.defaultValue state.LfsAutoTrackThresholdMb)
         MaterializeLargeObjects = downloadLargeFiles |> Option.defaultValue state.DownloadLargeFiles
+        DiffIndexingLimitMb = Some(diffIndexingLimitMb |> Option.defaultValue state.DiffIndexingLimitMb)
     }
 
 /// Resolves a caller-provided reply callback synchronously when the command runs.
@@ -1083,6 +1170,7 @@ let private titleForWriteRequest =
     | CommitSelection _
     | CommitAll _ -> "Could not commit changes"
     | DiscardSelection _ -> "Could not discard changes"
+    | SaveLfsSettings(GitBusyOperation.SavingDiffIndexingLimit, _) -> "Could not save the background indexing limit"
     | SaveLfsSettings _ -> "Could not save Git LFS settings"
     | PruneLfsCache -> "Could not clean Git LFS cache"
     | DedupLfsStorage -> "Could not reduce Git LFS storage"
@@ -1136,6 +1224,7 @@ let private transportFailure (message: string) : OperationFailureDto = {
     RecoveryAction = None
     Details = [||]
     RevisionEvidence = [||]
+    DiffDetail = None
 }
 
 /// Flattens the transport error and the structured result: Ok carries the outcome and
@@ -1217,172 +1306,1710 @@ let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = p
     | Ok _ -> return Ok()
 }
 
-/// Builds the diff page from the provider's base content and word diff plus the
-/// current file. Exposed with its readers as parameters so the tests can drive it.
-module GitDiffPageLoader =
-
-    let private unsupportedPage (path: string) (reason: string option) =
-        Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
-
-    let private lfsPointerVersionLine = "version https://git-lfs.github.com/spec/v1"
-
-    let private lfsPointerOidPattern =
-        System.Text.RegularExpressions.Regex("^oid sha256:[0-9a-f]{64}$")
-
-    let private lfsPointerSizePattern =
-        System.Text.RegularExpressions.Regex("^size [0-9]+$")
-
-    let private lfsPointerExtensionPattern =
-        // git-lfs checks only that an extension key starts with ext-<digit>-<word character>.
-        System.Text.RegularExpressions.Regex(@"^ext-[0-9]+-\w\S* .+$")
-
-    /// True when the text is a Git LFS pointer file: the version line first, then one oid line and
-    /// one size line, with optional `ext-` lines. The provider returns the pointer as the base
-    /// content when it does not read the previous version's object, for example because the object
-    /// is missing locally or exceeds the provider's base diff size limit.
-    let isLfsPointerText (text: string) =
-        // Git LFS never writes a pointer of 1024 bytes or more.
-        if isNull text || text.Length >= 1024 then
-            false
-        else
-            let lines = text.Replace("\r\n", "\n").TrimEnd('\n').Split('\n')
-
-            match List.ofArray lines with
-            | version :: rest when version = lfsPointerVersionLine ->
-                let oidLines = rest |> List.filter lfsPointerOidPattern.IsMatch
-                let sizeLines = rest |> List.filter lfsPointerSizePattern.IsMatch
-                let extensionLines = rest |> List.filter lfsPointerExtensionPattern.IsMatch
-
-                oidLines.Length = 1
-                && sizeLines.Length = 1
-                && oidLines.Length + sizeLines.Length + extensionLines.Length = rest.Length
-            | _ -> false
-
-    let private lfsPointerBaseReason (path: string) =
-        Some $"The previous version of the Git LFS file '{path}' cannot be shown here."
-
-    let private contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
-        match result with
-        | Error message -> Error message
-        | Ok(OperationResultDto.Failed failure) when failure.Category = FailureCategoryDto.Unsupported ->
-            Ok(ContentViewDto.Unsupported(Some failure.Message))
-        | Ok(OperationResultDto.Failed failure) -> Error(failureMessage failure)
-        | Ok result ->
-            OperationResultDto.tryValue result
-            |> Option.defaultValue (ContentViewDto.Unsupported None)
-            |> Ok
-
-    /// An added file has no committed base and a deleted file has no current content.
-    /// Either side is shown as empty text. A change with neither side is an error.
-    let load
-        (getBaseContent: string -> JS.Promise<Result<OperationResultDto<ContentViewDto>, string>>)
-        (getWordDiff: string -> JS.Promise<Result<OperationResultDto<ContentViewDto>, string>>)
-        (readCurrentContent: string -> JS.Promise<Result<string, string>>)
-        (change: GitSidebarChange)
-        : JS.Promise<Result<PageState, string>> =
-        promise {
-            let requestedPath = change.Path
-            let isDeleted = change.IndexStatus = "D" || change.WorkingTreeStatus = "D"
-            let! baseContent = getBaseContent requestedPath
-
-            let baseView =
-                match baseContent with
-                | Ok(OperationResultDto.Failed failure) when failure.Code = VersionControlCodes.BaseContentNotFound ->
-                    Ok None
-                | other -> contentOf other |> Result.map Some
-
-            // A pointer as the base means the provider did not read the previous version's object.
-            // Comparing the pointer text with the current bytes would show a false diff, so the loader opens the unsupported page.
-            let baseUnsupportedReason =
-                match baseView with
-                | Ok(Some(ContentViewDto.Unsupported reason)) -> Some reason
-                | Ok(Some(ContentViewDto.Text text)) when isLfsPointerText text ->
-                    Some(lfsPointerBaseReason requestedPath)
-                | _ -> None
-
-            // A promise block does not stop at a `return` inside an `if` without `else`, so the
-            // comparison is a separate step that only runs when the base can be shown.
-            let loadComparison () = promise {
-                let! wordDiff = getWordDiff requestedPath
-
-                let! currentContent =
-                    if isDeleted then
-                        promise { return Ok None }
-                    else
-                        promise {
-                            let! content = readCurrentContent requestedPath
-                            return content |> Result.map Some
-                        }
-
-                return baseView, wordDiff, currentContent
-            }
-
-            match baseUnsupportedReason with
-            | Some reason -> return unsupportedPage requestedPath reason
-            | None ->
-                let! baseView, wordDiff, currentContent = loadComparison ()
-
-                match baseView, contentOf wordDiff with
-                | Error message, _
-                | _, Error message -> return Error message
-                | Ok(Some(ContentViewDto.Unsupported reason)), _
-                | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-                | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
-                    let previousText =
-                        match previous with
-                        | Some(ContentViewDto.Text text) -> Some text
-                        | _ -> None
-
-                    match currentContent with
-                    | Error message ->
-                        return Error $"Could not read the current content of '{requestedPath}': {message}"
-                    | Ok None when previousText.IsNone ->
-                        return Error $"'{requestedPath}' has no content on either side of the diff."
-                    | Ok current ->
-                        return
-                            Ok(
-                                PageState.GitDiffPage {
-                                    Path = requestedPath
-                                    PreviousContent = previousText |> Option.defaultValue ""
-                                    CurrentContent = current |> Option.defaultValue ""
-                                    ChangeKind =
-                                        match previousText, current with
-                                        | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
-                                        | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
-                                        | _ -> None
-                                    WordDiffText = wordDiffText
-                                }
-                            )
-        }
-
 let private loadPageAsync
     (deps: GitDependencies)
     (activeConflict: ConflictSessionSummaryDto option)
     (workspaceVersion: string option)
     (change: GitSidebarChange)
     =
-    promise {
-        let path = change.Path
+    if not change.IsConflicted then
+        promise { return Ok GitPageChange.NoChange }
+    else
+        promise {
+            let path = change.Path
 
-        let! result =
-            match change.IsConflicted, activeConflict, workspaceVersion with
-            | true, Some conflict, Some version -> deps.loadConflictPage conflict version path
-            | true, _, _ -> promise {
-                // The status says the path conflicts but the session is not in the model: reload it
-                // together with a fresh token, so the page carries the state the user reviews.
+            match activeConflict, workspaceVersion with
+            | Some conflict, Some version ->
+                let! page = deps.loadConflictPage conflict version path
+                return page |> Result.map GitPageChange.Set
+            | _ ->
                 let! status = toResult (deps.getStatus (request deps))
 
                 match status with
                 | Ok(outcome, _) ->
                     match outcome.Value.ActiveConflictSession with
-                    | Some conflict -> return! deps.loadConflictPage conflict outcome.Value.WorkspaceVersion path
-                    | None -> return! deps.loadDiffPage change
+                    | Some conflict ->
+                        let! page = deps.loadConflictPage conflict outcome.Value.WorkspaceVersion path
+                        return page |> Result.map GitPageChange.Set
+                    | None -> return Ok GitPageChange.NoChange
                 | Error failure -> return Error(failureMessage failure)
-              }
-            | false, _, _ -> deps.loadDiffPage change
+        }
 
-        return result |> Result.map GitPageChange.Set
+/// Opens a text diff of one changed file and pages through it. Every response carries the
+/// generation of the page it was requested for. A response for a page that was left or
+/// replaced is dropped, and a handle that arrives for such a page is closed at once.
+module GitDiffPageLoader =
+
+    module Paged = Swate.Components.Page.GitComparison.GitPagedDiffTypes
+    module Presentation = Renderer.GitDiffPresentation
+
+    [<Literal>]
+    let MaxLoadedPages = 8
+
+    /// The time background page arrivals wait before the viewer shows them. The arrivals in that
+    /// time show as one update.
+    [<Literal>]
+    let PublishCoalesceMs = 100
+
+    /// The size limit of the loaded pages. Sizes are JSON lengths in UTF-16 code units, which
+    /// match bytes for ASCII text.
+    let MaxLoadedBytes = 8.0 * 1024.0 * 1024.0
+
+    [<Literal>]
+    let ContextLines = 3
+
+    [<Literal>]
+    let ExpandLineCount = 100
+
+    [<Literal>]
+    let LineSliceUtf16 = 8192
+
+    // Failure codes of the text diff calls, produced by the library.
+
+    /// The temp drive has less free space than the reserve. The session stays open, replays keep
+    /// working, and a later request may succeed.
+    [<Literal>]
+    let DiffTempSpaceLow = "diff_temp_space_low"
+
+    /// A memory diff refused a read or a write because of its budget. The session stays open and
+    /// replays keep working.
+    [<Literal>]
+    let DiffMemoryBudgetReached = "diff_memory_budget_reached"
+
+    [<Literal>]
+    let DiffContentNotText = "diff_content_not_text"
+
+    [<Literal>]
+    let SourceChanged = "source_changed"
+
+    [<Literal>]
+    let DiffWorkerFailed = "diff_worker_failed"
+
+    /// The worker closed the session behind the handle, after it sat idle or when a newer diff took
+    /// its slot.
+    [<Literal>]
+    let DiffSessionClosed = "diff_session_closed"
+
+    /// The worker dropped the suspended read that the continuation belongs to.
+    [<Literal>]
+    let ContinuationMismatch = "continuation_mismatch"
+
+    /// The preparation token of an encoding choice expired or no longer matches the sources.
+    [<Literal>]
+    let PreparationMismatch = "preparation_mismatch"
+
+    /// A side the library read as UTF-8 holds bytes that are not UTF-8 further on. DiffDetail
+    /// names the side.
+    [<Literal>]
+    let DiffEncodingMismatch = "diff_encoding_mismatch"
+
+    /// The encodings offered for a side that turned out not to be UTF-8. The library sends no
+    /// preview for them.
+    let private mismatchCandidates: EncodingCandidateDto[] = [|
+        { Encoding = "utf-8"; Preview = "" }
+        {
+            Encoding = "windows-1252"
+            Preview = ""
+        }
+    |]
+
+    let changeKindOf (change: GitSidebarChange) =
+        match change.IndexStatus with
+        | "A" -> Paged.GitDiffChangeKind.Added
+        | "D" -> Paged.GitDiffChangeKind.Deleted
+        | _ -> Paged.GitDiffChangeKind.Modified
+
+    /// The size a DTO takes on the wire, measured as the length of its JSON in UTF-16 code units.
+    let private payloadBytes (value: obj) = float (JS.JSON.stringify value).Length
+
+    /// A page in one of these states shows only a status message and takes no further requests.
+    let private isSettled (status: GitDiffPageStatus) =
+        match status with
+        | GitDiffPageStatus.Blocked _
+        | GitDiffPageStatus.SourceChanged
+        | GitDiffPageStatus.WorkerFailed _
+        | GitDiffPageStatus.Failed _ -> true
+        | _ -> false
+
+    let private isReopening (status: GitDiffPageStatus) =
+        match status with
+        | GitDiffPageStatus.Reopening _ -> true
+        | _ -> false
+
+    let failureStatus (failure: OperationFailureDto) =
+        match failure.Code, failure.DiffDetail with
+        | DiffContentNotText, detail ->
+            GitDiffPageStatus.Blocked(
+                detail |> Option.map _.Side,
+                GitDiffBlockReason.NotText(detail |> Option.map _.Evidence |> Option.defaultValue "")
+            )
+        | SourceChanged, _ -> GitDiffPageStatus.SourceChanged
+        | DiffWorkerFailed, _ -> GitDiffPageStatus.WorkerFailed(failureMessage failure)
+        | DiffEncodingMismatch, Some detail -> GitDiffPageStatus.EncodingChoice(detail.Side, None, mismatchCandidates)
+        // A session without a text diff service answers every diff call this way.
+        | VersionControlCodes.ServiceUnavailable, _ ->
+            GitDiffPageStatus.Blocked(None, GitDiffBlockReason.ProviderUnsupported)
+        | _ -> GitDiffPageStatus.Failed(failureMessage failure)
+
+    /// Statuses that end the diff when a request on the shown rows fails with them. Any other
+    /// failure of an expansion, a line slice or a replay stays with the control that asked.
+    let private endsDiff (status: GitDiffPageStatus) =
+        match status with
+        | GitDiffPageStatus.SourceChanged
+        | GitDiffPageStatus.Blocked _
+        | GitDiffPageStatus.EncodingChoice _
+        | GitDiffPageStatus.WorkerFailed _ -> true
+        | _ -> false
+
+    let private valueOf (result: Result<OperationResultDto<'T>, string>) : Result<'T, GitDiffPageStatus> =
+        match result with
+        | Error message -> Error(GitDiffPageStatus.Failed message)
+        | Ok(OperationResultDto.Succeeded outcome) -> Ok outcome.Value
+        | Ok(OperationResultDto.PartiallySucceeded(outcome, _)) -> Ok outcome.Value
+        | Ok(OperationResultDto.Failed failure) -> Error(failureStatus failure)
+
+    let blockedStatus (blocker: DiffBlockerDto) =
+        match blocker with
+        | DiffBlockerDto.Binary(side, evidence) ->
+            GitDiffPageStatus.Blocked(Some side, GitDiffBlockReason.Binary evidence)
+        | DiffBlockerDto.LocalContentUnavailable(side, objectId) ->
+            GitDiffPageStatus.Blocked(Some side, GitDiffBlockReason.LocalContentUnavailable objectId)
+        | DiffBlockerDto.NotRegularFile side -> GitDiffPageStatus.Blocked(Some side, GitDiffBlockReason.NotRegularFile)
+        | DiffBlockerDto.ProviderUnsupported -> GitDiffPageStatus.Blocked(None, GitDiffBlockReason.ProviderUnsupported)
+        | DiffBlockerDto.BlobTooLargeForMemory(side, blobBytes, limitBytes, cause) ->
+            GitDiffPageStatus.Blocked(
+                Some side,
+                GitDiffBlockReason.TooLargeForMemory(
+                    Presentation.number blobBytes,
+                    Presentation.number limitBytes,
+                    cause
+                )
+            )
+        | DiffBlockerDto.EncodingRequired(side, token, candidates) ->
+            GitDiffPageStatus.EncodingChoice(side, Some token, candidates)
+
+    /// Shows the page the user just selected.
+    let publishCmd (setPageState: PageState option -> unit) (page: GitDiffPageData) : Cmd<Msg> = [
+        fun _ -> setPageState (Some(PageState.GitDiffPage page))
+    ]
+
+    /// Shows the updated page only while the page state still shows this diff. An answer that
+    /// arrives after the user went to another page leaves that page in place.
+    let private publishShown (deps: GitDependencies) (page: GitDiffPageData) =
+        deps.updatePageState (fun current ->
+            match current with
+            | Some(PageState.GitDiffPage shown) when shown.Generation = page.Generation ->
+                Some(PageState.GitDiffPage page)
+            | other -> other
+        )
+
+    /// The page the delayed publish of background arrivals shows. It is set while a publish is waiting.
+    let mutable private pendingPublish: GitDiffPageData option = None
+
+    /// Shows the page at once. A delayed publish that waits is older than this page and drops out.
+    let private publishNowCmd (deps: GitDependencies) (page: GitDiffPageData) : Cmd<Msg> = [
+        fun _ ->
+            pendingPublish <- None
+            publishShown deps page
+    ]
+
+    /// Shows the page after PublishCoalesceMs. The pages that arrive in the meantime replace it, so
+    /// background arrivals that follow each other render the viewer once.
+    let private publishLaterCmd (deps: GitDependencies) (page: GitDiffPageData) : Cmd<Msg> = [
+        fun _ ->
+            let waiting = pendingPublish.IsSome
+            pendingPublish <- Some page
+
+            if not waiting then
+                deps.delay PublishCoalesceMs
+                |> Promise.iter (fun () ->
+                    match pendingPublish with
+                    | Some latest ->
+                        pendingPublish <- None
+                        publishShown deps latest
+                    | None -> ()
+                )
+    ]
+
+    let private send
+        (call: 'Request -> JS.Promise<Result<'T, string>>)
+        (request: 'Request)
+        (toMsg: 'Request -> Result<'T, string> -> GitDiffMsg)
+        : Cmd<Msg> =
+        Cmd.OfPromise.either
+            call
+            request
+            (fun result -> DiffPageMsg(toMsg request result))
+            (fun error -> DiffPageMsg(toMsg request (Error error.Message)))
+
+    let private track (operationId: string) (page: GitDiffPageData) = {
+        page with
+            RunningOperations = operationId :: page.RunningOperations
     }
+
+    let private finish (operationId: string) (page: GitDiffPageData) = {
+        page with
+            RunningOperations = page.RunningOperations |> List.filter (fun running -> running <> operationId)
+    }
+
+    /// Closes a handle nobody uses any more. Nothing waits for the answer, so errors are ignored.
+    let private closeHandle (deps: GitDependencies) (handle: DiffHandleDto) =
+        deps.textDiff.closeTextDiff {
+            OperationId = deps.newOperationId ()
+            HandleId = handle.Id
+            HandleVersion = handle.Version
+        }
+        |> Promise.catch (fun error -> Error error.Message)
+        |> Promise.start
+
+    let private closeHandleCmd (deps: GitDependencies) (handle: DiffHandleDto) : Cmd<Msg> = [
+        fun _ -> closeHandle deps handle
+    ]
+
+    /// Cancels the running requests of a page that was left and closes its handle. Nothing
+    /// waits for either answer, so errors are ignored.
+    let closeCmd (deps: GitDependencies) (page: GitDiffPageData) : Cmd<Msg> = [
+        for operationId in page.RunningOperations do
+            fun _ ->
+                deps.cancelOperation { OperationId = operationId }
+                |> Promise.catch (fun error -> Error error.Message)
+                |> Promise.start
+        match page.Handle with
+        | Some handle -> yield! closeHandleCmd deps handle
+        | None -> ()
+    ]
+
+    let private sendOpen (deps: GitDependencies) (page: GitDiffPageData) (request: OpenTextDiffRequestDto) =
+        track request.OperationId page,
+        send
+            deps.textDiff.openTextDiff
+            request
+            (fun request result -> GitDiffMsg.OpenCompleted(page.Generation, request, result))
+
+    let private openFresh (deps: GitDependencies) (page: GitDiffPageData) (preparationTokenId: string option) =
+        sendOpen deps page {
+            OperationId = deps.newOperationId ()
+            Path = page.Path
+            PreviousPath = page.PreviousPath
+            PreparationTokenId = preparationTokenId
+            PreviousEncoding = page.PreviousEncoding
+            CurrentEncoding = page.CurrentEncoding
+            ContextLines = ContextLines
+            Continuation = None
+        }
+
+    /// A diff page for the change that is still opening, and the command that opens it.
+    let start (deps: GitDependencies) (generation: int) (change: GitSidebarChange) =
+        let page: GitDiffPageData = {
+            Path = change.Path
+            PreviousPath = change.OriginalPath
+            ChangeKind = Some(changeKindOf change)
+            Generation = generation
+            Handle = None
+            SourceInfos = None
+            Pages = [||]
+            RequestedPageIndex = 0
+            NextCursor = None
+            NextRequest = None
+            PendingLineSlices = []
+            RestartedLineSlices = []
+            ExpandingGaps = []
+            PendingReplay = None
+            VisiblePages = []
+            KeepRequestedPage = false
+            Indexing = false
+            IndexingPaused = false
+            JournalBytes = 0.0
+            Storage = None
+            Stop = None
+            FailureCause = None
+            NextFailed = false
+            NextFailure = None
+            FailedGaps = []
+            FailedLineSlices = []
+            FailedReplays = []
+            Progress = None
+            Pending = None
+            OutputComplete = false
+            Status = GitDiffPageStatus.Opening
+            PreviousEncoding = None
+            CurrentEncoding = None
+            RunningOperations = []
+            ScrollTarget = None
+        }
+
+        openFresh deps page None
+
+    let private evictedCopy (windowPage: GitDiffWindowPage) = {
+        windowPage with
+            Parts = [|
+                Paged.PagedPart.EvictedPage(windowPage.PageId, windowPage.RowCount)
+            |]
+            PayloadBytes = 0.0
+            IsEvicted = true
+            ExpandedGaps = []
+    }
+
+    /// Puts the rows of the least recently expanded gap of the page back as a hidden gap with
+    /// that gap's id. Gaps the expansion returned stay where they are.
+    let private collapseOldestGap (windowPage: GitDiffWindowPage) =
+        match windowPage.ExpandedGaps with
+        | [] -> windowPage
+        | oldest :: rest ->
+            let parts =
+                windowPage.Parts
+                |> Array.map (fun part ->
+                    match part with
+                    | Paged.PagedPart.ExpandedRows(gapId, _) when gapId = oldest.GapId ->
+                        Paged.PagedPart.HiddenGap(oldest.GapId, oldest.Previous, oldest.Current)
+                    | _ -> part
+                )
+
+            {
+                windowPage with
+                    Parts = parts
+                    PayloadBytes = windowPage.PayloadBytes - oldest.PayloadBytes
+                    ExpandedGaps = rest
+            }
+
+    /// Replaces the loaded pages farthest from the requested page by placeholders until the
+    /// window holds at most MaxLoadedPages pages and MaxLoadedBytes, measured as JSON length in
+    /// UTF-16 code units. The requested page stays, and so do the pages the viewer showed at the
+    /// last replay request while the requested page is one of them, even when they alone exceed
+    /// the limits. When the requested page alone still exceeds MaxLoadedBytes, the rows of its
+    /// least recently expanded gaps collapse. The newest expansion stays, since the user just
+    /// asked for it. While the diff reopens, the page the new session read last stays as well,
+    /// since its pages can hold fewer lines and the page with the target line can land far from
+    /// the requested page.
+    let evict (page: GitDiffPageData) : GitDiffPageData =
+        let anchor = page.RequestedPageIndex
+
+        let lastRead =
+            match page.Status with
+            | GitDiffPageStatus.Reopening pagesRead when pagesRead > 0 -> Some(pagesRead - 1)
+            | _ -> None
+
+        // Once the requested page moves away from the pages of the last replay request, those
+        // pages are no longer on screen.
+        let visiblePages =
+            match page.Pages |> Array.tryItem anchor with
+            | Some anchorPage when page.VisiblePages |> List.contains anchorPage.PageId -> page.VisiblePages
+            | _ -> []
+
+        // A diff has thousands of evicted pages and a few loaded ones. The loaded pages are found
+        // in one pass, and the array is copied only when a page changes.
+        let loadedIndices = ResizeArray<int>()
+        let mutable loadedBytes = 0.0
+
+        for index in 0 .. page.Pages.Length - 1 do
+            let windowPage = page.Pages.[index]
+
+            if not windowPage.IsEvicted then
+                loadedIndices.Add index
+                loadedBytes <- loadedBytes + windowPage.PayloadBytes
+
+        let pages = ref page.Pages
+        let copied = ref false
+
+        let changePage (index: int) (changed: GitDiffWindowPage) =
+            if not copied.Value then
+                pages.Value <- Array.copy pages.Value
+                copied.Value <- true
+
+            pages.Value.[index] <- changed
+
+        let mutable evicting = true
+
+        while evicting do
+            if loadedIndices.Count > MaxLoadedPages || loadedBytes > MaxLoadedBytes then
+                // The loaded page farthest from the requested one goes first, the lowest index on a tie.
+                let mutable victim = -1
+                let mutable farthest = -1
+
+                for index in loadedIndices do
+                    if
+                        abs (index - anchor) > farthest
+                        && index <> anchor
+                        && Some index <> lastRead
+                        && not (visiblePages |> List.contains pages.Value.[index].PageId)
+                    then
+                        victim <- index
+                        farthest <- abs (index - anchor)
+
+                if victim < 0 then
+                    evicting <- false
+                else
+                    loadedBytes <- loadedBytes - pages.Value.[victim].PayloadBytes
+                    loadedIndices.Remove victim |> ignore
+                    changePage victim (evictedCopy pages.Value.[victim])
+            else
+                evicting <- false
+
+        let otherBytes =
+            loadedIndices
+            |> Seq.sumBy (fun index ->
+                if index <> anchor then
+                    pages.Value.[index].PayloadBytes
+                else
+                    0.0
+            )
+
+        let rec collapse (windowPage: GitDiffWindowPage) =
+            if
+                not windowPage.IsEvicted
+                && otherBytes + windowPage.PayloadBytes > MaxLoadedBytes
+                && windowPage.ExpandedGaps.Length > 1
+            then
+                collapse (collapseOldestGap windowPage)
+            else
+                windowPage
+
+        if anchor >= 0 && anchor < pages.Value.Length then
+            let collapsed = collapse pages.Value.[anchor]
+
+            if not (obj.ReferenceEquals(collapsed, pages.Value.[anchor])) then
+                changePage anchor collapsed
+
+        { page with Pages = pages.Value }
+
+    let private position (side: DiffSideDto) (number: float) : GitDiffLinePosition = { Side = side; Number = number }
+
+    /// The lines a part shows on one side. A gap and an evicted page show none.
+    let private linesOnSide (side: Paged.PagedDiffSide) (part: Paged.PagedPart) : Paged.PagedLine[] =
+        match part with
+        | Paged.PagedPart.HunkRows(_, _, _, _, _, rows)
+        | Paged.PagedPart.ExpandedRows(_, rows) ->
+            rows
+            |> Array.choose (fun row ->
+                match side with
+                | Paged.PagedDiffSide.Previous -> row.Previous
+                | Paged.PagedDiffSide.Current -> row.Current
+            )
+        | Paged.PagedPart.UnalignedRegion(_, previous, current, _, _) ->
+            match side with
+            | Paged.PagedDiffSide.Previous -> previous
+            | Paged.PagedDiffSide.Current -> current
+        | Paged.PagedPart.HiddenGap _
+        | Paged.PagedPart.EvictedPage _ -> [||]
+
+    /// The first line of the parts and the last line number on each side. A hidden gap covers
+    /// the lines of its ranges.
+    let private spanOf (parts: Paged.PagedPart[]) : GitDiffPageSpan =
+        let firstOf (previous: Paged.PagedLine option) (current: Paged.PagedLine option) =
+            match previous, current with
+            | Some line, _ -> Some(position DiffSideDto.Previous line.Number)
+            | None, Some line -> Some(position DiffSideDto.Current line.Number)
+            | None, None -> None
+
+        let first =
+            parts
+            |> Array.tryPick (
+                function
+                | Paged.PagedPart.HunkRows(_, _, _, _, _, rows)
+                | Paged.PagedPart.ExpandedRows(_, rows) ->
+                    rows |> Array.tryPick (fun row -> firstOf row.Previous row.Current)
+                | Paged.PagedPart.UnalignedRegion(_, previous, current, _, _) ->
+                    firstOf (Array.tryHead previous) (Array.tryHead current)
+                | Paged.PagedPart.HiddenGap(_, previous, current) ->
+                    if previous.Count > 0.0 then
+                        Some(position DiffSideDto.Previous previous.Start)
+                    elif current.Count > 0.0 then
+                        Some(position DiffSideDto.Current current.Start)
+                    else
+                        None
+                | Paged.PagedPart.EvictedPage _ -> None
+            )
+
+        let lastOn (side: Paged.PagedDiffSide) =
+            let numbers =
+                parts
+                |> Array.collect (
+                    function
+                    | Paged.PagedPart.HiddenGap(_, previous, current) ->
+                        let range =
+                            match side with
+                            | Paged.PagedDiffSide.Previous -> previous
+                            | Paged.PagedDiffSide.Current -> current
+
+                        if range.Count > 0.0 then
+                            [| range.Start + range.Count - 1.0 |]
+                        else
+                            [||]
+                    | part -> linesOnSide side part |> Array.map _.Number
+                )
+
+            if numbers.Length = 0 then None else Some(Array.max numbers)
+
+        {
+            First = first
+            LastPrevious = lastOn Paged.PagedDiffSide.Previous
+            LastCurrent = lastOn Paged.PagedDiffSide.Current
+        }
+
+    /// Whether the page shows the line or a later line of the same side.
+    let private reaches (line: GitDiffLinePosition) (windowPage: GitDiffWindowPage) =
+        let last =
+            match line.Side with
+            | DiffSideDto.Previous -> windowPage.Span.LastPrevious
+            | DiffSideDto.Current -> windowPage.Span.LastCurrent
+
+        last |> Option.exists (fun number -> number >= line.Number)
+
+    /// The page of the DTO. The JSON of the DTO is passed in, since the caller may need it too.
+    let private windowPageOfJson (dto: DiffPageDto) (json: string) : GitDiffWindowPage =
+        let parts = dto.Parts |> Array.map Presentation.part
+
+        {
+            PageId = dto.PageId
+            Parts = parts
+            RowCount = Paged.displayRowCount parts
+            PayloadBytes = float json.Length
+            IsEvicted = false
+            ExpandedGaps = []
+            Span = spanOf parts
+        }
+
+    let private windowPage (dto: DiffPageDto) : GitDiffWindowPage =
+        windowPageOfJson dto (JS.JSON.stringify dto)
+
+    /// The size of the JSON in UTF-8 bytes. The encoding runs through the TextEncoder of the runtime.
+    let private utf8Bytes (json: string) =
+        float (System.Text.Encoding.UTF8.GetBytes json).Length
+
+    /// Whether the pages the session answered add up to the limit of the background indexing. A
+    /// memory diff has its own budget, so the limit does not apply to it.
+    let indexingLimitReached (limitMb: int) (page: GitDiffPageData) =
+        match page.Storage with
+        | Some(DiffStorageDto.InMemory _) -> false
+        | _ -> page.JournalBytes >= float limitMb * 1024.0 * 1024.0
+
+    /// The library refused the request because of where the diff keeps its data. The session stays
+    /// usable, so the refusal is not a failure of the diff.
+    let private refusalOf (result: Result<OperationResultDto<'T>, string>) : GitDiffStop option =
+        match result with
+        | Ok(OperationResultDto.Failed failure) ->
+            match failure.Code with
+            | DiffTempSpaceLow -> Some GitDiffStop.TempSpaceLow
+            | DiffMemoryBudgetReached -> Some GitDiffStop.MemoryBudget
+            | _ -> None
+        | _ -> None
+
+    /// The blocked page of an open that a refusal ended before any row was read.
+    let private refusedStatus (refusal: GitDiffStop) =
+        match refusal with
+        | GitDiffStop.TempSpaceLow -> GitDiffPageStatus.Blocked(None, GitDiffBlockReason.TempSpaceLow)
+        | _ -> GitDiffPageStatus.Blocked(None, GitDiffBlockReason.MemoryBudgetReached)
+
+    /// Records the refusal of a read and ends the indexing. The rows and the cursor stay. The
+    /// continue button can ask again after a low-space stop and after the 3/4 background stop of a
+    /// memory diff, which leaves the rest of the budget for the user. It cannot ask again at the
+    /// full budget, and that stop stays.
+    let private stopReading (background: bool) (refusal: GitDiffStop) (page: GitDiffPageData) =
+        let stop =
+            match refusal, page.Stop with
+            | _, Some GitDiffStop.MemoryBudget -> GitDiffStop.MemoryBudget
+            | GitDiffStop.MemoryBudget, _ when background -> GitDiffStop.MemoryShareUsed
+            | _ -> refusal
+
+        {
+            page with
+                Status =
+                    match page.Status with
+                    | GitDiffPageStatus.LoadingNext -> GitDiffPageStatus.Ready
+                    | status -> status
+                Indexing = false
+                Stop = Some stop
+        }
+
+    /// Requests the page at the cursor, unless that cursor is already being read. The request
+    /// remembers whether the background indexing sent it.
+    let private readPage (deps: GitDependencies) (page: GitDiffPageData) (cursor: string) (background: bool) =
+        match page.Handle, page.NextRequest with
+        | None, _ -> page, Cmd.none
+        | Some _, Some running when running.Cursor = cursor -> page, Cmd.none
+        | Some handle, _ ->
+            let request: ReadTextDiffPageRequestDto = {
+                OperationId = deps.newOperationId ()
+                HandleId = handle.Id
+                HandleVersion = handle.Version
+                Cursor = cursor
+                Background = background
+            }
+
+            track request.OperationId {
+                page with
+                    NextRequest =
+                        Some {
+                            Cursor = cursor
+                            OperationId = request.OperationId
+                            Background = background
+                        }
+            },
+            send
+                deps.textDiff.readTextDiffPage
+                request
+                (fun request result -> GitDiffMsg.PageCompleted(page.Generation, request, result))
+
+    /// A Ready page joins the window once. A page id that is already in the window is ignored.
+    /// While the diff reopens, the page takes the place of the old page at the same index, and
+    /// the requested page stays where the user was.
+    /// A Scanning result keeps its continuation as the cursor and asks for the page again with it.
+    /// The continuation belongs to the background indexing when the read that answered did.
+    let private applyResumablePage
+        (deps: GitDependencies)
+        (page: GitDiffPageData)
+        (background: bool)
+        (result: ResumablePageDto)
+        =
+        // While the diff reopens, only the pages the new session has read count as read.
+        let readPages =
+            match page.Status with
+            | GitDiffPageStatus.Reopening pagesRead -> page.Pages |> Array.truncate pagesRead
+            | _ -> page.Pages
+
+        match result with
+        | ResumablePageDto.Ready dto when readPages |> Array.exists (fun windowPage -> windowPage.PageId = dto.PageId) ->
+            let status =
+                match page.Status with
+                | GitDiffPageStatus.LoadingNext when page.NextRequest.IsNone -> GitDiffPageStatus.Ready
+                | status -> status
+
+            { page with Status = status }, Cmd.none
+        | ResumablePageDto.Ready dto ->
+            // The JSON is made once and gives both sizes of the page.
+            let json = JS.JSON.stringify dto
+            let arrived = windowPageOfJson dto json
+
+            let pages, requestedPageIndex, status =
+                match page.Status with
+                | GitDiffPageStatus.Reopening pagesRead when pagesRead < page.Pages.Length ->
+                    page.Pages |> Array.updateAt pagesRead arrived,
+                    page.RequestedPageIndex,
+                    GitDiffPageStatus.Reopening(pagesRead + 1)
+                | GitDiffPageStatus.Reopening pagesRead ->
+                    Array.append page.Pages [| arrived |],
+                    page.RequestedPageIndex,
+                    GitDiffPageStatus.Reopening(pagesRead + 1)
+                | _ ->
+                    let pages = Array.append page.Pages [| arrived |]
+
+                    // The user went back to another page while this one loaded. That page and
+                    // the pages of its replay stay, and the new page is the one that may go.
+                    let requestedPageIndex =
+                        if page.KeepRequestedPage then
+                            page.RequestedPageIndex
+                        else
+                            pages.Length - 1
+
+                    pages, requestedPageIndex, GitDiffPageStatus.Ready
+
+            evict {
+                page with
+                    Pages = pages
+                    RequestedPageIndex = requestedPageIndex
+                    KeepRequestedPage = false
+                    JournalBytes = page.JournalBytes + utf8Bytes json
+                    // A page the user asked for shows that the temp drive has room again.
+                    Stop =
+                        match page.Stop with
+                        | Some GitDiffStop.TempSpaceLow when not background -> None
+                        | stop -> stop
+                    NextCursor = dto.NextCursor
+                    NextFailed = false
+                    NextFailure = None
+                    Progress = Some dto.Progress
+                    Pending = dto.Pending
+                    OutputComplete = dto.OutputComplete
+                    Status = status
+            },
+            Cmd.none
+        | ResumablePageDto.Scanning(progress, continuation, pending) ->
+            let status =
+                match page.Status with
+                | GitDiffPageStatus.Reopening _ -> page.Status
+                | _ when page.Pages.Length = 0 -> GitDiffPageStatus.Scanning
+                | _ -> GitDiffPageStatus.LoadingNext
+
+            readPage
+                deps
+                {
+                    page with
+                        Progress = Some progress
+                        Pending = pending
+                        NextCursor = Some continuation
+                        Status = status
+                }
+                continuation
+                background
+
+    let private isGap (gapId: string) (part: Paged.PagedPart) =
+        match part with
+        | Paged.PagedPart.HiddenGap(id, _, _) -> id = gapId
+        | _ -> false
+
+    let private pageIndexOfGap (gapId: string) (page: GitDiffPageData) =
+        page.Pages
+        |> Array.tryFindIndex (fun windowPage ->
+            not windowPage.IsEvicted && windowPage.Parts |> Array.exists (isGap gapId)
+        )
+
+    let private showsLine (side: Paged.PagedDiffSide) (number: float) (part: Paged.PagedPart) =
+        linesOnSide side part |> Array.exists (fun line -> line.Number = number)
+
+    /// The loaded page that shows the line on that side.
+    let private pageIndexOfLine (side: DiffSideDto) (number: float) (page: GitDiffPageData) =
+        page.Pages
+        |> Array.tryFindIndex (fun windowPage ->
+            not windowPage.IsEvicted
+            && windowPage.Parts |> Array.exists (showsLine (Presentation.side side) number)
+        )
+
+    /// Puts the expanded parts where the gap was. A gap on a page evicted in the meantime is left alone.
+    /// Each expansion result is recorded on its own, so its rows can be collapsed again.
+    /// Expanding a gap whose rows were collapsed returns the library's recorded first result,
+    /// whose remaining gaps the page already shows or has expanded further. Those gaps are
+    /// dropped, so no line appears twice.
+    let private replaceGap (gapId: string) (parts: DiffPartDto[]) (page: GitDiffPageData) =
+        match pageIndexOfGap gapId page with
+        | None -> page
+        | Some index ->
+            let windowPage = page.Pages.[index]
+            let bytes = payloadBytes parts
+
+            let shownGapIds =
+                windowPage.Parts
+                |> Array.choose (
+                    function
+                    | Paged.PagedPart.HiddenGap(id, _, _)
+                    | Paged.PagedPart.ExpandedRows(id, _) when id <> gapId -> Some id
+                    | _ -> None
+                )
+                |> Set.ofArray
+
+            let mapped =
+                parts
+                |> Array.map Presentation.part
+                |> Array.filter (
+                    function
+                    | Paged.PagedPart.HiddenGap(id, _, _) -> not (shownGapIds.Contains id)
+                    | _ -> true
+                )
+
+            let replaced =
+                windowPage.Parts
+                |> Array.collect (fun part -> if isGap gapId part then mapped else [| part |])
+
+            let gapRanges =
+                windowPage.Parts
+                |> Array.pick (
+                    function
+                    | Paged.PagedPart.HiddenGap(id, previous, current) when id = gapId -> Some(previous, current)
+                    | _ -> None
+                )
+
+            let linesOf (pick: Paged.PagedRow -> Paged.PagedLine option) (fallback: Paged.PagedRange) rows =
+                match rows |> Array.choose pick with
+                | [||] -> { fallback with Count = 0.0 }
+                | lines ->
+                    ({
+                        Start = lines.[0].Number
+                        Count = float lines.Length
+                    }
+                    : Paged.PagedRange)
+
+            let expandedGap =
+                mapped
+                |> Array.tryPick (
+                    function
+                    | Paged.PagedPart.ExpandedRows(id, rows) when id = gapId ->
+                        Some {
+                            GapId = gapId
+                            Previous = linesOf _.Previous (fst gapRanges) rows
+                            Current = linesOf _.Current (snd gapRanges) rows
+                            PayloadBytes = bytes
+                        }
+                    | _ -> None
+                )
+
+            let updated = {
+                windowPage with
+                    Parts = replaced
+                    PayloadBytes = windowPage.PayloadBytes + bytes
+                    ExpandedGaps =
+                        (windowPage.ExpandedGaps |> List.filter (fun expanded -> expanded.GapId <> gapId))
+                        @ Option.toList expandedGap
+            }
+
+            {
+                page with
+                    Pages = page.Pages |> Array.updateAt index updated
+                    RequestedPageIndex = index
+            }
+
+    /// Merges the slice into every loaded line it continues or replaces.
+    let private mergeLine (side: DiffSideDto) (lineDto: DiffLineDto) (page: GitDiffPageData) =
+        let slice = Presentation.line lineDto
+        let viewSide = Presentation.side side
+        let bytes = payloadBytes lineDto
+
+        let merged =
+            page.Pages
+            |> Array.map (fun windowPage ->
+                if windowPage.IsEvicted then
+                    windowPage, false
+                else
+                    let parts =
+                        windowPage.Parts
+                        |> Array.map (fun part ->
+                            match Presentation.mergeSliceInPart viewSide slice part with
+                            | Some mergedPart -> mergedPart, true
+                            | None -> part, false
+                        )
+
+                    // Bytes merged into expanded rows leave the page with their gap when it collapses.
+                    let mergedGapIds =
+                        parts
+                        |> Array.choose (
+                            function
+                            | Paged.PagedPart.ExpandedRows(gapId, _), true -> Some gapId
+                            | _ -> None
+                        )
+
+                    if parts |> Array.exists snd then
+                        {
+                            windowPage with
+                                Parts = parts |> Array.map fst
+                                PayloadBytes = windowPage.PayloadBytes + bytes
+                                ExpandedGaps =
+                                    windowPage.ExpandedGaps
+                                    |> List.map (fun expanded ->
+                                        if mergedGapIds |> Array.contains expanded.GapId then
+                                            {
+                                                expanded with
+                                                    PayloadBytes = expanded.PayloadBytes + bytes
+                                            }
+                                        else
+                                            expanded
+                                    )
+                        },
+                        true
+                    else
+                        windowPage, false
+            )
+
+        {
+            page with
+                Pages = merged |> Array.map fst
+                RequestedPageIndex = merged |> Array.tryFindIndex snd |> Option.defaultValue page.RequestedPageIndex
+        }
+
+    /// Puts a replayed page back in place of its placeholder. A page that is loaded again by
+    /// the time the answer arrives keeps its rows, with the expansions and slices merged into them.
+    let private replacePage (dto: DiffPageDto) (page: GitDiffPageData) =
+        match
+            page.Pages
+            |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = dto.PageId && windowPage.IsEvicted)
+        with
+        | None -> page
+        | Some index -> {
+            page with
+                Pages = page.Pages |> Array.updateAt index (windowPage dto)
+                RequestedPageIndex = index
+          }
+
+    /// The library keeps the worker session of a Scanning Open until its continuation is used.
+    /// Reopening with the continuation and canceling that operation at once releases the session.
+    /// An answer that still carries a handle closes it, and another Scanning answer is abandoned
+    /// the same way.
+    let rec private abandonOpen
+        (deps: GitDependencies)
+        (request: OpenTextDiffRequestDto)
+        (continuation: string)
+        : unit =
+        let operationId = deps.newOperationId ()
+
+        deps.textDiff.openTextDiff {
+            request with
+                OperationId = operationId
+                Continuation = Some continuation
+        }
+        |> Promise.map (fun result ->
+            match valueOf result with
+            | Ok(ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, _, _, _, _))) -> closeHandle deps handle
+            | Ok(ResumableOpenDto.Scanning(_, next, _)) -> abandonOpen deps request next
+            | _ -> ()
+        )
+        |> Promise.catch ignore
+        |> Promise.start
+
+        deps.cancelOperation { OperationId = operationId }
+        |> Promise.catch (fun error -> Error error.Message)
+        |> Promise.start
+
+    /// Releases what an Open answer holds when its page was left or replaced.
+    let private releaseArrivedOpenCmd
+        (deps: GitDependencies)
+        (request: OpenTextDiffRequestDto)
+        (result: Result<OperationResultDto<ResumableOpenDto>, string>)
+        =
+        match valueOf result with
+        | Ok(ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, _, _, _, _))) -> closeHandleCmd deps handle
+        | Ok(ResumableOpenDto.Scanning(_, continuation, _)) -> [
+            fun _ -> abandonOpen deps request continuation
+          ]
+        | _ -> Cmd.none
+
+    let private generationOf (msg: GitDiffMsg) =
+        match msg with
+        | GitDiffMsg.LoadNext generation
+        | GitDiffMsg.Index generation
+        | GitDiffMsg.Expand(generation, _, _)
+        | GitDiffMsg.LoadLineSlice(generation, _, _, _)
+        | GitDiffMsg.LoadLineBefore(generation, _, _, _)
+        | GitDiffMsg.Replay(generation, _, _)
+        | GitDiffMsg.ChooseEncoding(generation, _, _)
+        | GitDiffMsg.OpenCompleted(generation, _, _)
+        | GitDiffMsg.PageCompleted(generation, _, _)
+        | GitDiffMsg.ReplayCompleted(generation, _, _)
+        | GitDiffMsg.ExpandCompleted(generation, _, _)
+        | GitDiffMsg.LineCompleted(generation, _, _) -> Some generation
+        | GitDiffMsg.PageStateObserved _ -> None
+
+    let private withEncoding (side: DiffSideDto) (encoding: string) (page: GitDiffPageData) =
+        match side with
+        | DiffSideDto.Previous -> {
+            page with
+                PreviousEncoding = Some encoding
+          }
+        | DiffSideDto.Current -> {
+            page with
+                CurrentEncoding = Some encoding
+          }
+
+    /// Applies a message to the current page of the same generation.
+    let private updatePage (deps: GitDependencies) (msg: GitDiffMsg) (page: GitDiffPageData) =
+        // A reopening page takes no requests, since its handle is about to change.
+        let handleRequest () =
+            page.Handle
+            |> Option.filter (fun _ -> not (isSettled page.Status) && not (isReopening page.Status))
+
+        let readLineSlice (side: DiffSideDto) (line: float) (offsetUtf16: float) (maxUtf16: int) =
+            let slice: Paged.PagedLineSliceRequest = {
+                Side = Presentation.side side
+                Line = line
+                OffsetUtf16 = offsetUtf16
+            }
+
+            match handleRequest () with
+            | Some handle when not (page.PendingLineSlices |> List.contains slice) ->
+                let page = {
+                    page with
+                        FailedLineSlices =
+                            page.FailedLineSlices
+                            |> List.filter (fun failed -> failed.Side <> slice.Side || failed.Line <> slice.Line)
+                }
+
+                let request: ReadTextDiffLineRequestDto = {
+                    OperationId = deps.newOperationId ()
+                    HandleId = handle.Id
+                    HandleVersion = handle.Version
+                    Side = side
+                    Line = Presentation.decimalText line
+                    OffsetUtf16 = Presentation.decimalText offsetUtf16
+                    MaxUtf16 = maxUtf16
+                    Continuation = None
+                }
+
+                track request.OperationId {
+                    page with
+                        PendingLineSlices = slice :: page.PendingLineSlices
+                },
+                send
+                    deps.textDiff.readTextDiffLine
+                    request
+                    (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
+            | _ -> page, Cmd.none
+
+        match msg with
+        | GitDiffMsg.PageStateObserved _ -> page, Cmd.none
+        | GitDiffMsg.Index _ when page.Stop.IsSome -> page, Cmd.none
+        | GitDiffMsg.Index _ -> { page with Indexing = true }, Cmd.none
+        | GitDiffMsg.LoadNext _ ->
+            match page.Status, page.NextCursor, page.NextRequest with
+            // A diff at its full memory budget refuses every read of a new page, so none is sent.
+            // Replays and recorded answers still work.
+            | GitDiffPageStatus.Ready, Some _, None when page.Stop = Some GitDiffStop.MemoryBudget -> page, Cmd.none
+            | GitDiffPageStatus.Ready, Some cursor, None ->
+                // The viewer asks for the next page from the end of the diff, where the pages of
+                // the last replay request are out of view.
+                readPage
+                    deps
+                    {
+                        page with
+                            Status = GitDiffPageStatus.LoadingNext
+                            VisiblePages = []
+                            KeepRequestedPage = false
+                            NextFailed = false
+                            NextFailure = None
+                    }
+                    cursor
+                    false
+            | _ -> page, Cmd.none
+        | GitDiffMsg.Expand(_, gapId, fromStart) ->
+            match handleRequest (), pageIndexOfGap gapId page with
+            | Some handle, Some index when not (page.ExpandingGaps |> List.contains gapId) ->
+                let page = {
+                    page with
+                        KeepRequestedPage = page.KeepRequestedPage || page.NextRequest.IsSome
+                        FailedGaps = page.FailedGaps |> List.filter (fun failed -> failed <> gapId)
+                }
+
+                let request: ExpandTextDiffRequestDto = {
+                    OperationId = deps.newOperationId ()
+                    HandleId = handle.Id
+                    HandleVersion = handle.Version
+                    GapId = gapId
+                    FromStart = fromStart
+                    Count = ExpandLineCount
+                    Continuation = None
+                }
+
+                track request.OperationId {
+                    page with
+                        ExpandingGaps = gapId :: page.ExpandingGaps
+                        RequestedPageIndex = index
+                },
+                send
+                    deps.textDiff.expandTextDiff
+                    request
+                    (fun request result -> GitDiffMsg.ExpandCompleted(page.Generation, request, result))
+            | _ -> page, Cmd.none
+        | GitDiffMsg.LoadLineSlice(_, side, line, offsetUtf16) -> readLineSlice side line offsetUtf16 LineSliceUtf16
+        | GitDiffMsg.LoadLineBefore(_, side, line, displayedStart) when displayedStart > 0.0 ->
+            // The request ends one unit after the displayed start, and the answer goes in front of
+            // the displayed text. When the start splits a surrogate pair, the library starts and
+            // ends the slice one unit earlier, and the unit of overlap keeps it reaching the
+            // displayed text.
+            let offsetUtf16 = max 0.0 (displayedStart - float (LineSliceUtf16 - 1))
+            readLineSlice side line offsetUtf16 (int (displayedStart - offsetUtf16) + 1)
+        | GitDiffMsg.LoadLineBefore _ -> page, Cmd.none
+        | GitDiffMsg.Replay(_, pageId, visiblePages) ->
+            let isEvicted =
+                page.Pages
+                |> Array.exists (fun windowPage -> windowPage.PageId = pageId && windowPage.IsEvicted)
+
+            // One replay at a time. Each answer evicts other pages, and replays running side by
+            // side would evict each other's pages.
+            match handleRequest (), page.Pages |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = pageId) with
+            | Some handle, Some index when isEvicted && page.PendingReplay.IsNone ->
+                let request: ReplayTextDiffPageRequestDto = {
+                    OperationId = deps.newOperationId ()
+                    HandleId = handle.Id
+                    HandleVersion = handle.Version
+                    PageId = pageId
+                }
+
+                // A replay asked for from a folded placeholder names no visible part of that page,
+                // so the replayed page joins the pages eviction keeps. The replayed page is also
+                // the requested page, so a next page that lands before the replay answers keeps
+                // the pages on screen.
+                track request.OperationId {
+                    page with
+                        PendingReplay = Some pageId
+                        RequestedPageIndex = index
+                        VisiblePages = pageId :: visiblePages |> List.distinct
+                        KeepRequestedPage = page.KeepRequestedPage || page.NextRequest.IsSome
+                        FailedReplays = page.FailedReplays |> List.filter (fun failed -> failed <> pageId)
+                },
+                send
+                    deps.textDiff.replayTextDiffPage
+                    request
+                    (fun request result -> GitDiffMsg.ReplayCompleted(page.Generation, request, result))
+            | _ -> page, Cmd.none
+        | GitDiffMsg.ChooseEncoding(_, side, encoding) ->
+            match page.Status with
+            | GitDiffPageStatus.EncodingChoice(choiceSide, Some token, _) when choiceSide = side ->
+                openFresh
+                    deps
+                    {
+                        withEncoding side encoding page with
+                            Status = GitDiffPageStatus.Opening
+                    }
+                    (Some token.Id)
+            | _ -> page, Cmd.none
+        | GitDiffMsg.OpenCompleted(_, request, result) ->
+            let page = finish request.OperationId page
+
+            // An open that fails or asks for an encoding ends a reopen before the new session
+            // read any page, and the old pages go with it.
+            let settledWith status =
+                let pages =
+                    match page.Status with
+                    | GitDiffPageStatus.Reopening pagesRead -> page.Pages |> Array.truncate pagesRead
+                    | _ -> page.Pages
+
+                {
+                    page with
+                        Pages = pages
+                        Status = status
+                }
+
+            match refusalOf result, valueOf result with
+            | Some refusal, _ -> settledWith (refusedStatus refusal), Cmd.none
+            | None, Error status -> settledWith status, Cmd.none
+            | None, Ok(ResumableOpenDto.Scanning(progress, continuation, pending)) ->
+                let status =
+                    if isReopening page.Status then
+                        page.Status
+                    else
+                        GitDiffPageStatus.Scanning
+
+                sendOpen
+                    deps
+                    {
+                        page with
+                            Status = status
+                            Progress = Some progress
+                            Pending = pending
+                    }
+                    {
+                        request with
+                            OperationId = deps.newOperationId ()
+                            Continuation = Some continuation
+                    }
+            | None, Ok(ResumableOpenDto.Ready(OpenDiffResultDto.NotDiffable blocker)) ->
+                settledWith (blockedStatus blocker), Cmd.none
+            | None, Ok(ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, previous, current, first, storage))) ->
+                applyResumablePage
+                    deps
+                    {
+                        page with
+                            Handle = Some handle
+                            Storage = Some storage
+                            SourceInfos =
+                                Some(
+                                    {
+                                        Previous = previous
+                                        Current = current
+                                    }
+                                    : DiffSourceInfoPairDto
+                                )
+                    }
+                    false
+                    first
+        | GitDiffMsg.PageCompleted(_, request, result) ->
+            let page = finish request.OperationId page
+
+            // A Scanning answer reads on with a continuation, which keeps the origin of this read.
+            let background =
+                match page.NextRequest with
+                | Some running when running.OperationId = request.OperationId -> running.Background
+                | _ -> false
+
+            let page =
+                match page.NextRequest with
+                | Some running when running.OperationId = request.OperationId -> { page with NextRequest = None }
+                | _ -> page
+
+            // The rows the page keeps: the pages the new session read while the diff reopens.
+            let rowsRead =
+                match page.Status with
+                | GitDiffPageStatus.Reopening pagesRead -> pagesRead
+                | _ -> page.Pages.Length
+
+            if isSettled page.Status then
+                page, Cmd.none
+            else
+                match refusalOf result, valueOf result with
+                // A refusal leaves the session open. A reopen ends at the page it read last, which
+                // continueReopen does once the stop is recorded.
+                | Some refusal, _ when rowsRead > 0 -> stopReading background refusal page, Cmd.none
+                | Some refusal, _ ->
+                    {
+                        page with
+                            Pages = [||]
+                            Status = refusedStatus refusal
+                    },
+                    Cmd.none
+                // An error that ends the diff, or one while the diff has no rows or reopens,
+                // settles the page. Any other error keeps the rows, and the continue button asks again.
+                | None, Error status when endsDiff status || isReopening page.Status || page.Pages.Length = 0 ->
+                    { page with Status = status }, Cmd.none
+                | None, Error status ->
+                    {
+                        page with
+                            Status = GitDiffPageStatus.Ready
+                            NextFailed = true
+                            NextFailure =
+                                match status with
+                                | GitDiffPageStatus.Failed message -> Some message
+                                | _ -> None
+                    },
+                    Cmd.none
+                | None, Ok resumable -> applyResumablePage deps page background resumable
+        | GitDiffMsg.ReplayCompleted(_, request, result) ->
+            let page = {
+                finish request.OperationId page with
+                    PendingReplay = page.PendingReplay |> Option.filter (fun pageId -> pageId <> request.PageId)
+            }
+
+            if isSettled page.Status then
+                page, Cmd.none
+            else
+                match valueOf result with
+                | Error status when endsDiff status -> { page with Status = status }, Cmd.none
+                | Error _ ->
+                    {
+                        page with
+                            FailedReplays = request.PageId :: page.FailedReplays |> List.distinct
+                    },
+                    Cmd.none
+                | Ok dto -> evict (replacePage dto page), Cmd.none
+        | GitDiffMsg.ExpandCompleted(_, request, result) ->
+            let page = finish request.OperationId page
+
+            let expanded () = {
+                page with
+                    ExpandingGaps = page.ExpandingGaps |> List.filter (fun gapId -> gapId <> request.GapId)
+            }
+
+            if isSettled page.Status then
+                expanded (), Cmd.none
+            else
+                match valueOf result with
+                | Error status when endsDiff status -> { expanded () with Status = status }, Cmd.none
+                | Error _ ->
+                    let expanded = expanded ()
+
+                    {
+                        expanded with
+                            FailedGaps = request.GapId :: expanded.FailedGaps |> List.distinct
+                            FailureCause = refusalOf result
+                    },
+                    Cmd.none
+                | Ok(ResumablePartsDto.Scanning(progress, continuation, _)) ->
+                    let next = {
+                        request with
+                            OperationId = deps.newOperationId ()
+                            Continuation = Some continuation
+                    }
+
+                    track next.OperationId { page with Progress = Some progress },
+                    send
+                        deps.textDiff.expandTextDiff
+                        next
+                        (fun request result -> GitDiffMsg.ExpandCompleted(page.Generation, request, result))
+                | Ok(ResumablePartsDto.Ready parts) -> evict (replaceGap request.GapId parts (expanded ())), Cmd.none
+        | GitDiffMsg.LineCompleted(_, request, result) ->
+            let page = finish request.OperationId page
+
+            let slice: Paged.PagedLineSliceRequest = {
+                Side = Presentation.side request.Side
+                Line = Presentation.number request.Line
+                OffsetUtf16 = Presentation.number request.OffsetUtf16
+            }
+
+            let answered () = {
+                page with
+                    PendingLineSlices = page.PendingLineSlices |> List.filter (fun pending -> pending <> slice)
+                    RestartedLineSlices = page.RestartedLineSlices |> List.filter (fun pending -> pending <> slice)
+            }
+
+            if isSettled page.Status then
+                answered (), Cmd.none
+            else
+                let droppedRead =
+                    match result with
+                    | Ok(OperationResultDto.Failed failure) ->
+                        failure.Code = ContinuationMismatch
+                        && request.Continuation.IsSome
+                        && not (page.RestartedLineSlices |> List.contains slice)
+                    | _ -> false
+
+                match valueOf result with
+                | Error _ when droppedRead ->
+                    // The worker keeps eight suspended line reads and dropped this one. The restart
+                    // goes back to the start offset of the slice without a continuation, once per slice.
+                    let restart = {
+                        request with
+                            OperationId = deps.newOperationId ()
+                            Continuation = None
+                    }
+
+                    track restart.OperationId {
+                        page with
+                            RestartedLineSlices = slice :: page.RestartedLineSlices
+                    },
+                    send
+                        deps.textDiff.readTextDiffLine
+                        restart
+                        (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
+                | Error status when endsDiff status -> { answered () with Status = status }, Cmd.none
+                | Error _ ->
+                    let answered = answered ()
+
+                    {
+                        answered with
+                            FailedLineSlices = slice :: answered.FailedLineSlices
+                            FailureCause = refusalOf result
+                    },
+                    Cmd.none
+                | Ok(ResumableLineDto.Scanning(progress, continuation, _)) ->
+                    let next = {
+                        request with
+                            OperationId = deps.newOperationId ()
+                            Continuation = Some continuation
+                    }
+
+                    track next.OperationId { page with Progress = Some progress },
+                    send
+                        deps.textDiff.readTextDiffLine
+                        next
+                        (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
+                | Ok(ResumableLineDto.Ready lineDto) -> evict (mergeLine request.Side lineDto (answered ())), Cmd.none
+
+    let private failureCode (result: Result<OperationResultDto<'T>, string>) =
+        match result with
+        | Ok(OperationResultDto.Failed failure) -> Some failure.Code
+        | _ -> None
+
+    /// The operation id, the handle id, the handle version and the failure code of an answer
+    /// to a request that was sent on an open handle.
+    let private handleAnswerOf (msg: GitDiffMsg) =
+        match msg with
+        | GitDiffMsg.PageCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | GitDiffMsg.ReplayCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | GitDiffMsg.ExpandCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | GitDiffMsg.LineCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | _ -> None
+
+    /// Where the user was reading when the request behind the answer was sent: the requested
+    /// line, else the first line of the page being replayed, of the last page for the read of the
+    /// next page, or of the requested page. The index of that page is the target when the page
+    /// shows no line.
+    let private reopenTargetOf (msg: GitDiffMsg) (page: GitDiffPageData) : GitDiffReopen =
+        let shownPage =
+            match msg with
+            | GitDiffMsg.ReplayCompleted(_, request, _) ->
+                page.Pages
+                |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = request.PageId)
+            | GitDiffMsg.LineCompleted(_, request, _) ->
+                pageIndexOfLine request.Side (Presentation.number request.Line) page
+            // The viewer asks for the next page at the end of the pages read, and the background
+            // indexing leaves the requested page where the user asked for it last.
+            | GitDiffMsg.PageCompleted _ when page.Pages.Length > 0 -> Some(page.Pages.Length - 1)
+            | _ -> None
+
+        let pageIndex = shownPage |> Option.defaultValue page.RequestedPageIndex
+
+        let targetLine =
+            match msg with
+            | GitDiffMsg.LineCompleted(_, request, _) -> Some(position request.Side (Presentation.number request.Line))
+            | _ -> page.Pages |> Array.tryItem pageIndex |> Option.bind _.Span.First
+
+        {
+            Generation = page.Generation
+            TargetLine = targetLine
+            TargetPageIndex = pageIndex
+        }
+
+    /// Opens the diff again with the chosen encodings and no preparation token. The pages
+    /// stay on screen while the new session reads forward, and each page it reads replaces the
+    /// old page at the same index. Expanded gaps and line slices of the old session are gone.
+    /// The old handle is closed so the main process forgets it.
+    let private reopen (deps: GitDependencies) (target: GitDiffReopen) (page: GitDiffPageData) =
+        let next, openCmd =
+            openFresh
+                deps
+                {
+                    page with
+                        Handle = None
+                        RequestedPageIndex = target.TargetPageIndex
+                        NextCursor = None
+                        NextRequest = None
+                        PendingLineSlices = []
+                        RestartedLineSlices = []
+                        ExpandingGaps = []
+                        PendingReplay = None
+                        VisiblePages = []
+                        KeepRequestedPage = false
+                        IndexingPaused = false
+                        // The new session has read nothing yet and decides its storage again.
+                        JournalBytes = 0.0
+                        Storage = None
+                        Stop = None
+                        FailureCause = None
+                        NextFailed = false
+                        NextFailure = None
+                        FailedGaps = []
+                        FailedLineSlices = []
+                        FailedReplays = []
+                        Progress = None
+                        Pending = None
+                        OutputComplete = false
+                        Status = GitDiffPageStatus.Reopening 0
+                }
+                None
+
+        let closeOld =
+            match page.Handle with
+            | Some handle -> closeHandleCmd deps handle
+            | None -> Cmd.none
+
+        next, Cmd.batch [ openCmd; closeOld ]
+
+    /// Reads the next page while the reopened diff has not reached the target. The reopen ends
+    /// on the first page read that reaches the target line, or once the diff has no further
+    /// page, the page settles or the library asks for an encoding. The requested page is then
+    /// the page that reached the target, and the old pages after the last page read go away,
+    /// since the next page read from the new session takes their place. Pages too far from the
+    /// requested page to share a window with it are evicted, and the viewer scrolls to the
+    /// target line, or to the first line of the requested page when the diff ended before it.
+    let private continueReopen (deps: GitDependencies) (target: GitDiffReopen) (page: GitDiffPageData) =
+        match page.Status with
+        | GitDiffPageStatus.Reopening _ when page.Handle.IsNone || page.NextRequest.IsSome ->
+            page, Some target, Cmd.none
+        | GitDiffPageStatus.Reopening pagesRead ->
+            let landing =
+                match target.TargetLine with
+                | Some line -> page.Pages |> Array.truncate pagesRead |> Array.tryFindIndex (reaches line)
+                | None when pagesRead > target.TargetPageIndex -> Some target.TargetPageIndex
+                | None -> None
+
+            match landing, page.NextCursor with
+            | None, Some cursor when page.Stop.IsNone ->
+                let next, cmd = readPage deps page cursor false
+                next, Some target, cmd
+            | _ ->
+                let requested = landing |> Option.defaultValue (max 0 (pagesRead - 1))
+
+                // The old neighbors of the requested page stayed loaded while the reopen read
+                // forward. Left in place, they would hold the window away from the requested page.
+                let pages =
+                    page.Pages
+                    |> Array.truncate pagesRead
+                    |> Array.mapi (fun index windowPage ->
+                        if abs (index - requested) >= MaxLoadedPages && not windowPage.IsEvicted then
+                            evictedCopy windowPage
+                        else
+                            windowPage
+                    )
+
+                let scrollLine =
+                    (if landing.IsSome then target.TargetLine else None)
+                    |> Option.orElse (pages |> Array.tryItem requested |> Option.bind _.Span.First)
+
+                let finished =
+                    evict {
+                        page with
+                            Pages = pages
+                            RequestedPageIndex = requested
+                            Status = GitDiffPageStatus.Ready
+                            ScrollTarget =
+                                scrollLine
+                                |> Option.map (fun line ->
+                                    ({
+                                        Side = Presentation.side line.Side
+                                        Line = line.Number
+                                        Token =
+                                            page.ScrollTarget
+                                            |> Option.map (fun previous -> previous.Token + 1)
+                                            |> Option.defaultValue 1
+                                    }
+                                    : Paged.PagedScrollTarget)
+                                )
+                    }
+
+                finished, None, Cmd.none
+        | _ -> page, None, Cmd.none
+
+    /// Reads the page after the last one while the viewer asked for the indexing, once no other
+    /// read runs. The page joins the window without becoming the requested page, so the pages the
+    /// user looks at stay loaded and the new page goes first when the window is full. A diff
+    /// whose output is exhausted ends the indexing. Only a ready page reads on, so a failed or
+    /// settled diff, a reopen and a user request for the next page all hold it back. The one
+    /// pending read stays the only read, and the answer of a closed diff finds no page to continue.
+    /// Once the pages read add up to the limit, the read that just ended is the last one. The
+    /// indexing ends, and indexingRequest asks for it again when the limit rises.
+    let private continueIndexing (deps: GitDependencies) (limitMb: int) (page: GitDiffPageData) =
+        match page.Status, page.NextCursor, page.Handle with
+        | GitDiffPageStatus.Ready, Some cursor, Some _ when
+            page.Indexing
+            && not page.NextFailed
+            && page.NextRequest.IsNone
+            && page.Stop.IsNone
+            ->
+            if indexingLimitReached limitMb page then
+                { page with Indexing = false }, Cmd.none
+            else
+                readPage deps { page with KeepRequestedPage = true } cursor true
+        | GitDiffPageStatus.Ready, None, _ when page.Indexing -> { page with Indexing = false }, Cmd.none
+        | _ -> page, Cmd.none
+
+    /// The message that starts the indexing, once the first page is ready and more pages follow.
+    /// None while the indexing runs, waits for a retry, is paused, has read up to the limit or
+    /// stopped because the library refused a read.
+    let indexingRequest (limitMb: int) (page: GitDiffPageData) : GitDiffMsg option =
+        match page.Status, page.NextCursor, page.Handle with
+        | GitDiffPageStatus.Ready, Some _, Some _ when
+            not page.Indexing
+            && not page.NextFailed
+            && not page.IndexingPaused
+            && page.Stop.IsNone
+            && not (indexingLimitReached limitMb page)
+            ->
+            Some(GitDiffMsg.Index page.Generation)
+        | _ -> None
+
+    let private choosesWithoutToken (side: DiffSideDto) (status: GitDiffPageStatus) =
+        match status with
+        | GitDiffPageStatus.EncodingChoice(choiceSide, None, _) -> choiceSide = side
+        | _ -> false
+
+    /// Reopens the diff once when its worker session ended or the preparation token of an
+    /// encoding choice went stale. Any failure while that reopen runs settles the page. An
+    /// encoding chosen for a side that turned out not to be UTF-8 reopens the diff the same way.
+    let private updateWithReopen
+        (deps: GitDependencies)
+        (limitMb: int)
+        (msg: GitDiffMsg)
+        (reopening: GitDiffReopen option)
+        (page: GitDiffPageData)
+        =
+        match msg, handleAnswerOf msg with
+        // The window of the old handle is gone, so its late answers change nothing.
+        | _, Some(operationId, handleId, handleVersion, _) when
+            page.Handle
+            |> Option.forall (fun handle -> handle.Id <> handleId || handle.Version <> handleVersion)
+            ->
+            finish operationId page, reopening, Cmd.none
+        // A background indexing read whose session closed pauses the indexing. Reopening here
+        // would evict the next indexer, which would reopen in turn, so no indexer would keep its
+        // progress. Any user request still reopens, and the reopen lifts the pause. The read
+        // may be the continuation of a Scanning answer, which left the page LoadingNext, so the
+        // pause sets that page Ready for the continue button. Any other status, such as an
+        // encoding choice that an expansion asked for meanwhile, stays.
+        | GitDiffMsg.PageCompleted(_, request, result), _ when
+            reopening.IsNone
+            && not (isSettled page.Status)
+            && page.NextRequest
+               |> Option.exists (fun running -> running.OperationId = request.OperationId && running.Background)
+            && failureCode result = Some DiffSessionClosed
+            ->
+            {
+                finish request.OperationId page with
+                    NextRequest = None
+                    Indexing = false
+                    IndexingPaused = true
+                    Status =
+                        match page.Status with
+                        | GitDiffPageStatus.LoadingNext -> GitDiffPageStatus.Ready
+                        | status -> status
+            },
+            reopening,
+            Cmd.none
+        | _, Some(operationId, _, _, Some DiffSessionClosed) when reopening.IsNone && not (isSettled page.Status) ->
+            let target = reopenTargetOf msg page
+            let next, cmd = reopen deps target (finish operationId page)
+            next, Some target, cmd
+        // An Open sent with a continuation carries no handle. The library answers it with
+        // diff_session_closed when the session it was scanning in closed or was evicted.
+        | GitDiffMsg.OpenCompleted(_, request, result), _ when
+            reopening.IsNone
+            && not (isSettled page.Status)
+            && request.Continuation.IsSome
+            && failureCode result = Some DiffSessionClosed
+            ->
+            let target = reopenTargetOf msg page
+            let next, cmd = reopen deps target (finish request.OperationId page)
+            next, Some target, cmd
+        | GitDiffMsg.OpenCompleted(_, request, result), _ when
+            reopening.IsNone
+            && request.PreparationTokenId.IsSome
+            && failureCode result = Some PreparationMismatch
+            ->
+            let target: GitDiffReopen = {
+                Generation = page.Generation
+                TargetLine = None
+                TargetPageIndex = 0
+            }
+
+            let next, cmd = reopen deps target (finish request.OperationId page)
+            next, Some target, cmd
+        | GitDiffMsg.ChooseEncoding(_, side, encoding), _ when reopening.IsNone && choosesWithoutToken side page.Status ->
+            let target = reopenTargetOf msg page
+            let next, cmd = reopen deps target (withEncoding side encoding page)
+            next, Some target, cmd
+        | _ ->
+            let next, cmd = updatePage deps msg page
+
+            let next, reopening, cmd =
+                match reopening with
+                | Some target ->
+                    let next, reopening, readCmd = continueReopen deps target next
+                    next, reopening, Cmd.batch [ cmd; readCmd ]
+                | None -> next, None, cmd
+
+            // A reopen reads on by itself, and the indexing waits for it to land.
+            if reopening.IsSome then
+                next, reopening, cmd
+            else
+                let next, indexCmd = continueIndexing deps limitMb next
+                next, reopening, Cmd.batch [ cmd; indexCmd ]
+
+    /// Leaving the diff only drops the page here. The workflow's update closes the handle of
+    /// any diff page that disappears or is replaced.
+    let update (deps: GitDependencies) (msg: GitDiffMsg) (model: GitState) : GitState * Cmd<Msg> =
+        match msg, model.DiffPage with
+        | GitDiffMsg.PageStateObserved(Some(PageState.GitDiffPage _)), _ -> model, Cmd.none
+        | GitDiffMsg.PageStateObserved _, _ -> { model with DiffPage = None }, Cmd.none
+        | _, Some page when generationOf msg = Some page.Generation ->
+            let reopening =
+                model.DiffReopen
+                |> Option.filter (fun reopen -> reopen.Generation = page.Generation)
+
+            let next, reopening, cmd =
+                updateWithReopen deps model.DiffIndexingLimitMb msg reopening page
+
+            // The answer of a background read that leaves the indexing running shows after a
+            // short delay. Every other message shows its page at once, so a page the user asked
+            // for never waits.
+            let backgroundArrival =
+                match msg with
+                | GitDiffMsg.PageCompleted(_, request, _) ->
+                    page.NextRequest
+                    |> Option.exists (fun running -> running.OperationId = request.OperationId && running.Background)
+                | _ -> false
+
+            let indexingContinues =
+                next.Indexing
+                && not next.NextFailed
+                && next.NextCursor.IsSome
+                && (
+                    match next.Status with
+                    | GitDiffPageStatus.Ready
+                    | GitDiffPageStatus.LoadingNext -> true
+                    | _ -> false
+                )
+
+            let publish =
+                if backgroundArrival && indexingContinues then
+                    publishLaterCmd deps next
+                else
+                    publishNowCmd deps next
+
+            {
+                model with
+                    DiffPage = Some next
+                    DiffReopen = reopening
+            },
+            Cmd.batch [ publish; cmd ]
+        | GitDiffMsg.OpenCompleted(_, request, result), _ -> model, releaseArrivedOpenCmd deps request result
+        | _ -> model, Cmd.none
 
 let private conflictSessionConfirmationDialog (overlappingPaths: string[]) : GitSidebarConfirmationDialog =
     let overlapping =
@@ -2771,6 +4398,9 @@ let private resetFor (model: GitState) = {
     GitState.Empty with
         SidebarVisible = model.SidebarVisible
         ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
+        // The page load counter keeps counting. A page load of an ARC that closed could finish after
+        // a counter that started again at 0 has reached its id in a later ARC.
+        PageLoadRequestId = model.PageLoadRequestId
 }
 
 let private missingRepositoryModel (model: GitState) = {
@@ -2910,6 +4540,7 @@ let private updateCore
     : GitState * Cmd<Msg> =
     match msg with
     | ResetWorkflow -> resetFor model, Cmd.none
+    | DiffPageMsg diffMsg -> GitDiffPageLoader.update deps diffMsg model
     | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
@@ -3202,9 +4833,28 @@ let private updateCore
         nextModel, Cmd.ofMsg RefreshRequested
     | SelectChangeRequested(_, reply) when model.CurrentArcPath.IsNone ->
         model, resolveReplyCmd reply (Error "No ARC is loaded.")
+    | SelectChangeRequested(change, reply) when not change.IsConflicted ->
+        let requestId = nextPageLoadRequestId model
+        let page, openCmd = GitDiffPageLoader.start deps requestId change
+
+        {
+            model with
+                ErrorNotice = None
+                PageLoadRequestId = requestId
+                SelectedChangePath = Some change.Path
+                DiffPage = Some page
+        },
+        Cmd.batch [
+            GitDiffPageLoader.publishCmd setPageState page
+            openCmd
+            resolveReplyCmd reply (Ok())
+        ]
     | SelectChangeRequested(change, reply) ->
         let requestId = nextPageLoadRequestId model
 
+        // An open diff stays with its handle until the loaded page replaces it on screen. The
+        // page state then leaves the diff, and the handle closes. A load that fails or finds no
+        // conflict leaves the diff as it was, with a handle that still answers.
         let nextModel = {
             model with
                 ErrorNotice = None
@@ -3442,7 +5092,7 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingGitLfsDownloadPreference,
-                    buildUpdatedLfsSettings model None (Some downloadLargeFiles)
+                    buildUpdatedLfsSettings model None (Some downloadLargeFiles) None
                 )
             )
         )
@@ -3452,12 +5102,21 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingGitLfsThreshold,
-                    buildUpdatedLfsSettings model (Some thresholdMb) None
+                    buildUpdatedLfsSettings model (Some thresholdMb) None None
+                )
+            )
+        )
+    | SaveDiffIndexingLimitRequested limitMb ->
+        model,
+        Cmd.ofMsg (
+            WriteRequested(
+                SaveLfsSettings(
+                    GitBusyOperation.SavingDiffIndexingLimit,
+                    buildUpdatedLfsSettings model None None (Some limitMb)
                 )
             )
         )
     | FetchRequested -> model, Cmd.ofMsg (WriteRequested Fetch)
-    | PullRequested -> model, Cmd.ofMsg (WriteRequested(Pull GitUpdateAcceptance.RequirePreview))
     | PushRequested -> model, Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
     | CancelCurrentOperationRequested ->
         match model.CurrentOperation with
@@ -4202,6 +5861,17 @@ let update
     (model: GitState)
     : GitState * Cmd<Msg> =
     let next, cmd = updateCore deps setPageState msg model
+
+    // Every way of leaving a diff page ends here: another selection, another page, a closed
+    // page or a reset for another ARC.
+    let cmd =
+        match model.DiffPage with
+        | Some previous when
+            next.DiffPage
+            |> Option.forall (fun page -> page.Generation <> previous.Generation)
+            ->
+            Cmd.batch [ cmd; GitDiffPageLoader.closeCmd deps previous ]
+        | _ -> cmd
 
     if
         next.RefreshPending
