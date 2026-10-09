@@ -6,6 +6,7 @@ open Fable.Electron
 open Main.Bindings
 open Main.Bindings.Filesystem
 open Main.ArcMerge
+open Main.ArcVaultHelper
 open Main.ArcVaultTypes
 open Main.Bindings.Path
 open Swate.Components.Shared
@@ -68,6 +69,38 @@ let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePat
 
         buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
     )
+
+let filterArcMergeRelevantEvents (events: ArcVaultFileSystemEvent[]) =
+    events
+    |> Array.filter (fun event ->
+        let isCanonicalFileEvent =
+            (eventNameEquals Chokidar.Events.Add event.EventName
+             || eventNameEquals Chokidar.Events.Change event.EventName
+             || eventNameEquals Chokidar.Events.Unlink event.EventName)
+            && (ArcEntityPathRules.tryParseCanonicalArcFileTarget event.RelativePath
+                |> Option.isSome)
+
+        let isEntityDirectoryUnlink =
+            eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+            && (ArcEntityPathRules.buildFallbackUnlinkPaths event.RelativePath
+                |> List.isEmpty
+                |> not)
+
+        isCanonicalFileEvent || isEntityDirectoryUnlink
+    )
+
+let filterImportedFileWatcherOwnershipEvents arcPath (events: ArcVaultFileSystemEvent[]) =
+    events
+    |> filterArcMergeRelevantEvents
+    |> Array.filter (fun event -> not (isPermanentFileWatcherPathIgnored arcPath event.AbsolutePath))
+
+let tryTriggerImportedArcMerge mergeArcEvents (events: ArcVaultFileSystemEvent[]) =
+    let metadataEvents = filterArcMergeRelevantEvents events
+
+    if metadataEvents.Length = 0 then
+        promise { return Ok() }
+    else
+        mergeArcEvents (metadataEvents |> Array.toList)
 
 /// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
 let queueFileWatcherEvent

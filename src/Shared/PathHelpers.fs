@@ -185,14 +185,21 @@ module ArcEntityPathRules =
     let private splitPathSegments (path: string) =
         path.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
 
-    let private zoneFolderName =
+    let allAddZones = [
+        AddZone.Studies
+        AddZone.Assays
+        AddZone.Workflows
+        AddZone.Runs
+    ]
+
+    let zoneFolderName =
         function
         | AddZone.Studies -> ARCtrl.ArcPathHelper.StudiesFolderName
         | AddZone.Assays -> ARCtrl.ArcPathHelper.AssaysFolderName
         | AddZone.Workflows -> ARCtrl.ArcPathHelper.WorkflowsFolderName
         | AddZone.Runs -> ARCtrl.ArcPathHelper.RunsFolderName
 
-    let private zoneEntityFileName =
+    let zoneEntityFileName =
         function
         | AddZone.Studies -> ARCtrl.ArcPathHelper.StudyFileName
         | AddZone.Assays -> ARCtrl.ArcPathHelper.AssayFileName

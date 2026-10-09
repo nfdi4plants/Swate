@@ -8,6 +8,53 @@ open Feliz
 
 module private FileExplorerHelper =
 
+    type IntersectionObserverEntry =
+        abstract isIntersecting: bool
+
+    type IntersectionObserver =
+        abstract observe: Browser.Types.Element -> unit
+        abstract disconnect: unit -> unit
+
+    [<Emit("new IntersectionObserver($0)")>]
+    let createIntersectionObserver
+        (_callback: IntersectionObserverEntry[] -> IntersectionObserver -> unit)
+        : IntersectionObserver =
+        jsNative
+
+    let rec collectDirectoryIds (items: FileItem list) =
+        items
+        |> List.fold
+            (fun directoryIds item ->
+                let nestedDirectoryIds =
+                    item.Children |> Option.map collectDirectoryIds |> Option.defaultValue Set.empty
+
+                if item.IsDirectory then
+                    directoryIds |> Set.add item.Id |> Set.union nestedDirectoryIds
+                else
+                    directoryIds |> Set.union nestedDirectoryIds
+            )
+            Set.empty
+
+    let rec collectDirectoryChildCounts (items: FileItem list) =
+        items
+        |> List.fold
+            (fun counts item ->
+                let counts =
+                    if item.IsDirectory then
+                        counts
+                        |> Map.add item.Id (item.Children |> Option.map List.length |> Option.defaultValue 0)
+                    else
+                        counts
+
+                item.Children
+                |> Option.map (fun children ->
+                    collectDirectoryChildCounts children
+                    |> Map.fold (fun state directoryId childCount -> Map.add directoryId childCount state) counts
+                )
+                |> Option.defaultValue counts
+            )
+            Map.empty
+
     let tryGetEventTargetElement (e: Browser.Types.Event) : Browser.Types.Element option =
         let targetObj: obj = box e.target
 
@@ -104,6 +151,55 @@ module private FileExplorerHelper =
 [<Mangle(false); Erase>]
 type FileExplorer =
 
+    [<ReactComponent>]
+    static member private LoadMoreControl
+        (directoryId: string, boundary: int, onLoadMore: unit -> unit, onIntersectionChange: bool -> unit)
+        =
+        let sentinelRef = React.useElementRef ()
+
+        React.useEffect (
+            (fun () ->
+                match sentinelRef.current with
+                | None -> FsReact.createDisposable ignore
+                | Some sentinel ->
+                    let observer =
+                        FileExplorerHelper.createIntersectionObserver (fun entries _ ->
+                            entries
+                            |> Array.tryLast
+                            |> Option.iter (fun entry -> onIntersectionChange entry.isIntersecting)
+                        )
+
+                    observer.observe sentinel
+                    FsReact.createDisposable observer.disconnect
+            ),
+            [| box boundary |]
+        )
+
+        Html.li [
+            prop.ref sentinelRef
+            prop.key $"{directoryId}-{boundary}"
+            prop.testId $"file-explorer-load-more-{directoryId}"
+            prop.className "swt:list-none swt:py-1 swt:pl-1"
+            prop.children [
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-7 swt:gap-1 swt:px-2 swt:text-base-content/70"
+                    prop.onClick (fun event ->
+                        event.stopPropagation ()
+                        onLoadMore ()
+                    )
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:iconify swt:fluent--chevron-down-20-regular swt:size-4"
+                            prop.ariaHidden true
+                        ]
+                        Html.span "Load more"
+                    ]
+                ]
+            ]
+        ]
+
     [<ReactComponent(true)>]
     static member FileExplorer
         (
@@ -128,7 +224,11 @@ type FileExplorer =
             ?getItemIconClass: FileItem -> string option,
             ?getCopyPath: FileItem -> string option,
             ?getCopyRelativePath: FileItem -> string option,
-            ?includeDefaultContextMenuItems: bool
+            ?includeDefaultContextMenuItems: bool,
+            ?childRenderBatchSize: int,
+            ?hasMoreChildren: FileItem -> bool,
+            ?onLoadMoreChildren: FileItem -> unit,
+            ?automaticallyLoadChildren: bool
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
@@ -151,16 +251,35 @@ type FileExplorer =
         let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
         let getCopyRelativePath = defaultArg getCopyRelativePath (fun _ -> None)
         let includeDefaultContextMenuItems = defaultArg includeDefaultContextMenuItems true
+        let hasMoreChildren = defaultArg hasMoreChildren (fun _ -> false)
+        let automaticallyLoadChildren = defaultArg automaticallyLoadChildren true
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
         let getItemStatusAction = defaultArg getItemStatusAction (fun (_: FileItem) -> None)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
+
+        let childRenderBatchSize =
+            childRenderBatchSize
+            |> Option.map (fun batchSize ->
+                if batchSize < 1 then
+                    invalidArg (nameof childRenderBatchSize) "Child render batch size must be at least one."
+
+                batchSize
+            )
 
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
         let model, dispatch = React.useReducer (reducer, initialModel)
         let containerRef = React.useElementRef ()
+
+        let visibleChildCounts, setVisibleChildCounts =
+            React.useStateWithUpdater (Map.empty<string, int>)
+
+        // Permit only one increment while a directory's sentinel remains visible. In particular, browser
+        // scroll anchoring must not keep a recreated sentinel visible and cascade through every batch.
+        let directoriesAwaitingSentinelExit = React.useRef Set.empty<string>
+        let previousDirectoryChildCounts = React.useRef Map.empty<string, int>
 
         let onDirectoryExpansionChange =
             onDirectoryExpansionChange
@@ -198,10 +317,55 @@ type FileExplorer =
             |]
         )
 
+        React.useEffect (
+            (fun () ->
+                match childRenderBatchSize with
+                | None -> ()
+                | Some _ ->
+                    let currentDirectoryIds = FileExplorerHelper.collectDirectoryIds model.Items
+                    let currentChildCounts = FileExplorerHelper.collectDirectoryChildCounts model.Items
+
+                    let directoriesWithNewChildren =
+                        currentChildCounts
+                        |> Map.toSeq
+                        |> Seq.choose (fun (directoryId, childCount) ->
+                            let previousCount =
+                                previousDirectoryChildCounts.current
+                                |> Map.tryFind directoryId
+                                |> Option.defaultValue 0
+
+                            if childCount > previousCount then
+                                Some directoryId
+                            else
+                                None
+                        )
+                        |> Set.ofSeq
+
+                    setVisibleChildCounts (fun counts ->
+                        counts
+                        |> Map.filter (fun directoryId _ -> currentDirectoryIds.Contains directoryId)
+                    )
+
+                    directoriesAwaitingSentinelExit.current <-
+                        directoriesAwaitingSentinelExit.current
+                        |> Set.filter (fun directoryId ->
+                            currentDirectoryIds.Contains directoryId
+                            && not (directoriesWithNewChildren.Contains directoryId)
+                        )
+
+                    previousDirectoryChildCounts.current <- currentChildCounts
+            ),
+            [| box model.Items; box childRenderBatchSize |]
+        )
+
         let setExpanded (item: FileItem) (willExpand: bool) =
             let isExpanded = model.ExpandedIds.Contains item.Id
 
             if isExpanded <> willExpand then
+                if not willExpand && childRenderBatchSize.IsSome then
+                    setVisibleChildCounts (Map.remove item.Id)
+                    directoriesAwaitingSentinelExit.current <- directoriesAwaitingSentinelExit.current.Remove item.Id
+
                 dispatch (FileExplorerLogic.SetExpanded(item.Id, willExpand))
                 onDirectoryExpansionChange |> Option.iter (fun fn -> fn item willExpand)
 
@@ -273,6 +437,52 @@ type FileExplorer =
 
         let selectedPathIds = model.SelectedPath |> List.map _.Id |> Set.ofList
 
+        let getVisibleChildCount (directory: FileItem) (children: FileItem list) =
+            let childCount = List.length children
+
+            match childRenderBatchSize with
+            | None -> childCount
+            | Some batchSize ->
+                let storedCount =
+                    visibleChildCounts |> Map.tryFind directory.Id |> Option.defaultValue batchSize
+
+                let selectionRequiredCount =
+                    children
+                    |> List.tryFindIndex (fun child -> selectedPathIds.Contains child.Id)
+                    |> Option.map (fun selectedIndex -> ((selectedIndex / batchSize) + 1) * batchSize)
+                    |> Option.defaultValue 0
+
+                min childCount (max storedCount selectionRequiredCount)
+
+        let exposeNextChildBatch (directory: FileItem) childCount visibleCount =
+            match childRenderBatchSize with
+            | None -> ()
+            | Some batchSize ->
+                setVisibleChildCounts (fun counts ->
+                    let nextCount = min childCount (visibleCount + batchSize)
+
+                    if nextCount = visibleCount then
+                        counts
+                    else
+                        counts |> Map.add directory.Id nextCount
+                )
+
+        let loadMoreChildren (directory: FileItem) childCount visibleCount =
+            if visibleCount < childCount then
+                exposeNextChildBatch directory childCount visibleCount
+            elif hasMoreChildren directory then
+                onLoadMoreChildren |> Option.iter (fun loadMore -> loadMore directory)
+
+        let handleLoadMoreIntersection (directory: FileItem) childCount visibleCount isIntersecting =
+            if isIntersecting then
+                if not (directoriesAwaitingSentinelExit.current.Contains directory.Id) then
+                    directoriesAwaitingSentinelExit.current <- directoriesAwaitingSentinelExit.current.Add directory.Id
+
+                    if automaticallyLoadChildren then
+                        loadMoreChildren directory childCount visibleCount
+            else
+                directoriesAwaitingSentinelExit.current <- directoriesAwaitingSentinelExit.current.Remove directory.Id
+
         let rec renderItem item =
             let isSelected = model.SelectedId = Some item.Id
             let isInSelectedPath = selectedPathIds.Contains item.Id
@@ -305,10 +515,26 @@ type FileExplorer =
                     if isExpanded then
                         match item.Children with
                         | Some children ->
+                            let childCount = List.length children
+                            let visibleChildCount = getVisibleChildCount item children
+
+                            let renderedChildren =
+                                children |> List.truncate visibleChildCount |> List.map renderItem
+
                             Some(
                                 Html.ul [
                                     prop.className "swt:ml-4"
-                                    prop.children (children |> List.map renderItem)
+                                    prop.children [
+                                        yield! renderedChildren
+
+                                        if visibleChildCount < childCount || hasMoreChildren item then
+                                            FileExplorer.LoadMoreControl(
+                                                item.Id,
+                                                visibleChildCount,
+                                                (fun () -> loadMoreChildren item childCount visibleChildCount),
+                                                handleLoadMoreIntersection item childCount visibleChildCount
+                                            )
+                                    ]
                                 ]
                             )
                         | None -> None

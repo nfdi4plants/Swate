@@ -1,11 +1,13 @@
 module ElectronCore.FileTreeCreatorTests
 
 open System
+open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.Bindings.Path
 open Main.VersionControl
+open Swate.Components.Shared
 open Swate.Components.Composite.Authentication.Types
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
@@ -14,14 +16,13 @@ open Vitest
 open ElectronCore.TestHelpers
 
 module FileTreeCreator = Main.FileTreeCreator
+module ArcVaultHelper = Main.ArcVaultHelper
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
 let private childProcessDynamic: obj = importAll "node:child_process"
 
 let private fileTreeCreatorTestOptions = TestOptions(timeout = 20000)
-
-let private normalizeSlashes (path: string) = path.Replace("\\", "/")
 
 let private createFileEntry name path =
     ({
@@ -70,6 +71,25 @@ let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.
         |> unbox<Fable.Core.JS.Promise<obj>>
 
     return ()
+}
+
+let private createDirectoryAtAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
+    let! _ =
+        fsPromisesDynamic?mkdir (path, createObj [ "recursive" ==> true ])
+        |> unbox<Fable.Core.JS.Promise<obj>>
+
+    return ()
+}
+
+let private withTempDirectory (testBody: string -> Fable.Core.JS.Promise<unit>) = promise {
+    let! rootPath = createTempDirectoryAsync ()
+
+    try
+        do! testBody rootPath
+        do! removeDirectoryAsync rootPath
+    with error ->
+        do! removeDirectoryAsync rootPath
+        return raise error
 }
 
 let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Promise<string> = promise {
@@ -165,7 +185,7 @@ Vitest.describe (
     "FileTreeCreator LFS metadata",
     fun () ->
         Vitest.test (
-            "getFileEntries annotates materialized and pointer large objects",
+            "individual entries annotate materialized and pointer large objects",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -193,19 +213,17 @@ Vitest.describe (
 
                         do! writeUtf8FileAsync pointerFilePath pointerContents
 
-                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
+                        let! pointerEntry = FileTreeCreator.getFileEntry pointerFilePath
+                        let! downloadedEntry = FileTreeCreator.getFileEntry downloadedFilePath
 
-                        let pointerEntry =
-                            entries
-                            |> Microsoft.FSharp.Collections.Array.find (fun entry ->
-                                normalizeSlashes entry.path = normalizeSlashes pointerFilePath
-                            )
+                        let! enrichedEntries =
+                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [|
+                                pointerEntry
+                                downloadedEntry
+                            |]
 
-                        let downloadedEntry =
-                            entries
-                            |> Microsoft.FSharp.Collections.Array.find (fun entry ->
-                                normalizeSlashes entry.path = normalizeSlashes downloadedFilePath
-                            )
+                        let pointerEntry = enrichedEntries.[0]
+                        let downloadedEntry = enrichedEntries.[1]
 
                         Vitest.expect(pointerEntry.largeObject.IsSome).toBe (true)
                         Vitest.expect(downloadedEntry.largeObject.IsSome).toBe (true)
@@ -282,35 +300,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "getFileEntryWithLfsMetadata enriches a single staged LFS file",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let pointerFilePath = join [| context.RepoPath; "single-pointer.psd" |]
-
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-                        do! writeUtf8FileAsync pointerFilePath "Single tracked content.\n"
-                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "single-pointer.psd" |]
-                        ()
-
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
-
-                        Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
-                        let largeObject = enrichedEntry.largeObject |> Option.get
-
-                        Vitest.expect(largeObject.Path).toBe ("single-pointer.psd")
-                        Vitest.expect(largeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(largeObject.IsMaterialized).toBe (true)
-                        Vitest.expect(largeObject.IsLocallyAvailable).toBe (true)
-                        expectHexObjectId largeObject
-                    })
-            }
-        )
-
-        Vitest.test (
             "files absent from large-object listing keep metadata None",
             fileTreeCreatorTestOptions,
             fun () -> promise {
@@ -324,31 +313,212 @@ Vitest.describe (
                         let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes" |]
                         ()
 
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath untrackedLfsPath
+                        let! entry = FileTreeCreator.getFileEntry untrackedLfsPath
+
+                        let! enrichedEntries =
+                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
+
+                        let enrichedEntry = enrichedEntries.[0]
 
                         Vitest.expect(enrichedEntry.largeObject).toEqual (None)
                     })
             }
         )
 
+)
+
+Vitest.describe (
+    "FileTreeCreator.removePathAndDescendantsInPlace",
+    fun () ->
+        let createTreeEntry path isDirectory = {
+            name = path |> PathHelpers.normalizePath |> PathHelpers.getFileName
+            isDirectory = isDirectory
+            path = path
+            largeObject = None
+        }
+
         Vitest.test (
-            "no large objects keeps entries without metadata",
+            "removes only the target path and descendants",
+            fun () ->
+                let tree = Dictionary<string, FileEntry>()
+                tree.Add("C:/arc", createTreeEntry "C:/arc" true)
+                tree.Add("C:/arc/assays", createTreeEntry "C:/arc/assays" true)
+                tree.Add("C:/arc/assays/A", createTreeEntry "C:/arc/assays/A" true)
+                tree.Add("C:/arc/assays/A/isa.assay.xlsx", createTreeEntry "C:/arc/assays/A/isa.assay.xlsx" false)
+                tree.Add("C:/arc/assays/AB", createTreeEntry "C:/arc/assays/AB" true)
+                tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createTreeEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
+
+                FileTreeCreator.removePathAndDescendantsInPlace "C:/arc/assays/A" tree
+
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A")).toBe (false)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
+                Vitest.expect(tree.ContainsKey("C:/arc")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/AB")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
+        )
+)
+
+Vitest.describe (
+    "shallow FileTree loading",
+    fun () ->
+        Vitest.test (
+            "startup includes only the root and direct children even for a large nested payload",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
-                    withTempRepository (fun context -> promise {
-                        let plainFilePath = join [| context.RepoPath; "plain.txt" |]
-                        do! writeUtf8FileAsync plainFilePath "Plain text.\n"
+                    withTempDirectory (fun rootPath -> promise {
+                        let payloadPath = join [| rootPath; "dataset" |]
+                        do! createDirectoryAtAsync payloadPath
+                        do! writeUtf8FileAsync (join [| rootPath; "README.md" |]) "ARC"
 
-                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
+                        let writes =
+                            Array.init
+                                1000
+                                (fun index ->
+                                    writeUtf8FileAsync (join [| payloadPath; $"file-{index:D4}.txt" |]) "payload"
+                                )
 
-                        let plainEntry =
-                            entries
-                            |> Array.find (fun entry -> normalizeSlashes entry.path = normalizeSlashes plainFilePath)
+                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                        let! rootPage = FileTreeCreator.getFileTreeRootPage rootPath
+                        let tree = rootPage.Entries
+                        let names = tree.Values |> Seq.map _.name |> Seq.toArray
 
-                        Vitest.expect(plainEntry.largeObject).toEqual (None)
+                        Vitest.expect(tree.Count).toBe (3)
+                        Vitest.expect(names |> Array.contains "README.md").toBe (true)
+                        Vitest.expect(names |> Array.contains "dataset").toBe (true)
+                        Vitest.expect(names |> Array.contains "file-0000.txt").toBe (false)
+
+                        tree.Values
+                        |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject).toEqual (None))
                     })
             }
+        )
+
+        Vitest.test (
+            "paged reads return only the requested bounded slice",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let studiesPath = join [| rootPath; "studies" |]
+                        do! createDirectoryAtAsync studiesPath
+
+                        let writes =
+                            Array.init
+                                250
+                                (fun index ->
+                                    writeUtf8FileAsync (join [| studiesPath; sprintf "study-%03d" index |]) "study"
+                                )
+
+                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                        let! first = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 0 100
+                        let! second = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 100 100
+                        let! final = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 200 100
+
+                        Vitest.expect(first.Entries.Length).toBe 100
+                        Vitest.expect(first.HasMore).toBe true
+                        Vitest.expect(second.Entries.Length).toBe 100
+                        Vitest.expect(second.HasMore).toBe true
+                        Vitest.expect(final.Entries.Length).toBe 50
+                        Vitest.expect(final.HasMore).toBe false
+
+                        let distinctPaths =
+                            Array.concat [ first.Entries; second.Entries; final.Entries ]
+                            |> Array.map _.path
+                            |> Array.distinct
+
+                        Vitest.expect(distinctPaths.Length).toBe 250
+                    })
+            }
+        )
+
+        Vitest.test (
+            "startup root loading is bounded and reports additional children",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let writes =
+                            Array.init
+                                250
+                                (fun index ->
+                                    writeUtf8FileAsync (join [| rootPath; sprintf "root-%03d.txt" index |]) "root"
+                                )
+
+                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                        let! rootPage = FileTreeCreator.getFileTreeRootPage rootPath
+
+                        // One root entry plus exactly one bounded page of direct children.
+                        Vitest.expect(rootPage.Entries.Count).toBe 101
+                        Vitest.expect(rootPage.HasMore).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "directory reconciliation adds and removes direct children while preserving surviving descendants",
+            fun () ->
+                let rootPath = resolve [| "arc" |]
+                let studiesPath = join [| rootPath; "studies" |]
+                let removedPath = join [| studiesPath; "removed" |]
+                let removedChildPath = join [| removedPath; "old.txt" |]
+                let survivingPath = join [| studiesPath; "surviving" |]
+                let survivingChildPath = join [| survivingPath; "known.txt" |]
+                let newChildPath = join [| studiesPath; "new.txt" |]
+
+                let initial =
+                    [|
+                        FileEntry.create ("arc", rootPath, true)
+                        FileEntry.create ("studies", studiesPath, true)
+                        FileEntry.create ("removed", removedPath, true)
+                        FileEntry.create ("old.txt", removedChildPath, false)
+                        FileEntry.create ("surviving", survivingPath, true)
+                        FileEntry.create ("known.txt", survivingChildPath, false)
+                    |]
+                    |> createFileEntryTree
+
+                let currentChildren = [|
+                    FileEntry.create ("surviving", survivingPath, true)
+                    FileEntry.create ("new.txt", newChildPath, false)
+                |]
+
+                let reconciled =
+                    FileTreeCreator.reconcileFileTreeDirectory rootPath "studies" currentChildren initial
+
+                Vitest.expect(reconciled.ContainsKey(removedPath)).toBe (false)
+                Vitest.expect(reconciled.ContainsKey(removedChildPath)).toBe (false)
+                Vitest.expect(reconciled.ContainsKey(survivingChildPath)).toBe (true)
+                Vitest.expect(reconciled.ContainsKey(newChildPath)).toBe (true)
+        )
+
+        Vitest.test (
+            "permanent watcher includes canonical structure and excludes deep payload files",
+            fun () ->
+                let rootPath = "C:/arc"
+
+                Vitest
+                    .expect(ArcVaultHelper.isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/studies")
+                    .toBe (false)
+
+                Vitest
+                    .expect(ArcVaultHelper.isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/studies/S1")
+                    .toBe (false)
+
+                Vitest
+                    .expect(
+                        ArcVaultHelper.isPermanentFileWatcherPathIgnored
+                            rootPath
+                            $"{rootPath}/studies/S1/isa.study.xlsx"
+                    )
+                    .toBe (false)
+
+                Vitest
+                    .expect(
+                        ArcVaultHelper.isPermanentFileWatcherPathIgnored
+                            rootPath
+                            $"{rootPath}/studies/S1/dataset/file-99999.txt"
+                    )
+                    .toBe (true)
         )
 )

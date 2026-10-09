@@ -227,7 +227,7 @@ let Main () =
             Context.AppStateContext.AppStateCtx.Provider(
                 model.ArcRootPath,
                 Renderer.Context.FileStateContext.FileStateCtxProviderWithSnapshots(
-                    (fun () -> Api.ipcArcVaultApi.getFileTree ()),
+                    Api.ipcArcVaultApi.getFileTree,
                     {
                         loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
                         pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()

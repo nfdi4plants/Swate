@@ -364,6 +364,42 @@ let isFileWatcherPathIgnored (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
 
+let isPermanentFileWatcherPathIgnored (arcPath: string) (path: string) =
+    if isFileWatcherPathIgnored path then
+        true
+    else
+        match tryGetRepoRelativePathOrRoot arcPath path with
+        | None -> true
+        | Some relativePath ->
+            let segments =
+                (PathHelpers.normalizeCanonicalRelativePath relativePath)
+                    .Split([| '/' |], System.StringSplitOptions.RemoveEmptyEntries)
+
+            match segments with
+            | [||] -> false
+            | [| rootName |] ->
+                let structuralRootNames = [
+                    ARCtrl.ArcPathHelper.InvestigationFileName
+                    ARCtrl.ArcPathHelper.StudiesFolderName
+                    ARCtrl.ArcPathHelper.AssaysFolderName
+                    ARCtrl.ArcPathHelper.WorkflowsFolderName
+                    ARCtrl.ArcPathHelper.RunsFolderName
+                    ".gitattributes"
+                    "README.md"
+                ]
+
+                PathHelpers.pathMatchesAny structuralRootNames rootName |> not
+            | [| zoneName; _ |] ->
+                let zoneNames = [
+                    ARCtrl.ArcPathHelper.StudiesFolderName
+                    ARCtrl.ArcPathHelper.AssaysFolderName
+                    ARCtrl.ArcPathHelper.WorkflowsFolderName
+                    ARCtrl.ArcPathHelper.RunsFolderName
+                ]
+
+                PathHelpers.pathMatchesAny zoneNames zoneName |> not
+            | _ -> ArcEntityPathRules.tryParseCanonicalArcFileTarget relativePath |> Option.isNone
+
 let createFileWatcher (path: string) (usePolling: bool option) =
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
@@ -375,7 +411,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^(isPermanentFileWatcherPathIgnored path),
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
@@ -385,13 +421,63 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^(isPermanentFileWatcherPathIgnored path),
                 ignoreInitial = true
             )
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
     watcher
+
+/// Creates the permanent ARC watcher and captures its one initial readiness notification.
+let private captureWatcherReadiness (onError: exn -> unit) (watcher: Chokidar.IWatcher) =
+    JS.Constructors.Promise.Create(fun resolve _ ->
+        let mutable isSettled = false
+
+        watcher.on (
+            Chokidar.Events.Ready,
+            fun (_: string) ->
+                if not isSettled then
+                    isSettled <- true
+                    resolve (Ok())
+        )
+        |> ignore
+
+        watcher.on (
+            Chokidar.Events.Error,
+            fun (error: exn) ->
+                onError error
+
+                if not isSettled then
+                    isSettled <- true
+                    resolve (Error error)
+        )
+        |> ignore
+    )
+
+let createFileWatcherWithReady (path: string) (usePolling: bool option) (onError: exn -> unit) =
+    let watcher = createFileWatcher path usePolling
+    watcher, captureWatcherReadiness onError watcher
+
+/// Creates the native, shallow watcher used only for FileTree directories that were explicitly loaded.
+let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
+    Chokidar.Chokidar.watch (
+        paths,
+        Chokidar.WatchOptions(
+            cwd = arcPath,
+            awaitWriteFinish = true,
+            ignored = !^isFileWatcherPathIgnored,
+            ignoreInitial = true,
+            usePolling = false,
+            depth = 0
+        )
+    )
+
+/// Creates a loaded-directory watcher and captures its one initial readiness notification.
+/// Chokidar emits `ready` once after the watcher's initial scan, not after later `add` calls.
+let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) (onError: exn -> unit) =
+    let watcher = createLoadedDirectoryWatcher arcPath paths
+    watcher, captureWatcherReadiness onError watcher
 
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
     WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>

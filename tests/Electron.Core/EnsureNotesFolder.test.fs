@@ -3,6 +3,8 @@ module ElectronCore.EnsureNotesFolderTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.Notes.NoteScaffolding
+open Main.ArcVault
+open Main.IPC.ArcVaultsApi
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -134,6 +136,36 @@ Vitest.describe (
 
                     let! finalContent = readUtf8FileAsync notesReadmePath
                     Vitest.expect(finalContent).toBe (customContent)
+                    do! removePathAsync rootPath
+                with error ->
+                    do! removePathAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "refreshes the root FileTree after creating notes",
+            fun () -> promise {
+                let! rootPath, arcPath = createTempArcPathAsync ()
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    vault.path <- Some arcPath
+                    let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage arcPath
+                    vault.fileTree <- initialRootPage.Entries
+
+                    let! ensureResult = ensureNotesFolderAndRefreshFileTree vault arcPath
+                    assertEnsureSucceeded ensureResult
+
+                    let notesFolderPath = pathDynamic?join (arcPath, "notes") |> unbox<string>
+                    let! hasNotesFolder = pathExistsAsync notesFolderPath
+
+                    let treeHasNotes =
+                        vault.fileTree.Values
+                        |> Seq.exists (fun entry -> entry.isDirectory && entry.name = "notes")
+
+                    Vitest.expect(hasNotesFolder).toBe (true)
+                    Vitest.expect(treeHasNotes).toBe (true)
                     do! removePathAsync rootPath
                 with error ->
                     do! removePathAsync rootPath

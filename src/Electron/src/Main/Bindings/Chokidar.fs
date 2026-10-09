@@ -27,6 +27,7 @@ type WatchOptions
         ?cwd: string,
         ?awaitWriteFinish: bool,
         ?usePolling: bool,
+        ?depth: int,
         ?interval: int,
         ?binaryInterval: int
     ) =
@@ -37,6 +38,7 @@ type WatchOptions
     member val cwd: string option = cwd with get, set
     member val awaitWriteFinish: bool option = awaitWriteFinish with get, set
     member val usePolling: bool option = usePolling with get, set
+    member val depth: int option = depth with get, set
     member val interval: int option = interval with get, set
     member val binaryInterval: int option = binaryInterval with get, set
 
@@ -46,11 +48,12 @@ type IWatched =
 
 type IWatcher =
     abstract member close: unit -> Promise<unit>
-    abstract member add: paths: string -> unit
-    abstract member add: paths: string[] -> unit
-    abstract member unwatch: paths: string -> Promise<unit>
-    abstract member unwatch: paths: string[] -> Promise<unit>
+    abstract member add: paths: string -> IWatcher
+    abstract member add: paths: string[] -> IWatcher
+    abstract member unwatch: paths: string -> IWatcher
+    abstract member unwatch: paths: string[] -> IWatcher
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
+    abstract member on: eventName: Events * callback: (exn -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> string -> unit) -> IWatcher
     abstract member getWatched: unit -> IWatched
 
