@@ -170,8 +170,77 @@ let private resolveFileTreeDirectory (arcPath: string) (relativeDirectoryPath: s
 
 type FileTreeDirectoryPage = { Entries: FileEntry[]; HasMore: bool }
 
-/// Reads one bounded page of immediate children without materializing the complete directory listing.
-let readFileTreeDirectoryPage
+type FileTreeDirectoryCursor = {
+    Directory: Directory
+    mutable Lookahead: Dirent option
+}
+
+let openFileTreeDirectoryCursor (arcPath: string) (relativeDirectoryPath: string) = promise {
+    let normalizedArcPath = normalizeRootPath arcPath
+    let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
+    let! directory = openDirectoryAsync directoryPath
+    return directoryPath, { Directory = directory; Lookahead = None }
+}
+
+/// Advances an already-open directory cursor by one bounded batch. The accepted lookahead is
+/// retained by the cursor and becomes the first entry of the next batch.
+let readFileTreeDirectoryCursorPage
+    (directoryPath: string)
+    (cursor: FileTreeDirectoryCursor)
+    (pageSize: int)
+    : Fable.Core.JS.Promise<FileTreeDirectoryPage> =
+    promise {
+        if pageSize < 1 then
+            invalidArg (nameof pageSize) "Directory page size must be at least one."
+
+        let entries = ResizeArray<FileEntry>()
+        let mutable exhausted = false
+
+        let tryAccept (dirent: Dirent) =
+            let name = dirent.name
+            let isDirectory = dirent.isDirectory ()
+            let fullPath = join [| directoryPath; name |] |> PathHelpers.normalizeSeparators
+
+            if
+                (isDirectory && shouldIgnoreDirName name)
+                || (not isDirectory && shouldIgnorePath fullPath)
+            then
+                None
+            else
+                Some(FileEntry.create (name, fullPath, isDirectory, None))
+
+        cursor.Lookahead
+        |> Option.iter (fun dirent ->
+            cursor.Lookahead <- None
+            tryAccept dirent |> Option.iter entries.Add
+        )
+
+        while not exhausted && entries.Count < pageSize do
+            let! dirent = cursor.Directory.read ()
+
+            if isNull (box dirent) then
+                exhausted <- true
+            else
+                tryAccept dirent |> Option.iter entries.Add
+
+        // Read until the next accepted entry so ignored filesystem entries do not create a false
+        // positive HasMore result. Preserve that entry for the next batch.
+        while not exhausted && cursor.Lookahead.IsNone do
+            let! dirent = cursor.Directory.read ()
+
+            if isNull (box dirent) then
+                exhausted <- true
+            elif tryAccept dirent |> Option.isSome then
+                cursor.Lookahead <- Some dirent
+
+        return {
+            Entries = entries.ToArray()
+            HasMore = cursor.Lookahead.IsSome
+        }
+    }
+
+/// Reads a fresh bounded prefix for reconciliation. Incremental pagination uses a persistent cursor.
+let readFileTreeDirectoryPrefix
     (arcPath: string)
     (relativeDirectoryPath: string)
     (offset: int)
@@ -250,7 +319,7 @@ let getFileTreeRootPage (path: string) : Fable.Core.JS.Promise<FileTreeRootPage>
             HasMore = false
         }
     else
-        let! page = readFileTreeDirectoryPage normalizedArcPath "" 0 100
+        let! page = readFileTreeDirectoryPrefix normalizedArcPath "" 0 100
 
         return {
             Entries = createFileEntryTree (Array.append [| rootEntry |] page.Entries)

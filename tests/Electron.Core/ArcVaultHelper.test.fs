@@ -1010,8 +1010,11 @@ Vitest.describe (
 
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
                         let! firstSnapshot = vault.GetRendererFileTreeSnapshot()
+                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 1
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
                         let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let! finalSnapshot = vault.GetRendererFileTreeSnapshot()
 
                         let countPublishedStudies snapshot =
                             snapshot.entries.Values
@@ -1022,6 +1025,32 @@ Vitest.describe (
                         Vitest.expect(firstSnapshot.directoryHasMore.["studies"]).toBe true
                         Vitest.expect(countPublishedStudies secondSnapshot).toBe 200
                         Vitest.expect(secondSnapshot.directoryHasMore.["studies"]).toBe true
+                        // The ARC scaffold already contains studies/.gitkeep in addition to the 250 fixtures.
+                        Vitest.expect(countPublishedStudies finalSnapshot).toBe 251
+                        Vitest.expect(finalSnapshot.directoryHasMore.["studies"]).toBe false
+                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
+                    })
+        )
+
+        Vitest.test (
+            "file-tree reset closes partial directory cursors",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let studiesPath = join [| arcPath; "studies" |]
+                        do! mkdirWatcherDirectoryAsync studiesPath
+
+                        for index in 0..100 do
+                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 1
+
+                        do! vault.ResetFileTreeToRoot()
+                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
                     })
         )
 
@@ -2090,7 +2119,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "successful initialization publishes the path once after ARC and initial tree readiness",
+            "successful initialization publishes the path once after initial tree readiness",
             fun () ->
                 TestHelpers.withTempArcWith
                     "swate-open-transaction-commit-"
@@ -2109,11 +2138,9 @@ Vitest.describe (
                                                 wasReadyAtPathPublication <-
                                                     vaultAtPathPublication
                                                     |> Option.exists (fun vault ->
-                                                        vault.arc.IsSome
-                                                        && vault.path.IsSome
+                                                        vault.path.IsSome
                                                         && vault.fileTree.Count > 0
                                                         && vault.watcher.IsSome
-                                                        && not vault.isInitializingArc
                                                     )
                             }
 

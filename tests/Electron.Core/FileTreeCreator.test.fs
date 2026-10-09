@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
+open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Shared
@@ -396,7 +397,60 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "paged reads return only the requested bounded slice",
+            "cursor lookahead advances each underlying directory entry exactly once",
+            fun () -> promise {
+                let mutable readCalls = 0
+                let mutable nextIndex = 0
+
+                let dirents =
+                    Array.init 5 (fun index ->
+                        { new Dirent with
+                            member _.name = $"entry-{index}"
+                            member _.isDirectory() = false
+                            member _.isFile() = true
+                            member _.isSymbolicLink() = false
+                        }
+                    )
+
+                let directory =
+                    { new Directory with
+                        member _.read() =
+                            readCalls <- readCalls + 1
+
+                            let result =
+                                if nextIndex < dirents.Length then
+                                    let dirent = dirents.[nextIndex]
+                                    nextIndex <- nextIndex + 1
+                                    dirent
+                                else
+                                    unbox null
+
+                            JS.Constructors.Promise.resolve result
+
+                        member _.close() = JS.Constructors.Promise.resolve ()
+                    }
+
+                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
+                    Directory = directory
+                    Lookahead = None
+                }
+
+                let! first = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+                let! second = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+                let! final = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+
+                let names =
+                    Array.concat [ first.Entries; second.Entries; final.Entries ]
+                    |> Array.map _.name
+
+                Vitest.expect(names).toEqual ([| "entry-0"; "entry-1"; "entry-2"; "entry-3"; "entry-4" |])
+                Vitest.expect(readCalls).toBe 6
+                Vitest.expect(final.HasMore).toBe false
+            }
+        )
+
+        Vitest.test (
+            "cursor pages advance without rereading earlier directory entries",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -412,23 +466,28 @@ Vitest.describe (
                                 )
 
                         let! _ = Fable.Core.JS.Constructors.Promise.all writes
-                        let! first = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 0 100
-                        let! second = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 100 100
-                        let! final = FileTreeCreator.readFileTreeDirectoryPage rootPath "studies" 200 100
+                        let! directoryPath, cursor = FileTreeCreator.openFileTreeDirectoryCursor rootPath "studies"
 
-                        Vitest.expect(first.Entries.Length).toBe 100
-                        Vitest.expect(first.HasMore).toBe true
-                        Vitest.expect(second.Entries.Length).toBe 100
-                        Vitest.expect(second.HasMore).toBe true
-                        Vitest.expect(final.Entries.Length).toBe 50
-                        Vitest.expect(final.HasMore).toBe false
+                        try
+                            let! first = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
+                            let! second = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
+                            let! final = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
 
-                        let distinctPaths =
-                            Array.concat [ first.Entries; second.Entries; final.Entries ]
-                            |> Array.map _.path
-                            |> Array.distinct
+                            Vitest.expect(first.Entries.Length).toBe 100
+                            Vitest.expect(first.HasMore).toBe true
+                            Vitest.expect(second.Entries.Length).toBe 100
+                            Vitest.expect(second.HasMore).toBe true
+                            Vitest.expect(final.Entries.Length).toBe 50
+                            Vitest.expect(final.HasMore).toBe false
 
-                        Vitest.expect(distinctPaths.Length).toBe 250
+                            let allPaths =
+                                Array.concat [ first.Entries; second.Entries; final.Entries ]
+                                |> Array.map _.path
+
+                            Vitest.expect(allPaths.Length).toBe 250
+                            Vitest.expect(allPaths |> Array.distinct |> Array.length).toBe 250
+                        finally
+                            cursor.Directory.close () |> Promise.start
                     })
             }
         )

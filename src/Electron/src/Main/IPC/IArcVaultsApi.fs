@@ -863,6 +863,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                             match result with
                                             | Ok() ->
+                                                do! vault.CloseFileTreeDirectoryCursorsUnderPath normalizedRelativePath
+
                                                 let parentPath =
                                                     PathHelpers.tryGetParentPath normalizedRelativePath
                                                     |> Option.defaultValue ""
@@ -917,6 +919,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                             match result with
                                             | Ok() ->
+                                                do! vault.CloseFileTreeDirectoryCursorsUnderPath normalizedGenericPath
+
                                                 let parentPath =
                                                     PathHelpers.tryGetParentPath normalizedGenericPath
                                                     |> Option.defaultValue ""
