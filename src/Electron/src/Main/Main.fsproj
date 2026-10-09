@@ -12,6 +12,7 @@
     <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />
+    <Compile Include="Bindings\Menu.fs" />
     <Compile Include="Bindings\PromiseRace.fs" />
     <Compile Include="Helper\Assets.fs" />
     <Compile Include="Helper\WindowSend.fs" />
@@ -19,6 +20,7 @@
     <Compile Include="Notes\NoteScaffolding.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="Services\Settings\SettingsStore.fs" />
+    <Compile Include="Services\Settings\AppVersion.fs" />
     <Compile Include="Services\Settings\UiSettings.fs" />
     <Compile Include="Services\Settings\RecentArcStore.fs" />
     <Compile Include="ArcMerge\Types.fs" />
@@ -62,7 +64,9 @@
     <Compile Include="IPC\ITemplateApi.fs" />
     <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="IPC\IUiSettingsApi.fs" />
+    <Compile Include="IPC\IAppVersionApi.fs" />
     <Compile Include="Workers\TextDiffWorkerEntry.fs" />
+    <Compile Include="AppMenu.fs" />
     <Compile Include="main.fs" />
     <None Include="ChokidarTest.fsx" />
   </ItemGroup>

@@ -66,6 +66,10 @@ module private LazyComponents =
         Renderer.Components.MainContent.SettingsPageTarget.SettingsPage()
 
     [<ReactLazyComponent>]
+    let LazyChangelogTarget (version: string) =
+        Renderer.Components.MainContent.ChangelogTarget.ChangelogTarget(version)
+
+    [<ReactLazyComponent>]
     let LazyMarkdownEditorTarget (content: string) =
         Renderer.Components.MainContent.MarkdownEditorTargetView.MarkdownEditorTarget(content)
 
@@ -86,6 +90,17 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
                     | Some _, Some PageState.ValidationPackageBrowser -> ValidationPackageBrowserTarget()
+                    | _, Some(PageState.Changelog(version, requestId)) ->
+                        Html.div [
+                            prop.key requestId
+                            prop.className "swt:flex swt:grow swt:min-w-0 swt:min-h-0"
+                            prop.children [
+                                React.Suspense(
+                                    [ LazyComponents.LazyChangelogTarget(version) ],
+                                    fallback = LazyComponents.FullPageLoadingSpinner("Loading changelog...")
+                                )
+                            ]
+                        ]
                     | _, Some PageState.SettingsPage ->
                         React.Suspense(
                             [ LazyComponents.LazySettingPage() ],

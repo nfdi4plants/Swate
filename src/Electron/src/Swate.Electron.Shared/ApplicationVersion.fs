@@ -5,6 +5,15 @@ open Fable.Core
 [<ImportDefault("../../../../CHANGELOG.md?raw")>]
 let private changelog: string = jsNative
 
+/// <summary>
+/// Alternative define in vite.config from package.json. package.json version is set on release by build pipeline.
+/// ```
+/// // vite.config.ts
+/// define: {
+///   'import.meta.env.APP_VERSION': JSON.stringify(pkg.version),
+/// }
+/// ```
+/// </summary>
 let current =
     changelog.Split(Swate.Components.ClipboardContract.Contract.LineBreaks, System.StringSplitOptions.None)
     |> Array.tryPick (fun line ->

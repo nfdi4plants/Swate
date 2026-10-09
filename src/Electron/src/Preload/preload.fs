@@ -10,6 +10,9 @@ Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAuthApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<ITemplateApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IValidationPackageIPC>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAppVersionApi>
+Remoting.createIpc () |> Remoting.buildBridge<IAppVersionRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IReleaseNotesRendererApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IUiSettingsApi>
 
 Remoting.createIpc () |> Remoting.buildBridge<IPathChangeRendererApi>
