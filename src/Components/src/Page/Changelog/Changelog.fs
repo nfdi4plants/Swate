@@ -177,39 +177,49 @@ type Changelog =
         Html.div [
             prop.className "swt:flex swt:flex-col swt:md:flex-row swt:gap-4 swt:grow swt:min-h-0"
             prop.children [
+                // navigation sidebar (on small screens it is placed above the content)
                 Html.nav [
                     prop.ariaLabel "Release note sections"
                     prop.className "swt:md:w-56 swt:shrink-0 swt:overflow-auto swt:max-h-48 swt:md:max-h-none"
                     prop.children [
-                        if sections |> Array.exists (fun section -> not (Array.isEmpty section.children)) then
-                            Html.p [
-                                prop.className "swt:text-xs swt:opacity-70 swt:px-3 swt:pb-2"
-                                prop.text "Counts include subsections."
-                            ]
                         Html.ul [
                             prop.className "swt:menu swt:w-full swt:bg-base-200 swt:rounded-box"
                             prop.children [
+                                if sections |> Array.exists (fun section -> not (Array.isEmpty section.children)) then
+                                    Html.li [
+                                        prop.className "swt:text-xs swt:opacity-70 swt:menu-title"
+                                        prop.text "Counts include subsections."
+                                    ]
                                 for section in sections do
                                     Changelog.NavigationItem(section, navigate)
                             ]
                         ]
                     ]
                 ]
+                // content area
                 Html.div [
-                    prop.className "swt:flex swt:flex-col swt:grow swt:min-w-0 swt:min-h-0"
+                    prop.className "swt:flex swt:flex-col swt:grow swt:min-w-0 swt:min-h-0 swt:w-fit swt:gap-2"
                     prop.children [
+                        // scrollable markdown content
                         Html.div [
                             prop.ref contentRef
-                            prop.className "swt:grow swt:overflow-auto"
+                            prop.className "swt:grow swt:flex swt:flex-col swt:gap-2 swt:overflow-hidden"
                             prop.children [
                                 ReactMDEditor.MarkdownPreview(
                                     markdown,
                                     rehypePlugins = [| ReactMDEditor.rehypeSanitize |],
-                                    style = {| padding = 16; borderRadius = 8 |},
+                                    style = {|
+                                        padding = 16
+                                        borderRadius = 8
+                                        flex = 1
+                                        flexGrow = 1
+                                        overflow = "auto"
+                                    |},
                                     className = "swt:prose"
                                 )
                             ]
                         ]
+                        // pagination controls
                         pagination
                     ]
                 ]
@@ -263,7 +273,7 @@ type Changelog =
         let current = releases |> Array.tryItem selectedIndex
 
         Html.section [
-            prop.className "swt:w-full swt:overflow-auto swt:p-6 swt:flex swt:flex-col swt:grow"
+            prop.className "swt:w-full swt:overflow-auto swt:p-6 swt:flex swt:flex-col swt:grow swt:gap-4"
             prop.ariaLabel "Changelog"
             prop.children [
                 Html.h1 [
@@ -299,7 +309,7 @@ type Changelog =
                         | Some release ->
                             Html.select [
                                 prop.name "release-version-selector"
-                                prop.className "swt:select swt:select-bordered swt:mb-6"
+                                prop.className "swt:select swt:select-bordered swt:shrink-0"
                                 prop.ariaLabel "Release version"
                                 prop.value (string selectedIndex)
                                 prop.onChange (fun (value: string) -> setSelectedIndex (int value))
@@ -316,8 +326,7 @@ type Changelog =
                             Changelog.ReleaseNotes(
                                 release.body,
                                 Html.nav [
-                                    prop.className
-                                        "swt:flex swt:shrink-0 swt:items-center swt:justify-center swt:gap-3 swt:mt-6"
+                                    prop.className "swt:flex swt:gap-2 swt:items-center"
                                     prop.ariaLabel "Changelog pagination"
                                     prop.children [
                                         Html.button [
