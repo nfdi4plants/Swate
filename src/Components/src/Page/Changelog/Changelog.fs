@@ -5,8 +5,216 @@ open Feliz
 open Swate.Components.Api.GitHubReleases
 open Swate.Components.Composite.MarkdownText.JsBindings
 
+module private ChangelogTypes =
+
+    type Section = {
+        title: string
+        count: int
+        target: Browser.Types.Element
+        level: int
+        children: Section[]
+    }
+
+module private ChangelogHelpers =
+
+    open ChangelogTypes
+
+    [<Emit("Array.from($0.querySelectorAll($1))")>]
+    let queryElements (_root: Browser.Types.Element) (_selector: string) : Browser.Types.Element[] = jsNative
+
+    [<Emit("$0.scrollIntoView({ block: 'start', inline: 'nearest' })")>]
+    let scrollToSection (_target: Browser.Types.Element) : unit = jsNative
+
+    // Read the rendered Markdown so code fences, legacy headings and nested lists
+    // follow the same parsing rules as the visible release notes.
+    let sections (root: Browser.Types.Element) =
+        let nodes = queryElements root "h1,h2,h3,h4,h5,h6,li"
+
+        let headingLevel (node: Browser.Types.Element) =
+            match node.tagName.ToUpperInvariant() with
+            | "H1" -> 1
+            | "H2" -> 2
+            | "H3" -> 3
+            | "H4" -> 4
+            | "H5" -> 5
+            | "H6" -> 6
+            | _ -> 0
+
+        let headings =
+            nodes |> Array.indexed |> Array.filter (fun (_, node) -> headingLevel node > 0)
+
+        let countItems nodes =
+            nodes
+            |> Array.filter (fun (node: Browser.Types.Element) -> node.tagName.ToUpperInvariant() = "LI")
+            |> Array.length
+
+        let flatSections = [|
+            if Array.isEmpty headings then
+                yield {
+                    title = "Release notes"
+                    count = countItems nodes
+                    target = root
+                    level = 0
+                    children = [||]
+                }
+            else
+                let firstIndex, _ = headings.[0]
+                let introCount = nodes |> Array.take firstIndex |> countItems
+
+                if introCount > 0 then
+                    yield {
+                        title = "Overview"
+                        count = introCount
+                        target = root
+                        level = 0
+                        children = [||]
+                    }
+
+                for index, heading in headings do
+                    let contents =
+                        nodes
+                        |> Array.skip (index + 1)
+                        |> Array.takeWhile (fun node ->
+                            headingLevel node = 0 || headingLevel node > headingLevel heading
+                        )
+
+                    yield {
+                        title =
+                            if System.String.IsNullOrWhiteSpace heading.textContent then
+                                "Untitled section"
+                            else
+                                heading.textContent.Trim()
+                        count = countItems contents
+                        target = heading
+                        level = headingLevel heading
+                        children = [||]
+                    }
+        |]
+
+        // Nest under the nearest preceding shallower heading, even when legacy
+        // notes skip heading levels. Overview and fallback entries stay separate.
+        let mutable cursor = 0
+
+        let rec readChildren parentLevel = [|
+            while cursor < flatSections.Length && flatSections.[cursor].level > parentLevel do
+                let section = flatSections.[cursor]
+                cursor <- cursor + 1
+
+                let children =
+                    if section.level = 0 then
+                        [||]
+                    else
+                        readChildren section.level
+
+                yield { section with children = children }
+        |]
+
+        readChildren -1
+
 [<Erase; Mangle(false)>]
 type Changelog =
+
+    [<ReactComponent>]
+    static member private NavigationItem
+        (section: ChangelogTypes.Section, navigate: Browser.Types.Element -> unit)
+        : ReactElement =
+        Html.li [
+            prop.children [
+                Html.button [
+                    prop.type'.button
+                    prop.ariaLabel $"{section.title} {section.count}"
+                    prop.className "swt:flex swt:justify-between swt:gap-3"
+                    prop.onClick (fun _ -> navigate section.target)
+                    prop.children [
+                        Html.span section.title
+                        Html.span [
+                            prop.className "swt:badge swt:badge-sm swt:shrink-0"
+                            prop.text section.count
+                        ]
+                    ]
+                ]
+                if not (Array.isEmpty section.children) then
+                    Html.ul [
+                        prop.className "swt:ml-3 swt:pl-3 swt:border-l swt:border-base-300"
+                        prop.children [
+                            for child in section.children do
+                                Changelog.NavigationItem(child, navigate)
+                        ]
+                    ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private ReleaseNotes(body: string option, pagination: ReactElement) =
+        let contentRef = React.useElementRef ()
+        let sections, setSections = React.useState<ChangelogTypes.Section[]> [||]
+
+        let markdown =
+            match body with
+            | Some text when not (System.String.IsNullOrWhiteSpace text) -> text
+            | _ -> "No release notes provided."
+
+        React.useLayoutEffect (
+            (fun () ->
+                contentRef.current
+                |> Option.iter (fun root ->
+                    root.scrollTop <- 0
+                    setSections (ChangelogHelpers.sections root)
+                )
+            ),
+            [| box markdown |]
+        )
+
+        let navigate (target: Browser.Types.Element) =
+            contentRef.current
+            |> Option.iter (fun root ->
+                if target = root then
+                    root.scrollTop <- 0
+                else
+                    ChangelogHelpers.scrollToSection target
+            )
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:md:flex-row swt:gap-4 swt:grow swt:min-h-0"
+            prop.children [
+                Html.nav [
+                    prop.ariaLabel "Release note sections"
+                    prop.className "swt:md:w-56 swt:shrink-0 swt:overflow-auto swt:max-h-48 swt:md:max-h-none"
+                    prop.children [
+                        if sections |> Array.exists (fun section -> not (Array.isEmpty section.children)) then
+                            Html.p [
+                                prop.className "swt:text-xs swt:opacity-70 swt:px-3 swt:pb-2"
+                                prop.text "Counts include subsections."
+                            ]
+                        Html.ul [
+                            prop.className "swt:menu swt:w-full swt:bg-base-200 swt:rounded-box"
+                            prop.children [
+                                for section in sections do
+                                    Changelog.NavigationItem(section, navigate)
+                            ]
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:grow swt:min-w-0 swt:min-h-0"
+                    prop.children [
+                        Html.div [
+                            prop.ref contentRef
+                            prop.className "swt:grow swt:overflow-auto"
+                            prop.children [
+                                ReactMDEditor.MarkdownPreview(
+                                    markdown,
+                                    rehypePlugins = [| ReactMDEditor.rehypeSanitize |],
+                                    style = {| padding = 16; borderRadius = 8 |},
+                                    className = "swt:prose"
+                                )
+                            ]
+                        ]
+                        pagination
+                    ]
+                ]
+            ]
+        ]
 
     /// currentRelease accepts an exact tag or a semantic version (with or without v).
     /// Starts at the matching release, or the first release when no match exists.
@@ -105,42 +313,32 @@ type Changelog =
                                 ]
                             ]
 
-                            Html.div [
-                                prop.className "swt:grow swt:overflow-auto"
-                                prop.children [
-                                    ReactMDEditor.MarkdownPreview(
-                                        (match release.body with
-                                         | Some body when not (System.String.IsNullOrWhiteSpace body) -> body
-                                         | _ -> "No release notes provided."),
-                                        rehypePlugins = [| ReactMDEditor.rehypeSanitize |],
-                                        style = {| padding = 16; borderRadius = 8 |},
-                                        className = "swt:prose"
-                                    )
-                                ]
-                            ]
-
-                            Html.nav [
-                                prop.className "swt:flex swt:items-center swt:justify-center swt:gap-3 swt:mt-6"
-                                prop.ariaLabel "Changelog pagination"
-                                prop.children [
-                                    Html.button [
-                                        prop.type'.button
-                                        prop.className "swt:btn swt:btn-sm"
-                                        prop.text "Previous"
-                                        prop.disabled (selectedIndex <= 0)
-                                        prop.onClick (fun _ -> setSelectedIndex (max 0 (selectedIndex - 1)))
-                                    ]
-                                    Html.span $"{selectedIndex + 1} / {releases.Length}"
-                                    Html.button [
-                                        prop.type'.button
-                                        prop.className "swt:btn swt:btn-sm"
-                                        prop.text "Next"
-                                        prop.disabled (selectedIndex >= releases.Length - 1)
-                                        prop.onClick (fun _ ->
-                                            setSelectedIndex (min (releases.Length - 1) (selectedIndex + 1))
-                                        )
+                            Changelog.ReleaseNotes(
+                                release.body,
+                                Html.nav [
+                                    prop.className
+                                        "swt:flex swt:shrink-0 swt:items-center swt:justify-center swt:gap-3 swt:mt-6"
+                                    prop.ariaLabel "Changelog pagination"
+                                    prop.children [
+                                        Html.button [
+                                            prop.type'.button
+                                            prop.className "swt:btn swt:btn-sm"
+                                            prop.text "Previous"
+                                            prop.disabled (selectedIndex <= 0)
+                                            prop.onClick (fun _ -> setSelectedIndex (max 0 (selectedIndex - 1)))
+                                        ]
+                                        Html.span $"{selectedIndex + 1} / {releases.Length}"
+                                        Html.button [
+                                            prop.type'.button
+                                            prop.className "swt:btn swt:btn-sm"
+                                            prop.text "Next"
+                                            prop.disabled (selectedIndex >= releases.Length - 1)
+                                            prop.onClick (fun _ ->
+                                                setSelectedIndex (min (releases.Length - 1) (selectedIndex + 1))
+                                            )
+                                        ]
                                     ]
                                 ]
-                            ]
+                            )
             ]
         ]
