@@ -42,7 +42,11 @@ const adHocSignDarwinArm64App = async (_forgeConfig, packageResult) => {
 
 module.exports = {
   packagerConfig: {
-    asar: true,
+    // The main process starts the text diff worker from the unpacked copy next to app.asar.
+    // asar matches this pattern with minimatch and matchBase, so a bare file name matches the
+    // worker in any folder. A pattern with ** skips dot folders, which include .vite and any
+    // dot folder in the build path (C:\Users\x\.cache, for example).
+    asar: { unpack: 'text-diff-worker.cjs' },
     executableName: 'swate',
     icon: platformIcon,
     extraResource: [
@@ -94,6 +98,11 @@ module.exports = {
             entry: 'src/fable_output/Preload/preload.fs.jsx',
             config: 'vite.preload.config.mjs',
             target: 'preload',
+          },
+          {
+            entry: 'src/fable_output/Main/Workers/TextDiffWorkerEntry.fs.jsx',
+            config: 'vite.worker.config.mjs',
+            target: 'main',
           },
         ],
         renderer: [
