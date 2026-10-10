@@ -866,7 +866,10 @@ module ArcVaultExtensions =
                                                 || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir eventName
                                             then
                                                 let watcherEvent =
-                                                    WatcherHelpers.buildWatcherEvent arcPath eventName absoluteChangedPath
+                                                    WatcherHelpers.buildWatcherEvent
+                                                        arcPath
+                                                        eventName
+                                                        absoluteChangedPath
 
                                                 this.ApplyWatcherFileTreeEvents [ watcherEvent ]
                                                 |> Promise.catch (fun error ->
