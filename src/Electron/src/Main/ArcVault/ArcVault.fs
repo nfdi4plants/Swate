@@ -28,6 +28,11 @@ type internal FileWatcherReadyOutcome =
     | WatcherError of exn
     | Cancelled
 
+type internal OwnedFileTreeDirectoryCursor = {
+    Cursor: FileTreeDirectoryCursor
+    mutable LastAccess: int
+}
+
 type internal LoadedDirectoryWatcherState = {
     LifecycleActive: bool
     MutationActive: bool
@@ -245,13 +250,16 @@ type WatcherMergeOutcome =
 type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
+    let maxRetainedFileTreeDirectoryCursors = 8
     let arcMergeQueue = ArcMergeQueue(window.id)
     let mutable busyWritingDepth = 0
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
     let loadedDirectoryWatcherController = LoadedDirectoryWatcherController()
-    let fileTreeDirectoryCursors = Dictionary<string, FileTreeDirectoryCursor>()
+    let fileTreeDirectoryCursors = Dictionary<string, OwnedFileTreeDirectoryCursor>()
+    let fileTreeDirectoryCursorOffsets = Dictionary<string, int>()
+    let mutable fileTreeDirectoryCursorAccess = 0
 
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
@@ -334,23 +342,37 @@ type ArcVault(window: BrowserWindow) =
 
     member internal _.FileTreeDirectoryCursors = fileTreeDirectoryCursors
 
-    member internal this.CloseFileTreeDirectoryCursor(relativeDirectoryPath: string) = promise {
+    member internal _.FileTreeDirectoryCursorOffsets = fileTreeDirectoryCursorOffsets
+
+    member private _.TouchFileTreeDirectoryCursor(ownedCursor: OwnedFileTreeDirectoryCursor) =
+        fileTreeDirectoryCursorAccess <- fileTreeDirectoryCursorAccess + 1
+        ownedCursor.LastAccess <- fileTreeDirectoryCursorAccess
+
+    member internal this.CloseFileTreeDirectoryCursor(relativeDirectoryPath: string, ?forgetProgress: bool) = promise {
         let normalizedPath =
             PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
 
+        let forgetProgress = defaultArg forgetProgress true
+
         match fileTreeDirectoryCursors.TryGetValue normalizedPath with
-        | false, _ -> ()
-        | true, cursor ->
+        | false, _ ->
+            if forgetProgress then
+                fileTreeDirectoryCursorOffsets.Remove normalizedPath |> ignore
+        | true, ownedCursor ->
             fileTreeDirectoryCursors.Remove normalizedPath |> ignore
 
             try
-                do! cursor.Directory.close ()
+                do! ownedCursor.Cursor.Directory.close ()
             with _ ->
                 ()
+
+            if forgetProgress then
+                fileTreeDirectoryCursorOffsets.Remove normalizedPath |> ignore
     }
 
-    member internal this.CloseFileTreeDirectoryCursors(?underPath: string) = promise {
+    member internal this.CloseFileTreeDirectoryCursors(?underPath: string, ?forgetProgress: bool) = promise {
         let cursorPaths = fileTreeDirectoryCursors.Keys |> Seq.toArray
+        let forgetProgress = defaultArg forgetProgress true
 
         let pathsToClose =
             match underPath with
@@ -362,7 +384,82 @@ type ArcVault(window: BrowserWindow) =
                 |> Array.filter (fun cursorPath -> PathHelpers.isSameOrDescendantPath cursorPath normalizedPath)
 
         for cursorPath in pathsToClose do
-            do! this.CloseFileTreeDirectoryCursor cursorPath
+            do! this.CloseFileTreeDirectoryCursor(cursorPath, forgetProgress = forgetProgress)
+
+        if forgetProgress then
+            let offsetPaths = fileTreeDirectoryCursorOffsets.Keys |> Seq.toArray
+
+            let offsetsToForget =
+                match underPath with
+                | None -> offsetPaths
+                | Some path ->
+                    let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
+
+                    offsetPaths
+                    |> Array.filter (fun cursorPath -> PathHelpers.isSameOrDescendantPath cursorPath normalizedPath)
+
+            offsetsToForget
+            |> Array.iter (fun cursorPath -> fileTreeDirectoryCursorOffsets.Remove cursorPath |> ignore)
+    }
+
+    member internal this.AcquireFileTreeDirectoryCursor(arcPath: string, relativeDirectoryPath: string) = promise {
+        let normalizedPath =
+            PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+        match fileTreeDirectoryCursors.TryGetValue normalizedPath with
+        | true, ownedCursor ->
+            this.TouchFileTreeDirectoryCursor ownedCursor
+            let directoryPath = join [| arcPath; normalizedPath |] |> PathHelpers.normalizePath
+            return Some(directoryPath, ownedCursor.Cursor)
+        | false, _ ->
+            if fileTreeDirectoryCursors.Count >= maxRetainedFileTreeDirectoryCursors then
+                let inactivePath =
+                    fileTreeDirectoryCursors
+                    |> Seq.minBy (fun pair -> pair.Value.LastAccess)
+                    |> fun pair -> pair.Key
+
+                do! this.CloseFileTreeDirectoryCursor(inactivePath, forgetProgress = false)
+
+            let! directoryPath, cursor = openFileTreeDirectoryCursor arcPath normalizedPath
+
+            try
+                let resumeOffset =
+                    match fileTreeDirectoryCursorOffsets.TryGetValue normalizedPath with
+                    | true, offset -> offset
+                    | false, _ -> 0
+
+                let mutable canResume = true
+
+                if resumeOffset > 0 then
+                    let! skippedPage = readFileTreeDirectoryCursorPage directoryPath cursor resumeOffset
+
+                    if skippedPage.Entries.Length < resumeOffset || not skippedPage.HasMore then
+                        try
+                            do! cursor.Directory.close ()
+                        with _ ->
+                            ()
+
+                        fileTreeDirectoryCursorOffsets.Remove normalizedPath |> ignore
+                        canResume <- false
+
+                if canResume then
+                    fileTreeDirectoryCursorAccess <- fileTreeDirectoryCursorAccess + 1
+
+                    fileTreeDirectoryCursors.[normalizedPath] <- {
+                        Cursor = cursor
+                        LastAccess = fileTreeDirectoryCursorAccess
+                    }
+
+                    return Some(directoryPath, cursor)
+                else
+                    return None
+            with error ->
+                try
+                    do! cursor.Directory.close ()
+                with _ ->
+                    ()
+
+                return raise error
     }
 
     member this.arcActivityState: ArcActivityState = {
@@ -474,8 +571,17 @@ module ArcVaultExtensions =
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.map (fun _ -> ()) |> Promise.catch (fun _ -> ())
             queuedUpdate
 
-        member internal this.CloseFileTreeDirectoryCursorsUnderPath(relativeDirectoryPath: string) =
-            this.EnqueueFileTreeUpdate(fun () -> this.CloseFileTreeDirectoryCursors(underPath = relativeDirectoryPath))
+        member internal this.InvalidateFileTreeDirectoryCursors(relativeDirectoryPaths: string seq) =
+            let normalizedPaths =
+                relativeDirectoryPaths
+                |> Seq.map PathHelpers.normalizeCanonicalRelativePath
+                |> Seq.distinct
+                |> Seq.toArray
+
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                for relativeDirectoryPath in normalizedPaths do
+                    do! this.CloseFileTreeDirectoryCursors(underPath = relativeDirectoryPath)
+            })
 
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
             try
@@ -614,7 +720,11 @@ module ArcVaultExtensions =
                                 removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
 
                                 if WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
+                                    let parentPath =
+                                        PathHelpers.tryGetParentPath event.RelativePath |> Option.defaultValue ""
+
                                     do! this.CloseFileTreeDirectoryCursors(underPath = event.RelativePath)
+                                    do! this.CloseFileTreeDirectoryCursor parentPath
 
                                 hasFileTreeChanges <- true
                         with fileTreeError ->
@@ -1403,39 +1513,42 @@ module ArcVaultExtensions =
                         ->
                         return raise (ArcLoadCancelledException this.window.id)
                     | Some arcPath, Some _ ->
-                        let! directoryPath, cursor = promise {
-                            match this.FileTreeDirectoryCursors.TryGetValue normalizedRelativePath with
-                            | true, cursor ->
-                                let directoryPath =
-                                    join [| arcPath; normalizedRelativePath |] |> PathHelpers.normalizePath
+                        match this.fileTreeDirectoryHasMore.TryGetValue normalizedRelativePath with
+                        | true, false -> ()
+                        | _ ->
+                            match! this.AcquireFileTreeDirectoryCursor(arcPath, normalizedRelativePath) with
+                            | None -> this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- false
+                            | Some(directoryPath, cursor) ->
+                                try
+                                    let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
 
-                                return directoryPath, cursor
-                            | false, _ ->
-                                let! directoryPath, cursor = openFileTreeDirectoryCursor arcPath normalizedRelativePath
+                                    if
+                                        capturedWatcherEpoch <> this.WatcherEpoch
+                                        || this.path |> Option.exists (PathHelpers.pathsEqual arcPath) |> not
+                                    then
+                                        do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
+                                        return raise (ArcLoadCancelledException this.window.id)
 
-                                this.FileTreeDirectoryCursors.[normalizedRelativePath] <- cursor
-                                return directoryPath, cursor
-                        }
+                                    let nextTree = mergeFileTreeDirectoryPage page.Entries this.fileTree
 
-                        try
-                            let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
+                                    let previousOffset =
+                                        match
+                                            this.FileTreeDirectoryCursorOffsets.TryGetValue normalizedRelativePath
+                                        with
+                                        | true, offset -> offset
+                                        | false, _ -> 0
 
-                            if
-                                capturedWatcherEpoch <> this.WatcherEpoch
-                                || this.path |> Option.exists (PathHelpers.pathsEqual arcPath) |> not
-                            then
-                                do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
-                                return raise (ArcLoadCancelledException this.window.id)
+                                    this.FileTreeDirectoryCursorOffsets.[normalizedRelativePath] <-
+                                        previousOffset + page.Entries.Length
 
-                            let nextTree = mergeFileTreeDirectoryPage page.Entries this.fileTree
-                            this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- page.HasMore
-                            this.SetFileTree nextTree
+                                    this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- page.HasMore
+                                    this.SetFileTree nextTree
 
-                            if not page.HasMore then
-                                do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
-                        with error ->
-                            do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
-                            return raise error
+                                    if not page.HasMore then
+                                        do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
+                                with error ->
+                                    do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
+                                    return raise error
 
                         if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
                             let controller = this.LoadedDirectoryWatcherController
@@ -1484,7 +1597,7 @@ module ArcVaultExtensions =
 
                                 match this.path with
                                 | Some currentArcPath when PathHelpers.pathsEqual currentArcPath requestedArcPath ->
-                                    let! rootPage = this.LoadInitialFileTreeRootPage requestedArcPath
+                                    let! rootPage = this.LoadInitialFileTreeRootPageCore requestedArcPath
                                     do! this.RequestLoadedDirectoryWatcherCoverage false |> Promise.map ignore
                                     controller.ClearLoadedDirectories()
                                     this.fileTreeDirectoryHasMore.[""] <- rootPage.HasMore
@@ -1519,13 +1632,7 @@ module ArcVaultExtensions =
                 }
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
-                    do!
-                        this.EnqueueFileTreeUpdate(fun () -> promise {
-                            if this.fileTree.Count = 0 then
-                                let! rootPage = this.LoadInitialFileTreeRootPage arcPath
-                                this.fileTreeDirectoryHasMore.[""] <- rootPage.HasMore
-                                this.fileTree <- rootPage.Entries
-                        })
+                    do! this.EnsureInitialFileTreeRootPage arcPath |> Promise.map ignore
 
                 return {
                     entries = toRendererFileTree arcPath this.fileTree.Values
@@ -1545,7 +1652,7 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
-        member internal this.LoadInitialFileTreeRootPage(arcPath: string) = promise {
+        member private this.LoadInitialFileTreeRootPageCore(arcPath: string) = promise {
             let normalizedArcPath = normalizeRootPath arcPath
             let! rootEntry = getFileEntry normalizedArcPath
 
@@ -1556,23 +1663,47 @@ module ArcVaultExtensions =
                 }
             else
                 do! this.CloseFileTreeDirectoryCursor ""
-                let! directoryPath, cursor = openFileTreeDirectoryCursor normalizedArcPath ""
-                this.FileTreeDirectoryCursors.[""] <- cursor
 
-                try
-                    let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
-
-                    if not page.HasMore then
-                        do! this.CloseFileTreeDirectoryCursor ""
-
+                match! this.AcquireFileTreeDirectoryCursor(normalizedArcPath, "") with
+                | None ->
                     return {
-                        Entries = createFileEntryTree (Array.append [| rootEntry |] page.Entries)
-                        HasMore = page.HasMore
+                        Entries = createFileEntryTree [| rootEntry |]
+                        HasMore = false
                     }
-                with error ->
-                    do! this.CloseFileTreeDirectoryCursor ""
-                    return raise error
+                | Some(directoryPath, cursor) ->
+                    try
+                        let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
+                        this.FileTreeDirectoryCursorOffsets.[""] <- page.Entries.Length
+
+                        if not page.HasMore then
+                            do! this.CloseFileTreeDirectoryCursor ""
+
+                        return {
+                            Entries = createFileEntryTree (Array.append [| rootEntry |] page.Entries)
+                            HasMore = page.HasMore
+                        }
+                    with error ->
+                        do! this.CloseFileTreeDirectoryCursor ""
+                        return raise error
         }
+
+        member internal this.EnsureInitialFileTreeRootPage(arcPath: string) =
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                match this.path with
+                | Some currentArcPath when
+                    capturedWatcherEpoch = this.WatcherEpoch
+                    && PathHelpers.pathsEqual currentArcPath arcPath
+                    ->
+                    if this.fileTree.Count = 0 then
+                        let! rootPage = this.LoadInitialFileTreeRootPageCore arcPath
+                        this.fileTreeDirectoryHasMore.[""] <- rootPage.HasMore
+                        this.SetFileTree rootPage.Entries
+
+                    return this.fileTree
+                | _ -> return raise (ArcLoadCancelledException this.window.id)
+            })
 
         member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
@@ -1799,6 +1930,10 @@ module ArcVaultExtensions =
                     do! this.StopFileWatcher()
                 else
                     this.ClearPendingFileWatcherState()
+
+                // Release directory handles before moving the ARC folder. On platforms such as Windows,
+                // an open handle anywhere below the root can otherwise prevent the rename.
+                do! this.EnqueueFileTreeUpdate(fun () -> this.CloseFileTreeDirectoryCursors())
 
                 // A write can start while the watcher stops.
                 let! renameResult =
@@ -2305,14 +2440,12 @@ type ArcVaults() =
         | _ -> raise (ArcLoadCancelledException windowId)
 
     member private this.InitializeFileTreeForActiveVault(windowId: int, expectedVault: ArcVault, arcPath: string) = promise {
-        let! rootPageResult = expectedVault.LoadInitialFileTreeRootPage arcPath |> Promise.result
+        let! rootPageResult = expectedVault.EnsureInitialFileTreeRootPage arcPath |> Promise.result
 
         this.EnsureVaultIsStillActive(windowId, expectedVault)
 
         match rootPageResult with
-        | Ok rootPage ->
-            expectedVault.fileTreeDirectoryHasMore.[""] <- rootPage.HasMore
-            return rootPage.Entries
+        | Ok fileTree -> return fileTree
         | Error error -> return raise error
     }
 

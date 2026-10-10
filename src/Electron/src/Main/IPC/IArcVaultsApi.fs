@@ -846,6 +846,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 | Some arcLocal ->
                                     return!
                                         vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                            let parentPath =
+                                                PathHelpers.tryGetParentPath normalizedRelativePath
+                                                |> Option.defaultValue ""
+
+                                            do!
+                                                vault.InvalidateFileTreeDirectoryCursors [
+                                                    normalizedRelativePath
+                                                    parentPath
+                                                ]
+
                                             let! result =
                                                 vault.WithBusyWritingScope(fun () -> promise {
                                                     match!
@@ -862,16 +872,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 })
 
                                             match result with
-                                            | Ok() ->
-                                                do!
-                                                    vault.CloseFileTreeDirectoryCursorsUnderPath
-                                                        normalizedRelativePath
-
-                                                let parentPath =
-                                                    PathHelpers.tryGetParentPath normalizedRelativePath
-                                                    |> Option.defaultValue ""
-
-                                                do! vault.RefreshFileTreeDirectory parentPath
+                                            | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
                                             | Error _ -> ()
 
                                             return result
@@ -914,20 +915,23 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 else
                                     return!
                                         vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                            let parentPath =
+                                                PathHelpers.tryGetParentPath normalizedGenericPath
+                                                |> Option.defaultValue ""
+
+                                            do!
+                                                vault.InvalidateFileTreeDirectoryCursors [
+                                                    normalizedGenericPath
+                                                    parentPath
+                                                ]
+
                                             let! result =
                                                 ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                                     arcPath
                                                     normalizedGenericPath
 
                                             match result with
-                                            | Ok() ->
-                                                do! vault.CloseFileTreeDirectoryCursorsUnderPath normalizedGenericPath
-
-                                                let parentPath =
-                                                    PathHelpers.tryGetParentPath normalizedGenericPath
-                                                    |> Option.defaultValue ""
-
-                                                do! vault.RefreshFileTreeDirectory parentPath
+                                            | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
                                             | Error _ -> ()
 
                                             return result
@@ -964,16 +968,24 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
                                 return!
                                     vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                        let parentPath =
+                                            PathHelpers.tryGetParentPath request.relativePath
+                                            |> Option.defaultValue ""
+
+                                        let targetPath = path.join [| parentPath; request.newName |]
+
+                                        do!
+                                            vault.InvalidateFileTreeDirectoryCursors [
+                                                request.relativePath
+                                                targetPath
+                                                parentPath
+                                            ]
+
                                         let! result =
                                             ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
 
                                         match result with
-                                        | Ok() ->
-                                            let parentPath =
-                                                PathHelpers.tryGetParentPath request.relativePath
-                                                |> Option.defaultValue ""
-
-                                            do! vault.RefreshFileTreeDirectory parentPath
+                                        | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
                                         | Error _ -> ()
 
                                         return result
@@ -984,6 +996,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 | Some arcLocal ->
                                     return!
                                         vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                            let parentPath =
+                                                PathHelpers.tryGetParentPath request.relativePath
+                                                |> Option.defaultValue ""
+
+                                            let targetPath = path.join [| parentPath; request.newName |]
+
+                                            do!
+                                                vault.InvalidateFileTreeDirectoryCursors [
+                                                    request.relativePath
+                                                    targetPath
+                                                    parentPath
+                                                ]
+
                                             let! result =
                                                 vault.WithBusyWritingScope(fun () -> promise {
                                                     match!
@@ -997,12 +1022,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 })
 
                                             match result with
-                                            | Ok() ->
-                                                let parentPath =
-                                                    PathHelpers.tryGetParentPath request.relativePath
-                                                    |> Option.defaultValue ""
-
-                                                do! vault.RefreshFileTreeDirectory parentPath
+                                            | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
                                             | Error _ -> ()
 
                                             return result
@@ -1033,19 +1053,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         (fun vault -> promise {
                             return!
                                 vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                    let sourceParent =
+                                        PathHelpers.tryGetParentPath request.sourceRelativePath
+                                        |> Option.defaultValue ""
+
+                                    let targetParent =
+                                        PathHelpers.tryGetParentPath request.targetRelativePath
+                                        |> Option.defaultValue ""
+
+                                    do!
+                                        vault.InvalidateFileTreeDirectoryCursors [
+                                            request.sourceRelativePath
+                                            request.targetRelativePath
+                                            sourceParent
+                                            targetParent
+                                        ]
+
                                     let! result =
                                         ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
 
                                     match result with
                                     | Ok() ->
-                                        let sourceParent =
-                                            PathHelpers.tryGetParentPath request.sourceRelativePath
-                                            |> Option.defaultValue ""
-
-                                        let targetParent =
-                                            PathHelpers.tryGetParentPath request.targetRelativePath
-                                            |> Option.defaultValue ""
-
                                         do! vault.RefreshFileTreeDirectory sourceParent
 
                                         if not (PathHelpers.pathsEqual sourceParent targetParent) then
