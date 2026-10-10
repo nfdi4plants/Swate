@@ -209,6 +209,94 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "loaded watcher removes a deleted file from a partial directory and preserves other cached entries",
+            TestOptions(timeout = 20000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
+                        let! paths = createNumberedFiles datasetPath 150
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+
+                        let deletedPath =
+                            paths |> Array.find (fun path -> containsPath path vault)
+
+                        let preservedPath = findEntryOutsidePage paths page
+                        vault.fileTree.[preservedPath] <- FileEntry.create (basename preservedPath, preservedPath, false)
+                        do! Promise.sleep 200
+
+                        do! rmAsync deletedPath (RmOptions())
+                        do! waitUntil "partial-directory file deletion" (fun () -> not (containsPath deletedPath vault))
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
+                        Vitest.expect(containsPath preservedPath vault).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "loaded watcher removes a deleted directory and its cached descendants from a partial directory",
+            TestOptions(timeout = 20000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        let! _ = createNumberedFiles datasetPath 150
+                        let deletedDirectoryPath = join [| datasetPath; "deleted-directory" |]
+                        let deletedDescendantPath = join [| deletedDirectoryPath; "deep.txt" |]
+                        let! _ = mkdirAsync deletedDirectoryPath (MkdirOptions(recursive = true))
+                        do! writeFileAsync deletedDescendantPath "deep" TextEncoding.Utf8
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        vault.fileTree.[deletedDirectoryPath] <-
+                            FileEntry.create (basename deletedDirectoryPath, deletedDirectoryPath, true)
+                        vault.fileTree.[deletedDescendantPath] <-
+                            FileEntry.create (basename deletedDescendantPath, deletedDescendantPath, false)
+                        do! Promise.sleep 200
+
+                        do! rmAsync deletedDirectoryPath (RmOptions(recursive = true, force = true))
+
+                        do!
+                            waitUntil
+                                "partial-directory directory deletion"
+                                (fun () -> not (containsPath deletedDirectoryPath vault))
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
+                        Vitest.expect(containsPath deletedDescendantPath vault).toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
+            "loaded watcher keeps a file recreated before its queued deletion is applied",
+            TestOptions(timeout = 20000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        let! paths = createNumberedFiles datasetPath 150
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let recreatedPath =
+                            paths |> Array.find (fun path -> containsPath path vault)
+
+                        do! Promise.sleep 200
+                        let queueGate, releaseQueue = TestHelpers.deferred ()
+                        vault.FileTreeUpdateTail <- queueGate
+                        do! rmAsync recreatedPath (RmOptions())
+
+                        do!
+                            waitUntil
+                                "queued loaded-directory deletion"
+                                (fun () -> vault.LoadedDirectoryRefreshes.ContainsKey "dataset")
+
+                        do! writeFileAsync recreatedPath "recreated" TextEncoding.Utf8
+                        releaseQueue ()
+                        do! vault.FileTreeUpdateTail
+
+                        Vitest.expect(containsPath recreatedPath vault).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
             "loaded scopes grow explicitly and remain shallow",
             TestOptions(timeout = 15000),
             fun () -> promise {

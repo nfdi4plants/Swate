@@ -861,6 +861,24 @@ module ArcVaultExtensions =
                                             && controller.Current.ActiveGeneration = Some generation
                                             && this.IsFileTreeDirectoryLoaded parentPath
                                             ->
+                                            if
+                                                WatcherHelpers.eventNameEquals Chokidar.Events.Unlink eventName
+                                                || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir eventName
+                                            then
+                                                let watcherEvent =
+                                                    WatcherHelpers.buildWatcherEvent arcPath eventName absoluteChangedPath
+
+                                                this.ApplyWatcherFileTreeEvents [ watcherEvent ]
+                                                |> Promise.catch (fun error ->
+                                                    swatelogfn
+                                                        this.window.id
+                                                        "Unable to apply loaded-directory watcher event '%s' on '%s': %s"
+                                                        eventName
+                                                        watcherEvent.RelativePath
+                                                        error.Message
+                                                )
+                                                |> Promise.start
+
                                             this.QueueLoadedDirectoryRefresh(parentPath, generation)
                                         | _ -> ()
                             )
