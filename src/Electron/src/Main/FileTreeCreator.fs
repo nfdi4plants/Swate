@@ -210,6 +210,13 @@ let readFileTreeDirectoryCursorPage
 
         let entries = ResizeArray<FileEntry>()
         let mutable exhausted = false
+        let mutable rawReadCount = 0
+        let rawReadLimit = pageSize * 2
+
+        let readNext () = promise {
+            rawReadCount <- rawReadCount + 1
+            return! cursor.Directory.read ()
+        }
 
         let tryAccept (dirent: Dirent) =
             let name = dirent.name
@@ -230,8 +237,8 @@ let readFileTreeDirectoryCursorPage
             tryAccept dirent |> Option.iter entries.Add
         )
 
-        while not exhausted && entries.Count < pageSize do
-            let! dirent = cursor.Directory.read ()
+        while not exhausted && rawReadCount < rawReadLimit && entries.Count < pageSize do
+            let! dirent = readNext ()
 
             if isNull (box dirent) then
                 exhausted <- true
@@ -240,8 +247,8 @@ let readFileTreeDirectoryCursorPage
 
         // Read until the next accepted entry so ignored filesystem entries do not create a false
         // positive HasMore result. Preserve that entry for the next batch.
-        while not exhausted && cursor.Lookahead.IsNone do
-            let! dirent = cursor.Directory.read ()
+        while not exhausted && rawReadCount < rawReadLimit && cursor.Lookahead.IsNone do
+            let! dirent = readNext ()
 
             if isNull (box dirent) then
                 exhausted <- true
@@ -250,7 +257,7 @@ let readFileTreeDirectoryCursorPage
 
         return {
             Entries = entries.ToArray()
-            HasMore = cursor.Lookahead.IsSome
+            HasMore = not exhausted
         }
     }
 

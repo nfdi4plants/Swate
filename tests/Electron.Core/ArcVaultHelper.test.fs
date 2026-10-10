@@ -1087,12 +1087,6 @@ Vitest.describe (
                         Vitest.expect(countChildren firstDirectory beforeResume).toBe 100
 
                         do! vault.LoadNextFileTreeDirectoryPage firstDirectory
-                        let! afterRestartPage = vault.GetRendererFileTreeSnapshot()
-
-                        Vitest.expect(countChildren firstDirectory afterRestartPage).toBe 100
-                        Vitest.expect(afterRestartPage.directoryHasMore.[firstDirectory]).toBe true
-
-                        do! vault.LoadNextFileTreeDirectoryPage firstDirectory
                         let! afterResume = vault.GetRendererFileTreeSnapshot()
 
                         Vitest.expect(countChildren firstDirectory afterResume).toBe 101
@@ -1155,6 +1149,81 @@ Vitest.describe (
                         Vitest.expect(snapshot.directoryHasMore.["paged"]).toBe false
                         Vitest.expect(publicationCount).toBe 1
                         Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("paged")).toBe false
+                    })
+        )
+
+        Vitest.test (
+            "evicted cursor automatically crosses thousands of cached entries to discover new files",
+            TestOptions(timeout = 15000),
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let relativeDirectory = "large-paged"
+                        let directoryPath = join [| arcPath; relativeDirectory |]
+                        do! mkdirWatcherDirectoryAsync directoryPath
+
+                        let writes =
+                            Array.init
+                                1201
+                                (fun index ->
+                                    writeWatcherTextFileAsync
+                                        (join [| directoryPath; sprintf "entry-%04d.txt" index |])
+                                        "entry"
+                                )
+
+                        let! _ = JS.Constructors.Promise.all writes
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        for index in 0..1199 do
+                            let entryPath =
+                                join [| directoryPath; sprintf "entry-%04d.txt" index |]
+                                |> PathHelpers.normalizePath
+
+                            vault.fileTree.[entryPath] <-
+                                FileEntry.create (sprintf "entry-%04d.txt" index, entryPath, false)
+
+                        vault.fileTreeDirectoryHasMore.[relativeDirectory] <- true
+                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, relativeDirectory)
+
+                        for index in 0..7 do
+                            let inactivePath = sprintf "large-inactive-%02d" index
+                            do! mkdirWatcherDirectoryAsync (join [| arcPath; inactivePath |])
+                            let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, inactivePath)
+                            ()
+
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey(relativeDirectory)).toBe false
+
+                        do! vault.LoadNextFileTreeDirectoryPage relativeDirectory
+
+                        let newlyDiscoveredPath =
+                            join [| directoryPath; "entry-1200.txt" |] |> PathHelpers.normalizePath
+
+                        do!
+                            waitUntil
+                                "automatic cursor restart discovery"
+                                (fun () -> vault.fileTree.ContainsKey newlyDiscoveredPath)
+
+                        do! vault.FileTreeUpdateTail
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.[relativeDirectory]).toBe false
+                        Vitest.expect(vault.FileTreeDirectoryAutomaticContinuations.Count).toBe 0
+                    })
+        )
+
+        Vitest.test (
+            "reset cancels pending automatic directory continuation state",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.FileTreeDirectoryAutomaticContinuations.Add("studies") |> ignore
+
+                        do! vault.ResetFileTreeToRoot()
+
+                        Vitest.expect(vault.FileTreeDirectoryAutomaticContinuations.Count).toBe 0
                     })
         )
 

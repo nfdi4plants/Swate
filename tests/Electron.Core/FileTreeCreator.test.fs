@@ -495,6 +495,120 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "ignored-only cursor batches bound raw reads and eventually report exhaustion",
+            fun () -> promise {
+                let mutable readCalls = 0
+                let mutable nextIndex = 0
+
+                let directory =
+                    { new Directory with
+                        member _.read() =
+                            readCalls <- readCalls + 1
+
+                            let result =
+                                if nextIndex < 1000 then
+                                    let index = nextIndex
+                                    nextIndex <- nextIndex + 1
+
+                                    { new Dirent with
+                                        member _.name = $".~$ignored-{index}.xlsx"
+                                        member _.isDirectory() = false
+                                        member _.isFile() = true
+                                        member _.isSymbolicLink() = false
+                                    }
+                                else
+                                    unbox null
+
+                            JS.Constructors.Promise.resolve result
+
+                        member _.close() = JS.Constructors.Promise.resolve ()
+                    }
+
+                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
+                    Directory = directory
+                    Lookahead = None
+                }
+
+                let mutable hasMore = true
+                let mutable batchCount = 0
+
+                while hasMore do
+                    let readsBefore = readCalls
+                    let! page = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 100
+                    let readsThisBatch = readCalls - readsBefore
+                    batchCount <- batchCount + 1
+                    hasMore <- page.HasMore
+
+                    Vitest.expect(page.Entries.Length).toBe 0
+                    Vitest.expect(readsThisBatch <= 200).toBe true
+
+                Vitest.expect(batchCount).toBe 6
+                Vitest.expect(readCalls).toBe 1001
+            }
+        )
+
+        Vitest.test (
+            "lookahead uses the raw-read budget without losing the next accepted entry",
+            fun () -> promise {
+                let mutable readCalls = 0
+                let mutable nextIndex = 0
+
+                let names = [|
+                    "a.txt"
+                    "b.txt"
+                    ".~$ignored-1.xlsx"
+                    ".~$ignored-2.xlsx"
+                    "c.txt"
+                    "d.txt"
+                    "e.txt"
+                |]
+
+                let directory =
+                    { new Directory with
+                        member _.read() =
+                            readCalls <- readCalls + 1
+
+                            let result =
+                                if nextIndex < names.Length then
+                                    let name = names.[nextIndex]
+                                    nextIndex <- nextIndex + 1
+
+                                    { new Dirent with
+                                        member _.name = name
+                                        member _.isDirectory() = false
+                                        member _.isFile() = true
+                                        member _.isSymbolicLink() = false
+                                    }
+                                else
+                                    unbox null
+
+                            JS.Constructors.Promise.resolve result
+
+                        member _.close() = JS.Constructors.Promise.resolve ()
+                    }
+
+                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
+                    Directory = directory
+                    Lookahead = None
+                }
+
+                let! first = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+                Vitest.expect(readCalls).toBe 4
+                Vitest.expect(first.HasMore).toBe true
+
+                let! second = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+                let! final = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+
+                let acceptedNames =
+                    Array.concat [ first.Entries; second.Entries; final.Entries ]
+                    |> Array.map _.name
+
+                Vitest.expect(acceptedNames).toEqual ([| "a.txt"; "b.txt"; "c.txt"; "d.txt"; "e.txt" |])
+                Vitest.expect(final.HasMore).toBe false
+            }
+        )
+
+        Vitest.test (
             "restart pages ignore cached paths without depending on the earlier enumeration order",
             fun () ->
                 let cached = System.Collections.Generic.Dictionary<string, FileEntry>()
