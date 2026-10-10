@@ -461,10 +461,7 @@ Vitest.describe (
                         do! createDirectoryAtAsync studiesPath
 
                         for index in 0..9999 do
-                            do!
-                                writeUtf8FileAsync
-                                    (join [| studiesPath; sprintf "study-%05d" index |])
-                                    "study"
+                            do! writeUtf8FileAsync (join [| studiesPath; sprintf "study-%05d" index |]) "study"
 
                         let! directoryPath, cursor = FileTreeCreator.openFileTreeDirectoryCursor rootPath "studies"
 
