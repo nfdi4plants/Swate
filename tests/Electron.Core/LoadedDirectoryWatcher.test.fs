@@ -7,6 +7,7 @@ open Main.ArcVault
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
@@ -136,9 +137,72 @@ let private withLoadedDirectoryFixtureUsingWindow window testBody = promise {
 let private withLoadedDirectoryFixture testBody =
     withLoadedDirectoryFixtureUsingWindow (TestHelpers.testWindow ()) testBody
 
+let private createNumberedFiles directory count = promise {
+    let paths =
+        Array.init count (fun index -> join [| directory; sprintf "file-%03d.txt" index |])
+
+    for path in paths do
+        do! writeFileAsync path "content" TextEncoding.Utf8
+
+    return paths
+}
+
+let private findEntryOutsidePage (paths: string[]) (page: Main.FileTreeCreator.FileTreeDirectoryPage) =
+    paths
+    |> Array.find (fun path ->
+        page.Entries |> Array.exists (fun entry -> PathHelpers.pathsEqual entry.path path) |> not
+    )
+
 Vitest.describe (
     "loaded FileTree directory watching",
     fun () ->
+        Vitest.test (
+            "partial refresh preserves a cached child absent from the returned page",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
+                        let! paths = createNumberedFiles datasetPath 150
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let cachedPath = findEntryOutsidePage paths page
+                        vault.fileTree.[cachedPath] <- FileEntry.create (basename cachedPath, cachedPath, false)
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
+
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
+                        Vitest.expect(containsPath cachedPath vault).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "partial refresh preserves descendants of a cached directory absent from the returned page",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
+                        let! paths = createNumberedFiles datasetPath 150
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let cachedDirectoryPath = findEntryOutsidePage paths page + "-directory"
+                        let cachedDescendantPath = join [| cachedDirectoryPath; "deep.txt" |]
+                        let! _ = mkdirAsync cachedDirectoryPath (MkdirOptions(recursive = true))
+                        do! writeFileAsync cachedDescendantPath "deep" TextEncoding.Utf8
+                        vault.fileTree.[cachedDirectoryPath] <-
+                            FileEntry.create (basename cachedDirectoryPath, cachedDirectoryPath, true)
+                        vault.fileTree.[cachedDescendantPath] <-
+                            FileEntry.create (basename cachedDescendantPath, cachedDescendantPath, false)
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
+
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
+                        Vitest.expect(containsPath cachedDirectoryPath vault).toBe true
+                        Vitest.expect(containsPath cachedDescendantPath vault).toBe true
+                    })
+            }
+        )
+
         Vitest.test (
             "loaded scopes grow explicitly and remain shallow",
             TestOptions(timeout = 15000),
@@ -1043,6 +1107,38 @@ Vitest.describe (
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
                         Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "pending watcher handoff merges partial listings and reconciles complete listings",
+            TestOptions(timeout = 20000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
+                        let! paths = createNumberedFiles datasetPath 150
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let cachedPath = findEntryOutsidePage paths page
+                        vault.fileTree.[cachedPath] <- FileEntry.create (basename cachedPath, cachedPath, false)
+
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () ->
+                                JS.Constructors.Promise.resolve ()
+                            )
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
+                        Vitest.expect(containsPath cachedPath vault).toBe true
+
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                for path in paths do
+                                    do! rmAsync path (RmOptions())
+                            })
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe false
+                        Vitest.expect(containsPath cachedPath vault).toBe false
                     })
             }
         )

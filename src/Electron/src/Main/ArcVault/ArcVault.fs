@@ -920,7 +920,10 @@ module ArcVaultExtensions =
 
                     if canPublish () then
                         let nextFileTree =
-                            reconcileFileTreeDirectory arcPath relativePath page.Entries this.fileTree
+                            if page.HasMore then
+                                mergeFileTreeDirectoryPage page.Entries this.fileTree
+                            else
+                                reconcileFileTreeDirectory arcPath relativePath page.Entries this.fileTree
 
                         this.fileTreeDirectoryHasMore.[relativePath] <- page.HasMore
                         this.SetFileTree nextFileTree
@@ -1412,11 +1415,14 @@ module ArcVaultExtensions =
                                     do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
 
                                 let nextFileTree =
-                                    reconcileFileTreeDirectory
-                                        arcPath
-                                        normalizedRelativePath
-                                        page.Entries
-                                        this.fileTree
+                                    if page.HasMore then
+                                        mergeFileTreeDirectoryPage page.Entries this.fileTree
+                                    else
+                                        reconcileFileTreeDirectory
+                                            arcPath
+                                            normalizedRelativePath
+                                            page.Entries
+                                            this.fileTree
 
                                 this.SetFileTree nextFileTree
 
