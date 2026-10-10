@@ -12,6 +12,7 @@ open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 type LeftSidebarPage =
     | FileExplorer
     | Git
+    | GitHistory
 
 /// A conflicted file with the provider's combined preview. The handle and the
 /// workspace token are the ones the preview was taken with, so a confirmation is
@@ -226,6 +227,7 @@ type PageState =
     | NotesSearchPage
     | ProvenanceGroupingPage
     | GitDiffPage of GitDiffPageData
+    | GitHistoryDiffPage of revision: string * path: string
     | GitMergeConflictPage of VersionControlConflictPage
     | GitFileChoiceConflictPage of VersionControlFileChoicePage
     | GitUnsupportedPage of GitUnsupportedPageData

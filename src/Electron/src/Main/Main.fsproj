@@ -54,6 +54,7 @@
     <Compile Include="ArcVault\ArcVault.fs" />
     <Compile Include="Provenance\ProvenanceGroupingReader.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
+    <Compile Include="IPC\GitHistory.fs" />
     <Compile Include="IPC\FileSystemIO.fs" />
     <Compile Include="IPC\Delete.fs" />
     <Compile Include="IPC\Rename.fs" />
