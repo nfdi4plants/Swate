@@ -259,68 +259,9 @@ let private parseCommits (output: string) =
                 AuthorEmail = fields[offset + 4]
                 AuthoredAt = fields[offset + 5]
                 CommittedAt = fields[offset + 6]
+                Summary = None
             }
         )
-
-let private loadHistory root (request: GitHistoryRequest) = promise {
-    if not (safeInteger request.Skip) || request.Skip < 0 || request.Skip > 1000000 then
-        failwith "The requested history page is out of range."
-
-    if not (safeInteger request.PageSize) then
-        failwith "The requested history page size is invalid."
-
-    let pageSize =
-        if request.PageSize = 0 then
-            30
-        else
-            max 1 (min 100 request.PageSize)
-
-    let! branch, currentHead = branchAndHead root
-
-    let! head = promise {
-        match request.HeadRevision with
-        | Some revision ->
-            let! verified = verifyRevision root revision
-            return Some verified
-        | None -> return currentHead
-    }
-
-    match head with
-    | None ->
-        return {
-            BranchName = branch
-            HeadRevision = None
-            Commits = [||]
-            NextSkip = None
-        }
-    | Some revision ->
-        let! output =
-            run root [|
-                "log"
-                "--topo-order"
-                "-z"
-                "--no-show-signature"
-                "--no-notes"
-                "--format=%H%x00%P%x00%B%x00%an%x00%ae%x00%aI%x00%cI"
-                "--skip=" + string request.Skip
-                "--max-count=" + string (pageSize + 1)
-                revision
-                "--"
-            |]
-
-        let commits = parseCommits output
-
-        return {
-            BranchName = branch
-            HeadRevision = head
-            Commits = commits |> Array.truncate pageSize
-            NextSkip =
-                if commits.Length > pageSize then
-                    Some(request.Skip + pageSize)
-                else
-                    None
-        }
-}
 
 let private changeKind (status: string) =
     match status[0] with
@@ -422,6 +363,93 @@ let private diffArguments revision parent options =
         revisions
         [| "--" |]
     |]
+
+let private loadSummary root (commit: GitHistoryCommit) = promise {
+    try
+        let parent = Array.tryHead commit.ParentRevisions
+        let! names = run root (diffArguments commit.Revision parent [| "--name-status"; "-z" |])
+
+        return {
+            commit with
+                Summary = Some(parseChanges names |> GitHistoryChangeSummary.ofChanges)
+        }
+    with _ ->
+        // One unavailable summary must not prevent browsing the remaining history.
+        return commit
+}
+
+let private loadSummaries root (commits: GitHistoryCommit[]) = promise {
+    let loaded = ResizeArray<GitHistoryCommit>()
+
+    // Each summary makes one name-status read. Batches bound native Git reads to
+    // four while preserving history order and leaving file details lazy.
+    for batch in commits |> Array.chunkBySize 4 do
+        let! summaries = batch |> Array.map (loadSummary root) |> Promise.all
+        loaded.AddRange summaries
+
+    return loaded.ToArray()
+}
+
+let private loadHistory root (request: GitHistoryRequest) = promise {
+    if not (safeInteger request.Skip) || request.Skip < 0 || request.Skip > 1000000 then
+        failwith "The requested history page is out of range."
+
+    if not (safeInteger request.PageSize) then
+        failwith "The requested history page size is invalid."
+
+    let pageSize =
+        if request.PageSize = 0 then
+            30
+        else
+            max 1 (min 100 request.PageSize)
+
+    let! branch, currentHead = branchAndHead root
+
+    let! head = promise {
+        match request.HeadRevision with
+        | Some revision ->
+            let! verified = verifyRevision root revision
+            return Some verified
+        | None -> return currentHead
+    }
+
+    match head with
+    | None ->
+        return {
+            BranchName = branch
+            HeadRevision = None
+            Commits = [||]
+            NextSkip = None
+        }
+    | Some revision ->
+        let! output =
+            run root [|
+                "log"
+                "--topo-order"
+                "-z"
+                "--no-show-signature"
+                "--no-notes"
+                "--format=%H%x00%P%x00%B%x00%an%x00%ae%x00%aI%x00%cI"
+                "--skip=" + string request.Skip
+                "--max-count=" + string (pageSize + 1)
+                revision
+                "--"
+            |]
+
+        let commits = parseCommits output
+        let! visibleCommits = commits |> Array.truncate pageSize |> loadSummaries root
+
+        return {
+            BranchName = branch
+            HeadRevision = head
+            Commits = visibleCommits
+            NextSkip =
+                if commits.Length > pageSize then
+                    Some(request.Skip + pageSize)
+                else
+                    None
+        }
+}
 
 let private loadChanges root revision = promise {
     let! parent = parentRevision root revision

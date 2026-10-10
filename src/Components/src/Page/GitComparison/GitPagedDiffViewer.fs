@@ -9,6 +9,49 @@ open Swate.Components
 open Swate.Components.Page
 open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 
+module private DiffPaneDom =
+    // Estimates give offscreen rows a scroll range; measured inline text also covers font
+    // fallbacks, highlights and controls whose actual width differs from monospace cells.
+    [<Emit("""(() => {
+        const viewport = $0;
+        const frame = viewport.closest('[data-paged-diff-frame]');
+        const row = viewport.firstElementChild?.firstElementChild;
+        if (!(frame instanceof HTMLElement) || !row || row.children.length < 2) return;
+        const number = row.children[0], text = row.children[1];
+        const css = getComputedStyle(text), children = Array.from(text.children);
+        let width = number.getBoundingClientRect().width + parseFloat(css.paddingLeft)
+            + parseFloat(css.paddingRight) + (parseFloat(css.columnGap) || 0) * Math.max(0, children.length - 1);
+        const range = document.createRange();
+        for (const child of children) {
+            if (child instanceof HTMLElement && child.style.whiteSpace === 'pre') {
+                range.selectNodeContents(child);
+                width += range.getBoundingClientRect().width;
+            } else width += child.getBoundingClientRect().width;
+        }
+        const property = '--paged-' + viewport.getAttribute('data-diff-pane') + '-measured-width';
+        if (width + 2 > (parseFloat(frame.style.getPropertyValue(property)) || 0))
+            frame.style.setProperty(property, Math.ceil(width + 2) + 'px');
+    })()""")>]
+    let ensureContentWidth (viewport: HTMLElement) : unit = jsNative
+
+    [<Emit("Array.from($0.querySelectorAll('[data-diff-pane]'))")>]
+    let renderedPanes (frame: HTMLElement) : HTMLElement[] = jsNative
+
+    [<Emit("$0.style.setProperty($1, $2)")>]
+    let setStyleProperty (element: HTMLElement) (name: string) (value: string) : unit = jsNative
+
+    [<Emit("(() => { const pane = $0 instanceof Element ? $0.closest('[data-diff-pane]') : null; return pane instanceof HTMLElement ? pane : null; })()")>]
+    let paneFor (target: EventTarget) : HTMLElement option = jsNative
+
+    [<Emit("$0.getAttribute('data-diff-pane')")>]
+    let sideOf (pane: HTMLElement) : string = jsNative
+
+    [<Emit("if ($0 instanceof Element) $0.setPointerCapture($1)")>]
+    let capturePointer (element: EventTarget) (pointerId: float) : unit = jsNative
+
+    [<Emit("if ($0 instanceof Element && $0.hasPointerCapture($1)) $0.releasePointerCapture($1)")>]
+    let releasePointer (element: EventTarget) (pointerId: float) : unit = jsNative
+
 module internal GitPagedDiffDisplay =
 
     /// Where a run of folded pages sits relative to the loaded pages.
@@ -61,8 +104,6 @@ module internal GitPagedDiffDisplay =
         /// The last read of the next page failed. The continue button shows the failure and asks again.
         NextFailed: bool
         Progress: PagedProgress option
-        /// The columns of the row share one minimum width, so the rows line up.
-        ColumnMin: string
         /// The page a folded placeholder replays from its button, the one at the top of the viewport.
         FoldedTarget: string
         RequestExpand: (string -> bool -> unit) option
@@ -450,14 +491,51 @@ module internal GitPagedDiffDisplay =
 
     let numberColumnWidth (rows: Row[]) = numberColumnWidthOf (rowLines rows)
 
-    /// The minimum width of one column as a CSS length, wide enough for the longest line of the
-    /// rows. The rows use a monospace font, so the width counts characters. Controls beside a line
-    /// need room of their own. Every row uses the same width, so the columns line up.
-    let columnMinWidth (rows: Row[]) =
-        let lines = rowLines rows
+    /// Inner content width for one side, independent of its bounded viewport.
+    let columnMinWidth side (rows: Row[]) =
+        let lines =
+            rows
+            |> Array.choose (fun row ->
+                match row.Content with
+                | AlignedRow(row, _) ->
+                    if side = PagedDiffSide.Previous then
+                        row.Previous
+                    else
+                        row.Current
+                | UnalignedLines(previous, current) -> if side = PagedDiffSide.Previous then previous else current
+                | _ -> None
+            )
 
         let characters =
-            lines |> Array.fold (fun widest line -> max widest line.Text.Length) 0
+            lines
+            |> Array.fold
+                (fun widest line ->
+                    let columns =
+                        line.Text
+                        |> Seq.fold
+                            (fun column character ->
+                                let code = int character
+                                // Font fallbacks render East Asian wide/fullwidth glyphs wider than one
+                                // monospace cell. Supplementary glyphs already occupy two UTF-16 units.
+                                let wide =
+                                    (code >= 0x1100 && code <= 0x115f)
+                                    || (code >= 0x2e80 && code <= 0xa4cf)
+                                    || (code >= 0xac00 && code <= 0xd7a3)
+                                    || (code >= 0xf900 && code <= 0xfaff)
+                                    || (code >= 0xfe10 && code <= 0xfe19)
+                                    || (code >= 0xfe30 && code <= 0xfe6f)
+                                    || (code >= 0xff01 && code <= 0xff60)
+                                    || (code >= 0xffe0 && code <= 0xffe6)
+
+                                if character = '\t' then column + 8 - column % 8
+                                elif wide then column + 2
+                                else column + 1
+                            )
+                            0
+
+                    max widest columns
+                )
+                0
 
         let hasControls =
             lines
@@ -467,8 +545,19 @@ module internal GitPagedDiffDisplay =
                    |> Option.forall (fun total -> total > line.OffsetUtf16 + float line.Text.Length)
             )
 
-        let controls = if hasControls then " + 14rem" else ""
-        $"max(29rem, calc(1.5rem + {numberColumnWidthOf lines} + {characters + 2}ch{controls}))"
+        let hasEndingBadge =
+            rows
+            |> Array.exists (fun row ->
+                match row.Content with
+                | AlignedRow(row, forceContext) -> row.Kind = PagedRowKind.EndingChanged && not forceContext
+                | _ -> false
+            )
+
+        let controls =
+            (if hasControls then " + 14rem" else "")
+            + (if hasEndingBadge then " + 6rem" else "")
+
+        $"calc(1.5rem + {numberColumnWidth rows} + {characters + 2}ch{controls})"
 
     let endingText ending =
         match ending with
@@ -596,7 +685,7 @@ module internal GitPagedDiffDisplay =
 type GitPagedDiffViewer =
 
     [<ReactComponent>]
-    static member private LineContent(props: GitPagedDiffDisplay.LineProps) =
+    static member private LineInnerContent(props: GitPagedDiffDisplay.LineProps) =
         let kind =
             if props.ForceContext then
                 PagedRowKind.Context
@@ -707,7 +796,7 @@ type GitPagedDiffViewer =
 
                             Html.span [
                                 prop.className "swt:min-w-0 swt:flex-1"
-                                prop.style [ style.whitespace.pre ]
+                                prop.style [ style.whitespace.pre; style.custom ("tabSize", "8") ]
                                 prop.children [
                                     if line.OffsetUtf16 > 0.0 then
                                         Html.span [
@@ -753,6 +842,31 @@ type GitPagedDiffViewer =
                     ]
                 ]
             ]
+
+    [<ReactComponent>]
+    static member private LineContent(props: GitPagedDiffDisplay.LineProps) =
+        let side = GitPagedDiffDisplay.sideName props.Side
+
+        Html.div [
+            prop.custom ("data-diff-pane", side)
+            prop.className "swt:min-w-0 swt:overflow-clip"
+            prop.ref (fun element ->
+                if not (isNull element) then
+                    DiffPaneDom.ensureContentWidth (element :?> HTMLElement)
+            )
+            prop.children [
+                Html.div [
+                    prop.style [
+                        style.custom (
+                            "width",
+                            $"max(100%%, var(--paged-{side}-width), var(--paged-{side}-measured-width, 0px))"
+                        )
+                        style.custom ("transform", $"translateX(calc(-1 * var(--paged-{side}-offset, 0px)))")
+                    ]
+                    prop.children [ GitPagedDiffViewer.LineInnerContent props ]
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member private PendingPanel(prefix: string, pending: PagedPending) =
@@ -869,10 +983,7 @@ type GitPagedDiffViewer =
                 prop.children children
             ]
 
-        // A full-width row is as wide as the longest line. The controls of such a row sit in a
-        // wrapper that sticks to the left edge of the scroller and takes the width of its visible
-        // area (the scroller is a query container), so they stay in view at any horizontal scroll
-        // position.
+        // Shared controls use the visible width, independently of either side's horizontal offset.
         let inView (className: string) (children: ReactElement list) : ReactElement =
             Html.div [
                 prop.className $"swt:sticky swt:left-0 {className}"
@@ -1156,8 +1267,7 @@ type GitPagedDiffViewer =
                 style.top 0
                 style.left 0
                 style.custom ("transform", $"translateY({props.Start}px)")
-                style.custom ("gridTemplateColumns", $"repeat(2, minmax({props.ColumnMin}, 1fr))")
-                style.custom ("minWidth", $"calc(2 * {props.ColumnMin})")
+                style.custom ("gridTemplateColumns", "var(--paged-columns)")
                 match props.Row.Content with
                 | GitPagedDiffDisplay.Continue _ -> ()
                 | _ -> style.height props.Height
@@ -1171,7 +1281,7 @@ type GitPagedDiffViewer =
             rows: GitPagedDiffDisplay.Row[],
             rowParts: int[],
             evictedIds: Lazy<JS.Set<string>>,
-            columnMin: string,
+            columnMin: string * string,
             numberColumn: string,
             previousTitle: string,
             currentTitle: string,
@@ -1197,11 +1307,52 @@ type GitPagedDiffViewer =
             failedReplays: string[],
             scrollTarget: PagedScrollTarget option,
             failureNote: string option,
-            endNote: string option
+            endNote: string option,
+            splitPercent: float,
+            onSplitChange: float -> unit
         ) =
         let rowHeight = GitPagedDiffDisplay.RowHeightPx
-        let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        let frameRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        let previousScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        let currentScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        let dragging = React.useRef false
+
+        let scrollFor side =
+            if side = "previous" then
+                previousScrollRef
+            else
+                currentScrollRef
+
+        let syncHorizontal side =
+            match frameRef.current, (scrollFor side).current with
+            | Some frame, Some scroll ->
+                DiffPaneDom.setStyleProperty frame $"--paged-{side}-offset" $"{scroll.scrollLeft}px"
+            | _ -> ()
+
+        let moveHorizontal side delta =
+            (scrollFor side).current
+            |> Option.iter (fun scroll ->
+                scroll.scrollLeft <- scroll.scrollLeft + delta
+                syncHorizontal side
+            )
+
+        let updateSplit (event: PointerEvent) =
+            if dragging.current then
+                frameRef.current
+                |> Option.iter (fun frame ->
+                    let rect = frame.getBoundingClientRect ()
+
+                    let width =
+                        bodyScrollRef.current
+                        |> Option.map (fun body -> float body.clientWidth)
+                        |> Option.defaultValue rect.width
+
+                    if width > 0.0 then
+                        onSplitChange (max 15.0 (min 85.0 (100.0 * (event.clientX - rect.left) / width)))
+                )
+
+        let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
         let previousLayout = React.useRef<GitPagedDiffDisplay.AnchorSnapshot option> None
@@ -1344,22 +1495,46 @@ type GitPagedDiffViewer =
                     let onWheel (event: Event) =
                         let wheel = unbox<WheelEvent> event
 
+                        let scale =
+                            match int wheel.deltaMode with
+                            | 1 -> float GitPagedDiffDisplay.RowHeightPx
+                            | 2 -> float bodyScroll.clientHeight
+                            | _ -> 1.0
+
+                        let horizontal =
+                            if wheel.shiftKey && wheel.deltaX = 0.0 then
+                                wheel.deltaY
+                            else
+                                wheel.deltaX
+
+                        if not wheel.ctrlKey && horizontal <> 0.0 then
+                            DiffPaneDom.paneFor event.target
+                            |> Option.iter (fun pane -> moveHorizontal (DiffPaneDom.sideOf pane) (horizontal * scale))
+
                         // Chromium sends a trackpad pinch and Ctrl+wheel as wheel events with ctrlKey set.
                         // They keep the default handling.
-                        if isCapped () && not wheel.ctrlKey && abs wheel.deltaY >= abs wheel.deltaX then
-                            let scale =
-                                match int wheel.deltaMode with
-                                | 1 -> float GitPagedDiffDisplay.RowHeightPx
-                                | 2 -> float bodyScroll.clientHeight
-                                | _ -> 1.0
-
+                        if not wheel.ctrlKey && (wheel.shiftKey || abs wheel.deltaX > abs wheel.deltaY) then
                             event.preventDefault ()
-                            bodyScroll.scrollLeft <- bodyScroll.scrollLeft + wheel.deltaX * scale
+                        elif isCapped () && not wheel.ctrlKey then
+                            event.preventDefault ()
                             moveLogical (wheel.deltaY * scale)
 
                     let onKeyDown (event: Event) =
                         let keyboard = unbox<KeyboardEvent> event
                         let view = float bodyScroll.clientHeight
+
+                        if
+                            (keyboard.key = "ArrowLeft" || keyboard.key = "ArrowRight")
+                            && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey)
+                        then
+                            DiffPaneDom.paneFor event.target
+                            |> Option.iter (fun pane ->
+                                event.preventDefault ()
+
+                                moveHorizontal
+                                    (DiffPaneDom.sideOf pane)
+                                    (if keyboard.key = "ArrowLeft" then -40.0 else 40.0)
+                            )
 
                         // Space on a button of a row presses the button.
                         let onScroller = obj.ReferenceEquals(event.target, bodyScroll)
@@ -1410,6 +1585,22 @@ type GitPagedDiffViewer =
 
                     let onFocusIn (event: Event) =
                         let target = unbox<HTMLElement> event.target
+
+                        DiffPaneDom.paneFor event.target
+                        |> Option.iter (fun pane ->
+                            let viewport = pane.getBoundingClientRect ()
+                            let focused = target.getBoundingClientRect ()
+
+                            let delta =
+                                if focused.right > viewport.right then
+                                    focused.right - viewport.right
+                                elif focused.left < viewport.left then
+                                    focused.left - viewport.left
+                                else
+                                    0.0
+
+                            moveHorizontal (DiffPaneDom.sideOf pane) delta
+                        )
 
                         focusedInside.current <-
                             if obj.ReferenceEquals(target, bodyScroll) then
@@ -1470,11 +1661,35 @@ type GitPagedDiffViewer =
 
         let contentWidth = contentRect.width |> Option.map int |> Option.defaultValue 0
 
-        let headerContentWidth =
-            if contentWidth > 0 then
-                $"max(58rem, {contentWidth}px)"
-            else
-                "max(58rem, 100%)"
+        let headerContentWidth = if contentWidth > 0 then $"{contentWidth}px" else "100%"
+
+        React.useLayoutEffect (
+            (fun () ->
+                frameRef.current
+                |> Option.iter (fun frame ->
+                    for side in [| "previous"; "current" |] do
+                        DiffPaneDom.setStyleProperty frame $"--paged-{side}-measured-width" "0px"
+
+                    for pane in DiffPaneDom.renderedPanes frame do
+                        DiffPaneDom.ensureContentWidth pane
+                )
+
+                for side in [| "previous"; "current" |] do
+                    (scrollFor side).current
+                    |> Option.iter (fun scroll ->
+                        scroll.scrollLeft <-
+                            max 0.0 (min scroll.scrollLeft (float (scroll.scrollWidth - scroll.clientWidth)))
+
+                        syncHorizontal side
+                    )
+            ),
+            [|
+                box rows
+                box columnMin
+                box contentWidth
+                box splitPercent
+            |]
+        )
 
         // Reports the logical scroll offset to the virtualizer on every scroll event, and that the
         // scrolling ended once the events stop.
@@ -2079,23 +2294,33 @@ type GitPagedDiffViewer =
 
         Html.div [
             prop.testId $"{prefix}-grid"
-            prop.className "swt:flex swt:min-h-0 swt:flex-1 swt:flex-col"
+            prop.custom ("data-paged-diff-frame", "")
+            prop.ref frameRef
+            prop.className "swt:relative swt:flex swt:min-h-0 swt:min-w-0 swt:flex-1 swt:flex-col"
+            prop.style [
+                style.custom ("--paged-columns", $"minmax(0, {splitPercent}fr) minmax(0, {100.0 - splitPercent}fr)")
+                style.custom ("--paged-previous-width", fst columnMin)
+                style.custom ("--paged-current-width", snd columnMin)
+            ]
             prop.children [
                 Html.div [
                     prop.ref headerScrollRef
                     prop.className "swt:overflow-hidden"
                     prop.children [
                         Html.div [
-                            prop.className "swt:min-w-232"
                             prop.style [ style.custom ("width", headerContentWidth) ]
                             prop.children [
                                 Html.div [
-                                    prop.className "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
+                                    prop.className "swt:grid swt:divide-x swt:divide-base-content/10"
+                                    prop.style [
+                                        style.custom ("gridTemplateColumns", "var(--paged-columns)")
+                                    ]
                                     prop.children [
                                         for label, title in [ "Previous", previousTitle; "Current", currentTitle ] do
                                             Html.div [
+                                                prop.testId $"{prefix}-pane-{label.ToLowerInvariant()}"
                                                 prop.className
-                                                    "swt:flex swt:items-start swt:justify-between swt:gap-3 swt:px-4 swt:py-3 swt:bg-base-200 swt:border-b swt:border-base-content/10"
+                                                    "swt:flex swt:min-w-0 swt:overflow-hidden swt:items-start swt:justify-between swt:gap-3 swt:px-4 swt:py-3 swt:bg-base-200 swt:border-b swt:border-base-content/10 swt:font-sans"
                                                 prop.children [
                                                     Html.div [
                                                         prop.className "swt:min-w-0 swt:flex swt:flex-col swt:gap-0.5"
@@ -2125,7 +2350,7 @@ type GitPagedDiffViewer =
                     // The scroll element takes focus when a row is clicked, so the scroll keys reach it.
                     prop.tabIndex 0
                     prop.className
-                        "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:-outline-offset-2 swt:focus-visible:outline-primary"
+                        "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:scrollbar-fade swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:-outline-offset-2 swt:focus-visible:outline-primary"
                     // The rows measure the visible width of the scroller in cqw units.
                     prop.style [ style.custom ("containerType", "inline-size") ]
                     prop.onScroll (fun event ->
@@ -2147,7 +2372,6 @@ type GitPagedDiffViewer =
                             prop.className "swt:relative swt:w-full swt:font-mono swt:text-xs"
                             prop.style [
                                 style.height (int (GitPagedDiffDisplay.physicalHeight cap totalRef.current))
-                                style.custom ("minWidth", $"calc(2 * {columnMin})")
                                 style.custom ("--paged-number-column", numberColumn)
                                 // Rows laid out past the content height must not add to the scroll
                                 // range. That happens above the cap and while the scrollbar is held.
@@ -2173,7 +2397,6 @@ type GitPagedDiffViewer =
                                                 HideIndexingStatus = hideIndexingStatus
                                                 NextFailed = nextFailed
                                                 Progress = progress
-                                                ColumnMin = columnMin
                                                 FoldedTarget =
                                                     (match rows.[item.Index].Content with
                                                      | GitPagedDiffDisplay.Folded(_, pageIds, _) ->
@@ -2199,6 +2422,88 @@ type GitPagedDiffViewer =
                             ]
                         ]
                     ]
+                ]
+                Html.div [
+                    prop.className "swt:grid swt:shrink-0 swt:min-w-0"
+                    prop.style [
+                        style.custom ("width", headerContentWidth)
+                        style.custom ("gridTemplateColumns", "var(--paged-columns)")
+                    ]
+                    prop.children [
+                        for side in [| "previous"; "current" |] do
+                            Html.div [
+                                prop.ref (scrollFor side)
+                                prop.testId $"{prefix}-scroll-{side}"
+                                prop.custom ("data-diff-pane", side)
+                                prop.tabIndex 0
+                                prop.ariaLabel $"Scroll {side} version horizontally"
+                                prop.className
+                                    "swt:min-w-0 swt:overflow-x-auto swt:overflow-y-hidden swt:font-mono swt:text-xs swt:focus-visible:outline-2 swt:focus-visible:outline-primary"
+                                prop.style [ style.height 20 ]
+                                prop.onScroll (fun _ -> syncHorizontal side)
+                                prop.children [
+                                    Html.div [
+                                        prop.style [
+                                            style.height 1
+                                            style.custom (
+                                                "width",
+                                                $"max(100%%, var(--paged-{side}-width), var(--paged-{side}-measured-width, 0px))"
+                                            )
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+                Html.div [
+                    prop.testId $"{prefix}-divider"
+                    prop.role "separator"
+                    prop.tabIndex 0
+                    prop.ariaLabel "Resize previous and current panes"
+                    prop.custom ("aria-orientation", "vertical")
+                    prop.custom ("aria-valuemin", 15)
+                    prop.custom ("aria-valuemax", 85)
+                    prop.custom ("aria-valuenow", splitPercent)
+                    prop.title "Drag to resize; double-click to reset"
+                    prop.className
+                        "swt:absolute swt:top-0 swt:bottom-0 swt:z-10 swt:w-1.5 swt:cursor-col-resize swt:select-none swt:hover:bg-primary/40 swt:focus-visible:bg-primary/40 swt:focus-visible:outline-2 swt:focus-visible:outline-primary"
+                    prop.style [
+                        style.custom ("left", $"calc({headerContentWidth} * {splitPercent / 100.0})")
+                        style.marginLeft -3
+                        style.custom ("touchAction", "none")
+                    ]
+                    prop.onPointerDown (fun event ->
+                        if event.button = 0.0 then
+                            event.preventDefault ()
+                            (event.currentTarget :?> HTMLElement).focus ()
+                            dragging.current <- true
+                            DiffPaneDom.capturePointer event.currentTarget event.pointerId
+                    )
+                    prop.onPointerMove updateSplit
+                    prop.onPointerUp (fun event ->
+                        updateSplit event
+                        dragging.current <- false
+                        DiffPaneDom.releasePointer event.currentTarget event.pointerId
+                    )
+                    prop.onPointerCancel (fun event ->
+                        dragging.current <- false
+                        DiffPaneDom.releasePointer event.currentTarget event.pointerId
+                    )
+                    prop.onLostPointerCapture (fun _ -> dragging.current <- false)
+                    prop.onDoubleClick (fun _ -> onSplitChange 50.0)
+                    prop.onKeyDown (fun event ->
+                        match event.key with
+                        | "ArrowLeft" ->
+                            event.preventDefault ()
+                            onSplitChange (max 15.0 (splitPercent - 5.0))
+                        | "ArrowRight" ->
+                            event.preventDefault ()
+                            onSplitChange (min 85.0 (splitPercent + 5.0))
+                        | "Enter" ->
+                            event.preventDefault ()
+                            onSplitChange 50.0
+                        | _ -> ()
+                    )
                 ]
             ]
         ]
@@ -2412,6 +2717,7 @@ type GitPagedDiffViewer =
         let prefix = defaultArg testIdPrefix "git-paged-diff"
         let previousTitle = defaultArg previousTitle "Previous version"
         let currentTitle = defaultArg currentTitle "Current version"
+        let splitPercent, setSplitPercent = React.useState 50.0
         // The rows of the parts are built once for each change of the parts array. The key of the
         // last row of the last part stands in for the next page when the caller names none.
         let partRowsOnly, partRowParts, lastRowKey, columnMin, numberColumn, evictedIds =
@@ -2475,7 +2781,8 @@ type GitPagedDiffViewer =
                     rows,
                     rowParts.ToArray(),
                     lastRowKey,
-                    GitPagedDiffDisplay.columnMinWidth rows,
+                    (GitPagedDiffDisplay.columnMinWidth PagedDiffSide.Previous rows,
+                     GitPagedDiffDisplay.columnMinWidth PagedDiffSide.Current rows),
                     GitPagedDiffDisplay.numberColumnWidth rows,
                     evictedIds
                 ),
@@ -2600,7 +2907,9 @@ type GitPagedDiffViewer =
                             defaultArg failedReplays [||],
                             scrollTarget,
                             failureNote,
-                            endNote
+                            endNote,
+                            splitPercent,
+                            setSplitPercent
                         )
                     ]
 

@@ -70,6 +70,72 @@ let private firstPage: GitHistoryRequest = {
     PageSize = 2
 }
 
+let private expectedSummary root revision parent =
+    let revisions =
+        match parent with
+        | Some previous -> [| previous; revision |]
+        | None -> [| revision |]
+
+    let output =
+        git
+            root
+            (Array.concat [|
+                [|
+                    "diff-tree"
+                    "--no-commit-id"
+                    "-r"
+                    "--root"
+                    "--no-ext-diff"
+                    "--no-textconv"
+                    "--no-color"
+                    "-M"
+                    "-C"
+                    "--name-status"
+                    "-z"
+                |]
+                revisions
+                [| "--" |]
+            |])
+
+    let fields = output.Split('\000')
+    let mutable index = 0
+    let mutable summary = GitHistoryChangeSummary.empty
+
+    while index < fields.Length && fields[index] <> "" do
+        let status = fields[index][0]
+
+        summary <-
+            match status with
+            | 'A' -> {
+                summary with
+                    Added = summary.Added + 1
+              }
+            | 'D' -> {
+                summary with
+                    Deleted = summary.Deleted + 1
+              }
+            | 'M' -> {
+                summary with
+                    Modified = summary.Modified + 1
+              }
+            | 'R' -> {
+                summary with
+                    Renamed = summary.Renamed + 1
+              }
+            | 'C' -> {
+                summary with
+                    Copied = summary.Copied + 1
+              }
+            | 'T' -> {
+                summary with
+                    TypeChanged = summary.TypeChanged + 1
+              }
+            | _ -> failwith $"Unexpected Git status: {fields[index]}"
+
+        index <- index + (if status = 'R' || status = 'C' then 3 else 2)
+
+    summary
+
 Vitest.describe (
     "Read-only Git history",
     fun () ->
@@ -118,13 +184,93 @@ Vitest.describe (
                                         Skip = 2
                                 }
 
-                            Vitest.expect((value next).Commits |> Array.map _.Revision).toEqual expected[2..3]
+                            let nextPage = value next
+                            Vitest.expect(nextPage.Commits |> Array.map _.Revision).toEqual expected[2..3]
+
+                            // Summaries are present on every page before expansion and
+                            // match the independently loaded first-parent file details.
+                            for commit in Array.append page.Commits nextPage.Commits do
+                                let! changed = api.listChanges { Revision = commit.Revision }
+
+                                Vitest
+                                    .expect(commit.Summary)
+                                    .toEqual (Some(GitHistoryChangeSummary.ofChanges (value changed)))
                         })
 
                 let! indexAfter = Main.Bindings.Filesystem.readFileBase64Async (resolve [| root; indexPath |])
                 Vitest.expect(indexAfter).toEqual indexBefore
                 Vitest.expect(git root [| "rev-parse"; "HEAD" |] |> _.Trim()).toBe expected[0]
                 Vitest.expect(git root [| "status"; "--porcelain=v1"; "-z" |]).toEqual before
+            }
+        )
+
+        Vitest.test (
+            "summarizes root commits against an empty tree and available merges against their first parent",
+            fun () -> promise {
+                let root = repositoryRoot ()
+
+                let rootRevision =
+                    git root [|
+                        "log"
+                        "--max-parents=0"
+                        "--max-count=1"
+                        "--format=%H"
+                        "HEAD"
+                        "--"
+                    |]
+                    |> lines
+                    |> Array.head
+
+                let mergeRevision =
+                    git root [|
+                        "log"
+                        "--min-parents=2"
+                        "--max-count=1"
+                        "--format=%H"
+                        "HEAD"
+                        "--"
+                    |]
+                    |> lines
+                    |> Array.tryHead
+
+                let revisions = Array.append [| rootRevision |] (mergeRevision |> Option.toArray)
+
+                do!
+                    withApi
+                        root
+                        (fun api -> promise {
+                            for revision in revisions do
+                                let parents = git root [| "rev-parse"; revision + "^@" |] |> lines
+                                let parent = Array.tryHead parents
+                                let expected = expectedSummary root revision parent
+
+                                let! response =
+                                    api.listHistory {
+                                        firstPage with
+                                            HeadRevision = Some revision
+                                            PageSize = 1
+                                    }
+
+                                let commit = (value response).Commits |> Array.head
+                                Vitest.expect(commit.Revision).toBe revision
+                                Vitest.expect(commit.ParentRevisions).toEqual parents
+                                Vitest.expect(commit.Summary).toEqual (Some expected)
+
+                                let! response = api.listChanges { Revision = revision }
+                                Vitest.expect(GitHistoryChangeSummary.ofChanges (value response)).toEqual expected
+
+                                if revision = rootRevision then
+                                    Vitest.expect(parents.Length).toBe 0
+
+                                    Vitest
+                                        .expect(
+                                            expected.Modified + expected.Deleted + expected.Renamed + expected.Copied
+                                        )
+                                        .toBe
+                                        0
+                                else
+                                    Vitest.expect(parents.Length > 1).toBe true
+                        })
             }
         )
 

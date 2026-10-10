@@ -59,6 +59,53 @@ module private GitHistoryHelpers =
 type GitHistory =
 
     [<ReactComponent>]
+    static member private ChangeBadge(label: string, text: string, color: string) =
+        Html.span [
+            prop.role "img"
+            prop.ariaLabel label
+            prop.title label
+            prop.className (
+                "swt:inline-flex swt:items-center swt:gap-0.5 swt:rounded swt:px-1 swt:font-mono swt:text-[10px] swt:leading-4 swt:tabular-nums "
+                + color
+            )
+            prop.text text
+        ]
+
+    [<ReactComponent>]
+    static member private ChangeBadges(summary: GitHistoryChangeSummary option) =
+        Html.span [
+            prop.role "group"
+            prop.ariaLabel "File change summary"
+            prop.className "swt:flex swt:min-w-0 swt:flex-wrap swt:gap-1"
+            prop.children [
+                match summary with
+                | None ->
+                    GitHistory.ChangeBadge(
+                        "File change summary unavailable",
+                        "Counts unavailable",
+                        "swt:bg-base-200 swt:text-base-content/55"
+                    )
+                | Some counts ->
+                    let categories = [|
+                        "A", "added", counts.Added, "swt:bg-success/10 swt:text-success"
+                        "D", "deleted", counts.Deleted, "swt:bg-error/10 swt:text-error"
+                        "M", "modified", counts.Modified, "swt:bg-warning/10 swt:text-warning"
+                        "R", "renamed", counts.Renamed, "swt:bg-info/10 swt:text-info"
+                        "C", "copied", counts.Copied, "swt:bg-secondary/10 swt:text-secondary"
+                        "T", "type changed", counts.TypeChanged, "swt:bg-accent/10 swt:text-accent"
+                    |]
+
+                    if categories |> Array.forall (fun (_, _, count, _) -> count = 0) then
+                        GitHistory.ChangeBadge("0 changed files", "0 files", "swt:bg-base-200 swt:text-base-content/55")
+                    else
+                        for code, name, count, color in categories do
+                            if count > 0 then
+                                let noun = if count = 1 then "file" else "files"
+                                GitHistory.ChangeBadge($"{count} {name} {noun}", $"{code} {count}", color)
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private FileRow
         (
             commit: GitHistoryCommit,
@@ -156,6 +203,13 @@ type GitHistory =
         ) =
         let selected = selectedRevision = Some commit.Revision
 
+        let summary =
+            match commit.Summary, details with
+            | Some summary, _ -> Some summary
+            | None, Some data when not data.Loading && data.Error.IsNone ->
+                Some(GitHistoryChangeSummary.ofChanges data.Files)
+            | _ -> None
+
         Html.li [
             prop.key commit.Revision
             prop.className "swt:border-b swt:border-base-200 swt:last:border-b-0"
@@ -228,16 +282,9 @@ type GitHistory =
                                             ]
                                     ]
                                 ]
+                                GitHistory.ChangeBadges summary
                             ]
                         ]
-                        match details with
-                        | Some data when not data.Loading && data.Error.IsNone ->
-                            Html.span [
-                                prop.className "swt:shrink-0 swt:text-[10px] swt:text-base-content/45"
-                                prop.title $"{data.Files.Length} changed files"
-                                prop.text (string data.Files.Length)
-                            ]
-                        | _ -> ()
                     ]
                 ]
                 if expanded then

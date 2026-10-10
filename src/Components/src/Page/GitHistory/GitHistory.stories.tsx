@@ -6,6 +6,7 @@ import {
   GitHistoryCommit,
   GitHistoryCommitChanges,
   GitHistoryFileChange,
+  GitHistoryChangeSummary,
 } from "./Types.fs.js";
 
 type Props = React.ComponentProps<typeof GitHistory>;
@@ -19,13 +20,21 @@ const revisions = [
   "61b0db11ba7af2c52437c7066b1342cfae54a33e",
 ];
 
+const summaries = [
+  new GitHistoryChangeSummary(1, 0, 2, 0, 0, 0),
+  new GitHistoryChangeSummary(0, 0, 2, 0, 0, 0),
+  new GitHistoryChangeSummary(0, 1, 0, 1, 1, 1),
+  new GitHistoryChangeSummary(2, 0, 0, 0, 0, 0),
+  new GitHistoryChangeSummary(1, 0, 0, 0, 0, 0),
+];
+
 function commit(index: number, message: string, author = "Maya Chen", merge = false) {
   const date = new Date(Date.now() - index * 86_400_000).toISOString();
   const parents = index + 1 < revisions.length ? [revisions[index + 1]] : [];
   if (merge) parents.push("cb4aef930bd02367b02b87660dcb4889e8172340");
   return new GitHistoryCommit(
     revisions[index], parents, message, author,
-    `${author.toLowerCase().replaceAll(" ", ".")}@example.org`, date, date,
+    `${author.toLowerCase().replaceAll(" ", ".")}@example.org`, date, date, summaries[index],
   );
 }
 
@@ -88,7 +97,7 @@ function InteractiveHistory({ width = 320, ...props }: Props & { width?: number 
       <GitHistory
         {...props}
         commits={showOlder ? [...props.commits, ...olderCommits] : props.commits}
-        changes={showOlder ? [...fileChanges, ...changes.slice(3)] : fileChanges}
+        changes={fileChanges}
         expandedRevisions={expanded}
         selectedRevision={selectedRevision}
         selectedPath={selectedPath}
@@ -103,6 +112,10 @@ function InteractiveHistory({ width = 320, ...props }: Props & { width?: number 
               ? changes.find((loaded) => loaded.Revision === revision) ?? item
               : item));
           } else {
+            const loaded = changes.find((item) => item.Revision === revision);
+            if (!fileChanges.some((item) => item.Revision === revision) && loaded) {
+              setFileChanges((current) => [...current, loaded]);
+            }
             setExpanded((current) => current.includes(revision)
               ? current.filter((item) => item !== revision)
               : [...current, revision]);
@@ -197,6 +210,7 @@ export const DenseOverview: Story = {
       "researcher@example.org",
       new Date(Date.now() - index * 86_400_000).toISOString(),
       new Date(Date.now() - index * 86_400_000).toISOString(),
+      new GitHistoryChangeSummary(index % 3, 0, 1, 0, 0, 0),
     )),
     changes: [],
     expandedRevisions: [],
@@ -208,7 +222,7 @@ export const DenseOverview: Story = {
     const bottom = sidebar.getBoundingClientRect().bottom;
     const visibleCommits = canvas.getAllByRole("button", { name: /^Expand saved version:/ })
       .filter((button) => button.getBoundingClientRect().bottom <= bottom);
-    await expect(visibleCommits.length).toBeGreaterThanOrEqual(12);
+    await expect(visibleCommits.length).toBeGreaterThanOrEqual(10);
   },
 };
 
@@ -221,6 +235,52 @@ export const NarrowSidebar: Story = {
     for (const button of within(sidebar).getAllByRole("button")) {
       await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
     }
+  },
+};
+
+export const CollapsedSummaries: Story = {
+  args: { changes: [], expandedRevisions: [] },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("img", { name: "1 added file" })).toBeInTheDocument();
+    await expect(canvas.getAllByRole("img", { name: "2 modified files" })).toHaveLength(2);
+    await expect(canvas.getByRole("img", { name: "1 deleted file" })).toBeInTheDocument();
+    await expect(canvas.getByRole("img", { name: "1 renamed file" })).toBeInTheDocument();
+    await expect(canvas.getByRole("img", { name: "1 copied file" })).toBeInTheDocument();
+    await expect(canvas.getByRole("img", { name: "1 type changed file" })).toBeInTheDocument();
+    await expect(canvas.queryByRole("list", { name: "Changed files" })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Load older versions" }));
+    await expect(canvas.getByRole("img", { name: "2 added files" })).toBeInTheDocument();
+  },
+};
+
+export const SixKindsInNarrowSidebar: Story = {
+  parameters: { historyWidth: 260 },
+  args: {
+    commits: [new GitHistoryCommit(
+      revisions[0], [], "Review all file changes", "Maya Chen", "maya@example.org",
+      new Date().toISOString(), new Date().toISOString(),
+      new GitHistoryChangeSummary(12, 23, 34, 45, 56, 67),
+    )],
+    changes: [], expandedRevisions: [], hasMore: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole("img")).toHaveLength(6);
+    const button = canvas.getByRole("button", { name: "Expand saved version: Review all file changes" });
+    await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
+  },
+};
+
+export const EmptyAndUnavailableSummaries: Story = {
+  args: {
+    commits: [
+      new GitHistoryCommit(revisions[0], [], "Empty saved version", "Maya Chen", "maya@example.org",
+        new Date().toISOString(), new Date().toISOString(), new GitHistoryChangeSummary(0, 0, 0, 0, 0, 0)),
+      new GitHistoryCommit(revisions[1], [], "Summary unavailable", "Maya Chen", "maya@example.org",
+        new Date().toISOString(), new Date().toISOString(), undefined),
+    ],
+    changes: [], expandedRevisions: [], hasMore: false,
   },
 };
 

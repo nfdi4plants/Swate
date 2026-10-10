@@ -2,7 +2,12 @@
 
 The **Version history** button in Electron's left activity bar opens the history
 sidebar while preserving the main content. Compact commit rows show the subject,
-author, date and revision. Expand a commit to load its changed files.
+author, date and revision. File-status badges are visible before expansion:
+**A** added, **D** deleted, **M** modified, **R** renamed, **C** copied and **T**
+type changed. Each badge counts files, has a full accessible label and tooltip,
+and wraps within narrow sidebars. Zero categories are omitted; an empty commit
+shows a neutral **0 files** badge. **Counts unavailable** means its summary could not be loaded.
+Expand a commit to load its changed files.
 Click a file to compare that commit with its first parent in the existing paged
 diff viewer. The first commit compares with an empty tree. Merge commits use
 their first parent. File rows show the name, directory, change label and line
@@ -10,6 +15,12 @@ counts; hover for the full path and rename source. **Close comparison** returns
 to the previous file or page. Workspace diff sessions close when leaving them,
 so closing the comparison returns to an empty main area in that case. The sidebar
 retains expanded commits and its scroll position while reading a comparison.
+
+Comparisons start with equally sized Previous and Current panes. Each pane has
+its own horizontal scrollbar; vertical scrolling keeps the rows aligned. Drag
+the divider to resize the panes, or focus it and use Left/Right to adjust by 5%.
+Double-click or press Enter to restore 50/50. The split stays between 15% and
+85% and is retained while the viewer remains open.
 
 History follows the active branch and loads 30 commits at a time. Further pages
 are pinned to the first page's HEAD. **Refresh** loads the current branch again.
@@ -27,6 +38,14 @@ validation and patch parsing live in `Main/IPC/GitHistory.fs`. Calls resolve the
 vault of the calling window and require that folder to be the Git repository
 root. They never modify the index, files, branches or refs, and do not change the
 existing provider workflow.
+
+History pages include optional summaries computed from the same NUL-delimited
+name-status parser and first-parent comparison as the changed-file endpoint.
+Root commits compare with an empty tree. Summary reads run in batches of at most
+four, preserve commit order and do not request line statistics. A failed summary
+leaves the commit available with no summary. File lists and line statistics load
+on expansion; successfully loaded details also supply badges when a summary is
+missing. Summary failure does not prevent opening file details or comparisons.
 
 Native process options are plain JavaScript objects. Git configuration is
 isolated with `NUL` on Windows and `/dev/null` elsewhere, and inherited Git
@@ -72,6 +91,10 @@ watcher before running component test commands; do not run them together.
 The focused history tests use this checkout's existing commits and require a
 recent `.fs`, `.md` or `.tsx` change for their text-diff scenario. They compare
 HEAD, index contents and workspace status before and after history reads.
+They also compare summaries with loaded file changes across two pinned pages,
+and verify root commits and available merges against independent Git output.
+Component unit tests cover status counting, and RTL tests verify all six badges,
+zero counts, unavailable summaries and the loaded-details fallback.
 If Fable project discovery fails with `NU1900` because NuGet's vulnerability
 service is unreachable, temporarily set `$env:NuGetAudit = 'false'` in that
 verification shell and retry. Restore its previous value afterward. This
@@ -96,3 +119,6 @@ Fable version treats MSBuild warning output as a discovery failure.
   current view. Check branch changes and new commits after refreshing history.
 - Inspect light/dark themes, narrow layouts and keyboard-only expansion/file
   selection in the native GitHistory Storybook showcases.
+- Inspect collapsed commits before requesting file lists, including later pages.
+  Check the six status badges, zero-file commits and unavailable summaries. Use
+  the narrow six-kind showcase to check badge wrapping and full hover labels.
