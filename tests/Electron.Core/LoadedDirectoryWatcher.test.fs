@@ -150,7 +150,9 @@ let private createNumberedFiles directory count = promise {
 let private findEntryOutsidePage (paths: string[]) (page: Main.FileTreeCreator.FileTreeDirectoryPage) =
     paths
     |> Array.find (fun path ->
-        page.Entries |> Array.exists (fun entry -> PathHelpers.pathsEqual entry.path path) |> not
+        page.Entries
+        |> Array.exists (fun entry -> PathHelpers.pathsEqual entry.path path)
+        |> not
     )
 
 Vitest.describe (
@@ -188,10 +190,13 @@ Vitest.describe (
                         let cachedDescendantPath = join [| cachedDirectoryPath; "deep.txt" |]
                         let! _ = mkdirAsync cachedDirectoryPath (MkdirOptions(recursive = true))
                         do! writeFileAsync cachedDescendantPath "deep" TextEncoding.Utf8
+
                         vault.fileTree.[cachedDirectoryPath] <-
                             FileEntry.create (basename cachedDirectoryPath, cachedDirectoryPath, true)
+
                         vault.fileTree.[cachedDescendantPath] <-
                             FileEntry.create (basename cachedDescendantPath, cachedDescendantPath, false)
+
                         vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
 
                         do! vault.RefreshFileTreeDirectory "dataset"
@@ -1123,10 +1128,7 @@ Vitest.describe (
                         let cachedPath = findEntryOutsidePage paths page
                         vault.fileTree.[cachedPath] <- FileEntry.create (basename cachedPath, cachedPath, false)
 
-                        do!
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () ->
-                                JS.Constructors.Promise.resolve ()
-                            )
+                        do! vault.WithLoadedDirectoryWatcherSuspended(fun () -> JS.Constructors.Promise.resolve ())
 
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
                         Vitest.expect(containsPath cachedPath vault).toBe true
