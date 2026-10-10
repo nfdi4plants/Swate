@@ -175,15 +175,6 @@ type FileTreeDirectoryCursor = {
     mutable Lookahead: Dirent option
 }
 
-/// Keeps only entries that are not already represented by their normalized path in the FileTree.
-/// Cursor restarts use this on each bounded page instead of relying on enumeration order.
-let filterUndiscoveredDirectoryEntries (fileTree: Dictionary<string, FileEntry>) (entries: FileEntry[]) : FileEntry[] =
-    entries
-    |> Array.filter (fun entry ->
-        let normalizedEntryPath = PathHelpers.normalizePath entry.path
-        not (fileTree.ContainsKey normalizedEntryPath)
-    )
-
 let openFileTreeDirectoryCursor (arcPath: string) (relativeDirectoryPath: string) = promise {
     let normalizedArcPath = normalizeRootPath arcPath
     let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
@@ -210,13 +201,6 @@ let readFileTreeDirectoryCursorPage
 
         let entries = ResizeArray<FileEntry>()
         let mutable exhausted = false
-        let mutable rawReadCount = 0
-        let rawReadLimit = pageSize * 2
-
-        let readNext () = promise {
-            rawReadCount <- rawReadCount + 1
-            return! cursor.Directory.read ()
-        }
 
         let tryAccept (dirent: Dirent) =
             let name = dirent.name
@@ -237,8 +221,8 @@ let readFileTreeDirectoryCursorPage
             tryAccept dirent |> Option.iter entries.Add
         )
 
-        while not exhausted && rawReadCount < rawReadLimit && entries.Count < pageSize do
-            let! dirent = readNext ()
+        while not exhausted && entries.Count < pageSize do
+            let! dirent = cursor.Directory.read ()
 
             if isNull (box dirent) then
                 exhausted <- true
@@ -247,8 +231,8 @@ let readFileTreeDirectoryCursorPage
 
         // Read until the next accepted entry so ignored filesystem entries do not create a false
         // positive HasMore result. Preserve that entry for the next batch.
-        while not exhausted && rawReadCount < rawReadLimit && cursor.Lookahead.IsNone do
-            let! dirent = readNext ()
+        while not exhausted && cursor.Lookahead.IsNone do
+            let! dirent = cursor.Directory.read ()
 
             if isNull (box dirent) then
                 exhausted <- true
@@ -257,7 +241,7 @@ let readFileTreeDirectoryCursorPage
 
         return {
             Entries = entries.ToArray()
-            HasMore = not exhausted
+            HasMore = cursor.Lookahead.IsSome
         }
     }
 

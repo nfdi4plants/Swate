@@ -452,240 +452,40 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "cursor pages advance without rereading earlier directory entries",
-            fileTreeCreatorTestOptions,
+            "ten thousand directory entries are paginated without loading everything at once",
+            TestOptions(timeout = 120000),
             fun () -> promise {
                 do!
                     withTempDirectory (fun rootPath -> promise {
                         let studiesPath = join [| rootPath; "studies" |]
                         do! createDirectoryAtAsync studiesPath
 
-                        let writes =
-                            Array.init
-                                250
-                                (fun index ->
-                                    writeUtf8FileAsync (join [| studiesPath; sprintf "study-%03d" index |]) "study"
-                                )
+                        for index in 0..9999 do
+                            do!
+                                writeUtf8FileAsync
+                                    (join [| studiesPath; sprintf "study-%05d" index |])
+                                    "study"
 
-                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
                         let! directoryPath, cursor = FileTreeCreator.openFileTreeDirectoryCursor rootPath "studies"
 
                         try
                             let! first = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
-                            let! second = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
-                            let! final = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
-
                             Vitest.expect(first.Entries.Length).toBe 100
                             Vitest.expect(first.HasMore).toBe true
-                            Vitest.expect(second.Entries.Length).toBe 100
-                            Vitest.expect(second.HasMore).toBe true
-                            Vitest.expect(final.Entries.Length).toBe 50
-                            Vitest.expect(final.HasMore).toBe false
 
-                            let allPaths =
-                                Array.concat [ first.Entries; second.Entries; final.Entries ]
-                                |> Array.map _.path
+                            let allPaths = ResizeArray(first.Entries |> Array.map _.path)
+                            let mutable hasMore = first.HasMore
 
-                            Vitest.expect(allPaths.Length).toBe 250
-                            Vitest.expect(allPaths |> Array.distinct |> Array.length).toBe 250
+                            while hasMore do
+                                let! page = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
+                                allPaths.AddRange(page.Entries |> Array.map _.path)
+                                hasMore <- page.HasMore
+
+                            Vitest.expect(allPaths.Count).toBe 10000
+                            Vitest.expect(allPaths |> Seq.distinct |> Seq.length).toBe 10000
                         finally
                             cursor.Directory.close () |> Promise.start
                     })
-            }
-        )
-
-        Vitest.test (
-            "ignored-only cursor batches bound raw reads and eventually report exhaustion",
-            fun () -> promise {
-                let mutable readCalls = 0
-                let mutable nextIndex = 0
-
-                let directory =
-                    { new Directory with
-                        member _.read() =
-                            readCalls <- readCalls + 1
-
-                            let result =
-                                if nextIndex < 1000 then
-                                    let index = nextIndex
-                                    nextIndex <- nextIndex + 1
-
-                                    { new Dirent with
-                                        member _.name = $".~$ignored-{index}.xlsx"
-                                        member _.isDirectory() = false
-                                        member _.isFile() = true
-                                        member _.isSymbolicLink() = false
-                                    }
-                                else
-                                    unbox null
-
-                            JS.Constructors.Promise.resolve result
-
-                        member _.close() = JS.Constructors.Promise.resolve ()
-                    }
-
-                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
-                    Directory = directory
-                    Lookahead = None
-                }
-
-                let mutable hasMore = true
-                let mutable batchCount = 0
-
-                while hasMore do
-                    let readsBefore = readCalls
-                    let! page = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 100
-                    let readsThisBatch = readCalls - readsBefore
-                    batchCount <- batchCount + 1
-                    hasMore <- page.HasMore
-
-                    Vitest.expect(page.Entries.Length).toBe 0
-                    Vitest.expect(readsThisBatch <= 200).toBe true
-
-                Vitest.expect(batchCount).toBe 6
-                Vitest.expect(readCalls).toBe 1001
-            }
-        )
-
-        Vitest.test (
-            "lookahead uses the raw-read budget without losing the next accepted entry",
-            fun () -> promise {
-                let mutable readCalls = 0
-                let mutable nextIndex = 0
-
-                let names = [|
-                    "a.txt"
-                    "b.txt"
-                    ".~$ignored-1.xlsx"
-                    ".~$ignored-2.xlsx"
-                    "c.txt"
-                    "d.txt"
-                    "e.txt"
-                |]
-
-                let directory =
-                    { new Directory with
-                        member _.read() =
-                            readCalls <- readCalls + 1
-
-                            let result =
-                                if nextIndex < names.Length then
-                                    let name = names.[nextIndex]
-                                    nextIndex <- nextIndex + 1
-
-                                    { new Dirent with
-                                        member _.name = name
-                                        member _.isDirectory() = false
-                                        member _.isFile() = true
-                                        member _.isSymbolicLink() = false
-                                    }
-                                else
-                                    unbox null
-
-                            JS.Constructors.Promise.resolve result
-
-                        member _.close() = JS.Constructors.Promise.resolve ()
-                    }
-
-                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
-                    Directory = directory
-                    Lookahead = None
-                }
-
-                let! first = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
-                Vitest.expect(readCalls).toBe 4
-                Vitest.expect(first.HasMore).toBe true
-
-                let! second = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
-                let! final = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
-
-                let acceptedNames =
-                    Array.concat [ first.Entries; second.Entries; final.Entries ]
-                    |> Array.map _.name
-
-                Vitest.expect(acceptedNames).toEqual ([| "a.txt"; "b.txt"; "c.txt"; "d.txt"; "e.txt" |])
-                Vitest.expect(final.HasMore).toBe false
-            }
-        )
-
-        Vitest.test (
-            "restart pages ignore cached paths without depending on the earlier enumeration order",
-            fun () ->
-                let cached = System.Collections.Generic.Dictionary<string, FileEntry>()
-
-                [| 2; 0 |]
-                |> Array.iter (fun index ->
-                    let path = $"arc/studies/entry-{index}.txt"
-                    cached.[path] <- FileEntry.create ($"entry-{index}.txt", path, false)
-                )
-
-                let restartedPage = [|
-                    FileEntry.create ("entry-0.txt", "arc/studies/entry-0.txt", false)
-                    FileEntry.create ("entry-1.txt", "arc/studies/entry-1.txt", false)
-                    FileEntry.create ("entry-2.txt", "arc/studies/entry-2.txt", false)
-                    FileEntry.create ("entry-3.txt", "arc/studies/entry-3.txt", false)
-                |]
-
-                let undiscovered =
-                    FileTreeCreator.filterUndiscoveredDirectoryEntries cached restartedPage
-
-                Vitest.expect(undiscovered |> Array.map _.name).toEqual ([| "entry-1.txt"; "entry-3.txt" |])
-
-                let merged = FileTreeCreator.mergeFileTreeDirectoryPage undiscovered cached
-                Vitest.expect(merged.Count).toBe 4
-                Vitest.expect(merged.Values |> Seq.map _.path |> Seq.distinct |> Seq.length).toBe 4
-        )
-
-        Vitest.test (
-            "restart work stays bounded when thousands of entries are already cached",
-            fun () -> promise {
-                let cached = System.Collections.Generic.Dictionary<string, FileEntry>()
-
-                for index in 0..4999 do
-                    let path = $"arc/studies/entry-{index:D5}.txt"
-                    cached.[path] <- FileEntry.create ($"entry-{index:D5}.txt", path, false)
-
-                let mutable readCalls = 0
-                let mutable nextIndex = 0
-
-                let directory =
-                    { new Directory with
-                        member _.read() =
-                            readCalls <- readCalls + 1
-
-                            let result =
-                                if nextIndex < 6000 then
-                                    let index = nextIndex
-                                    nextIndex <- nextIndex + 1
-
-                                    { new Dirent with
-                                        member _.name = $"entry-{index:D5}.txt"
-                                        member _.isDirectory() = false
-                                        member _.isFile() = true
-                                        member _.isSymbolicLink() = false
-                                    }
-                                else
-                                    unbox null
-
-                            JS.Constructors.Promise.resolve result
-
-                        member _.close() = JS.Constructors.Promise.resolve ()
-                    }
-
-                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
-                    Directory = directory
-                    Lookahead = None
-                }
-
-                let! page = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 100
-
-                let undiscovered =
-                    FileTreeCreator.filterUndiscoveredDirectoryEntries cached page.Entries
-
-                Vitest.expect(readCalls).toBe 101
-                Vitest.expect(page.Entries.Length).toBe 100
-                Vitest.expect(undiscovered.Length).toBe 0
-                Vitest.expect(page.HasMore).toBe true
             }
         )
 

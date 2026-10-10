@@ -28,11 +28,6 @@ type internal FileWatcherReadyOutcome =
     | WatcherError of exn
     | Cancelled
 
-type internal OwnedFileTreeDirectoryCursor = {
-    Cursor: FileTreeDirectoryCursor
-    mutable LastAccess: int
-}
-
 type internal LoadedDirectoryWatcherState = {
     LifecycleActive: bool
     MutationActive: bool
@@ -250,14 +245,12 @@ type WatcherMergeOutcome =
 type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
-    let maxRetainedFileTreeDirectoryCursors = 8
     let arcMergeQueue = ArcMergeQueue(window.id)
     let mutable busyWritingDepth = 0
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
     let loadedDirectoryWatcherController = LoadedDirectoryWatcherController()
-    let mutable fileTreeDirectoryCursorAccess = 0
 
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
@@ -300,8 +293,7 @@ type ArcVault(window: BrowserWindow) =
     member val internal SchedulePendingFileWatcherEvents: (unit -> unit) option = None with get, set
     /// Settles when the in-memory ARC model for the currently opening path is ready.
     member val internal ArcInitialization: Fable.Core.JS.Promise<unit> option = None with get, set
-    member val internal FileTreeDirectoryCursors = Dictionary<string, OwnedFileTreeDirectoryCursor>() with get
-    member val internal FileTreeDirectoryAutomaticContinuations = HashSet<string>() with get
+    member val internal FileTreeDirectoryCursors = Dictionary<string, FileTreeDirectoryCursor>() with get
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -340,21 +332,17 @@ type ArcVault(window: BrowserWindow) =
         with get () = pendingFileTreeReset
         and set value = pendingFileTreeReset <- value
 
-    member private _.TouchFileTreeDirectoryCursor(ownedCursor: OwnedFileTreeDirectoryCursor) =
-        fileTreeDirectoryCursorAccess <- fileTreeDirectoryCursorAccess + 1
-        ownedCursor.LastAccess <- fileTreeDirectoryCursorAccess
-
     member internal this.CloseFileTreeDirectoryCursor(relativeDirectoryPath: string) = promise {
         let normalizedPath =
             PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
 
         match this.FileTreeDirectoryCursors.TryGetValue normalizedPath with
         | false, _ -> ()
-        | true, ownedCursor ->
+        | true, cursor ->
             this.FileTreeDirectoryCursors.Remove normalizedPath |> ignore
 
             try
-                do! ownedCursor.Cursor.Directory.close ()
+                do! cursor.Directory.close ()
             with _ ->
                 ()
     }
@@ -374,15 +362,6 @@ type ArcVault(window: BrowserWindow) =
         for cursorPath in pathsToClose do
             do! this.CloseFileTreeDirectoryCursor cursorPath
 
-        let continuationPaths = this.FileTreeDirectoryAutomaticContinuations |> Seq.toArray
-
-        continuationPaths
-        |> Array.filter (fun continuationPath ->
-            match underPath with
-            | None -> true
-            | Some path -> PathHelpers.isSameOrDescendantPath continuationPath path
-        )
-        |> Array.iter (this.FileTreeDirectoryAutomaticContinuations.Remove >> ignore)
     }
 
     member internal this.AcquireFileTreeDirectoryCursor(arcPath: string, relativeDirectoryPath: string) = promise {
@@ -390,28 +369,14 @@ type ArcVault(window: BrowserWindow) =
             PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
 
         match this.FileTreeDirectoryCursors.TryGetValue normalizedPath with
-        | true, ownedCursor ->
-            this.TouchFileTreeDirectoryCursor ownedCursor
+        | true, cursor ->
             let directoryPath = join [| arcPath; normalizedPath |] |> PathHelpers.normalizePath
-            return directoryPath, ownedCursor.Cursor
+            return directoryPath, cursor
         | false, _ ->
-            if this.FileTreeDirectoryCursors.Count >= maxRetainedFileTreeDirectoryCursors then
-                let inactivePath =
-                    this.FileTreeDirectoryCursors
-                    |> Seq.minBy (fun pair -> pair.Value.LastAccess)
-                    |> fun pair -> pair.Key
-
-                do! this.CloseFileTreeDirectoryCursor inactivePath
-
             let! directoryPath, cursor = openFileTreeDirectoryCursor arcPath normalizedPath
 
             try
-                fileTreeDirectoryCursorAccess <- fileTreeDirectoryCursorAccess + 1
-
-                this.FileTreeDirectoryCursors.[normalizedPath] <- {
-                    Cursor = cursor
-                    LastAccess = fileTreeDirectoryCursorAccess
-                }
+                this.FileTreeDirectoryCursors.[normalizedPath] <- cursor
 
                 return directoryPath, cursor
             with error ->
@@ -1474,19 +1439,12 @@ module ArcVaultExtensions =
                             return raise refreshError
             })
 
-        /// Loads one useful page for an expanded directory, advancing through a bounded number of
-        /// cached-only or ignored-only cursor batches before scheduling another serialized slice.
+        /// Loads exactly one additional page for an expanded directory.
         member this.LoadNextFileTreeDirectoryPage(relativeDirectoryPath: string) = promise {
             let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
             let mutable needsWatcherCoverage = false
-            let mutable needsAutomaticContinuation = false
             let capturedWatcherEpoch = this.WatcherEpoch
             let capturedArcPath = this.path
-            let maxCursorBatchesPerSlice = 4
-
-            // A manual request supersedes a continuation that has not entered the queue yet.
-            this.FileTreeDirectoryAutomaticContinuations.Remove normalizedRelativePath
-            |> ignore
 
             do!
                 this.EnqueueFileTreeUpdate(fun () -> promise {
@@ -1506,47 +1464,21 @@ module ArcVaultExtensions =
                                 this.AcquireFileTreeDirectoryCursor(arcPath, normalizedRelativePath)
 
                             try
-                                let previousHasMore =
-                                    match this.fileTreeDirectoryHasMore.TryGetValue normalizedRelativePath with
-                                    | true, hasMore -> Some hasMore
-                                    | false, _ -> None
+                                let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
 
-                                let mutable batchCount = 0
-                                let mutable shouldKeepAdvancing = true
-                                let mutable discoveredEntries = [||]
-                                let mutable hasMore = true
-
-                                while shouldKeepAdvancing && batchCount < maxCursorBatchesPerSlice do
-                                    let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
-                                    batchCount <- batchCount + 1
-
-                                    if
-                                        capturedWatcherEpoch <> this.WatcherEpoch
-                                        || this.path |> Option.exists (PathHelpers.pathsEqual arcPath) |> not
-                                    then
-                                        do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
-                                        raise (ArcLoadCancelledException this.window.id)
-
-                                    // A retired cursor restarts from the beginning. Comparing every bounded
-                                    // page with the existing cache makes that restart independent of order.
-                                    discoveredEntries <- filterUndiscoveredDirectoryEntries this.fileTree page.Entries
-
-                                    hasMore <- page.HasMore
-                                    shouldKeepAdvancing <- discoveredEntries.Length = 0 && hasMore
-
-                                    if shouldKeepAdvancing && batchCount < maxCursorBatchesPerSlice then
-                                        do! Promise.sleep 0
-
-                                this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- hasMore
-
-                                if discoveredEntries.Length > 0 || previousHasMore <> Some hasMore then
-                                    let nextTree = mergeFileTreeDirectoryPage discoveredEntries this.fileTree
-                                    this.SetFileTree nextTree
-
-                                if not hasMore then
+                                if
+                                    capturedWatcherEpoch <> this.WatcherEpoch
+                                    || this.path |> Option.exists (PathHelpers.pathsEqual arcPath) |> not
+                                then
                                     do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
-                                elif shouldKeepAdvancing then
-                                    needsAutomaticContinuation <- true
+                                    return raise (ArcLoadCancelledException this.window.id)
+
+                                let nextTree = mergeFileTreeDirectoryPage page.Entries this.fileTree
+                                this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- page.HasMore
+                                this.SetFileTree nextTree
+
+                                if not page.HasMore then
+                                    do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
                             with error ->
                                 do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
                                 return raise error
@@ -1565,27 +1497,6 @@ module ArcVaultExtensions =
                 |> Promise.map ignore
                 |> Promise.catch (fun error ->
                     swatelogfn this.window.id "Failed to establish loaded-directory watcher coverage: %s" error.Message
-                )
-                |> Promise.start
-
-            if
-                needsAutomaticContinuation
-                && this.FileTreeDirectoryAutomaticContinuations.Add normalizedRelativePath
-            then
-                promise {
-                    do! Promise.sleep 0
-
-                    if this.FileTreeDirectoryAutomaticContinuations.Remove normalizedRelativePath then
-                        match capturedArcPath, this.path with
-                        | Some expectedPath, Some currentPath when
-                            capturedWatcherEpoch = this.WatcherEpoch
-                            && PathHelpers.pathsEqual expectedPath currentPath
-                            ->
-                            do! this.LoadNextFileTreeDirectoryPage normalizedRelativePath
-                        | _ -> ()
-                }
-                |> Promise.catch (fun error ->
-                    swatelogfn this.window.id "Automatic FileTree pagination failed: %s" error.Message
                 )
                 |> Promise.start
 
