@@ -6,6 +6,7 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IArcVaultsApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IVersionControlApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitHistoryApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAuthApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<ITemplateApi>

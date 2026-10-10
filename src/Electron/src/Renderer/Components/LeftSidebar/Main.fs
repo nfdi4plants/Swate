@@ -80,12 +80,16 @@ let Main (leftSidebarTarget: LeftSidebarPage) =
             "swt:max-w-full"
             "swt:flex-col"
             "swt:overflow-hidden"
-            "swt:p-4"
+            if leftSidebarTarget = LeftSidebarPage.GitHistory then
+                "swt:p-2"
+            else
+                "swt:p-4"
         ]
         prop.children [|
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> Renderer.Components.LeftSidebar.FileExplorer.Main.Main()
             | LeftSidebarPage.Git -> Git.GitSidebarPanel.Main()
+            | LeftSidebarPage.GitHistory -> GitHistorySidebar.Main()
             FileImportStatusNotice()
         |]
     ]

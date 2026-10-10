@@ -45,6 +45,7 @@ app
         registerRequiredWindow "The application window could not be loaded."
 
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IVersionControlApi.api
+        Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.GitHistory.api
         Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.ArcVaultsApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.AuthApi.api
