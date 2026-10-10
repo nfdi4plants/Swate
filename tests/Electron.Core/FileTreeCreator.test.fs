@@ -495,6 +495,87 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "restart pages ignore cached paths without depending on the earlier enumeration order",
+            fun () ->
+                let cached = System.Collections.Generic.Dictionary<string, FileEntry>()
+
+                [| 2; 0 |]
+                |> Array.iter (fun index ->
+                    let path = $"arc/studies/entry-{index}.txt"
+                    cached.[path] <- FileEntry.create ($"entry-{index}.txt", path, false)
+                )
+
+                let restartedPage = [|
+                    FileEntry.create ("entry-0.txt", "arc/studies/entry-0.txt", false)
+                    FileEntry.create ("entry-1.txt", "arc/studies/entry-1.txt", false)
+                    FileEntry.create ("entry-2.txt", "arc/studies/entry-2.txt", false)
+                    FileEntry.create ("entry-3.txt", "arc/studies/entry-3.txt", false)
+                |]
+
+                let undiscovered =
+                    FileTreeCreator.filterUndiscoveredDirectoryEntries cached restartedPage
+
+                Vitest.expect(undiscovered |> Array.map _.name).toEqual ([| "entry-1.txt"; "entry-3.txt" |])
+
+                let merged = FileTreeCreator.mergeFileTreeDirectoryPage undiscovered cached
+                Vitest.expect(merged.Count).toBe 4
+                Vitest.expect(merged.Values |> Seq.map _.path |> Seq.distinct |> Seq.length).toBe 4
+        )
+
+        Vitest.test (
+            "restart work stays bounded when thousands of entries are already cached",
+            fun () -> promise {
+                let cached = System.Collections.Generic.Dictionary<string, FileEntry>()
+
+                for index in 0..4999 do
+                    let path = $"arc/studies/entry-{index:D5}.txt"
+                    cached.[path] <- FileEntry.create ($"entry-{index:D5}.txt", path, false)
+
+                let mutable readCalls = 0
+                let mutable nextIndex = 0
+
+                let directory =
+                    { new Directory with
+                        member _.read() =
+                            readCalls <- readCalls + 1
+
+                            let result =
+                                if nextIndex < 6000 then
+                                    let index = nextIndex
+                                    nextIndex <- nextIndex + 1
+
+                                    { new Dirent with
+                                        member _.name = $"entry-{index:D5}.txt"
+                                        member _.isDirectory() = false
+                                        member _.isFile() = true
+                                        member _.isSymbolicLink() = false
+                                    }
+                                else
+                                    unbox null
+
+                            JS.Constructors.Promise.resolve result
+
+                        member _.close() = JS.Constructors.Promise.resolve ()
+                    }
+
+                let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
+                    Directory = directory
+                    Lookahead = None
+                }
+
+                let! page = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 100
+
+                let undiscovered =
+                    FileTreeCreator.filterUndiscoveredDirectoryEntries cached page.Entries
+
+                Vitest.expect(readCalls).toBe 101
+                Vitest.expect(page.Entries.Length).toBe 100
+                Vitest.expect(undiscovered.Length).toBe 0
+                Vitest.expect(page.HasMore).toBe true
+            }
+        )
+
+        Vitest.test (
             "startup root loading is bounded and reports additional children",
             fileTreeCreatorTestOptions,
             fun () -> promise {

@@ -1084,8 +1084,13 @@ Vitest.describe (
 
                         Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 8
                         Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey(firstDirectory)).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursorOffsets.[firstDirectory]).toBe 100
                         Vitest.expect(countChildren firstDirectory beforeResume).toBe 100
+
+                        do! vault.LoadNextFileTreeDirectoryPage firstDirectory
+                        let! afterRestartPage = vault.GetRendererFileTreeSnapshot()
+
+                        Vitest.expect(countChildren firstDirectory afterRestartPage).toBe 100
+                        Vitest.expect(afterRestartPage.directoryHasMore.[firstDirectory]).toBe true
 
                         do! vault.LoadNextFileTreeDirectoryPage firstDirectory
                         let! afterResume = vault.GetRendererFileTreeSnapshot()
@@ -1101,6 +1106,90 @@ Vitest.describe (
                             |> Seq.length
 
                         Vitest.expect(distinctPaths).toBe 101
+                    })
+        )
+
+        Vitest.test (
+            "resume exhaustion after eviction publishes completed pagination metadata",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let mutable publicationCount = 0
+
+                        let send =
+                            System.Func<obj array, unit>(fun args ->
+                                if args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate") then
+                                    publicationCount <- publicationCount + 1
+                            )
+                            |> fun callback -> emitJsExpr callback "((...args) => $0(args))"
+
+                        let pagedPath = join [| arcPath; "paged" |]
+                        do! mkdirWatcherDirectoryAsync pagedPath
+
+                        for index in 0..100 do
+                            do!
+                                writeWatcherTextFileAsync
+                                    (join [| pagedPath; sprintf "entry-%03d.txt" index |])
+                                    "entry"
+
+                        let vault = ArcVault(windowWithStates (fun () -> false) (fun () -> false) send)
+                        vault.path <- Some arcPath
+                        do! vault.LoadNextFileTreeDirectoryPage "paged"
+
+                        for index in 0..7 do
+                            let relativePath = sprintf "inactive-%02d" index
+                            do! mkdirWatcherDirectoryAsync (join [| arcPath; relativePath |])
+                            let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, relativePath)
+                            ()
+
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("paged")).toBe false
+
+                        do! rmAsync pagedPath (RmOptions(recursive = true, force = true))
+                        do! mkdirWatcherDirectoryAsync pagedPath
+                        publicationCount <- 0
+
+                        do! vault.LoadNextFileTreeDirectoryPage "paged"
+                        let! snapshot = vault.GetRendererFileTreeSnapshot()
+
+                        Vitest.expect(snapshot.directoryHasMore.["paged"]).toBe false
+                        Vitest.expect(publicationCount).toBe 1
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("paged")).toBe false
+                    })
+        )
+
+        Vitest.test (
+            "loaded-directory cleanup retires missing directory cursors and descendants only",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        for relativePath in [| "available"; "available/nested"; "unaffected" |] do
+                            do! mkdirWatcherDirectoryAsync (join [| arcPath; relativePath |])
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "available")
+                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "available/nested")
+                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "unaffected")
+
+                        let parentCursor = vault.FileTreeDirectoryCursors.["available"]
+                        let descendantCursor = vault.FileTreeDirectoryCursors.["available/nested"]
+                        vault.FileTreeDirectoryCursors.Remove("available") |> ignore
+                        vault.FileTreeDirectoryCursors.Remove("available/nested") |> ignore
+                        vault.FileTreeDirectoryCursors.["missing"] <- parentCursor
+                        vault.FileTreeDirectoryCursors.["missing/nested"] <- descendantCursor
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("missing", false)
+
+                        do! vault.RefreshFileTreeDirectory ""
+                        do! vault.FileTreeUpdateTail
+
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("missing")).toBe false
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("missing/nested")).toBe false
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("unaffected")).toBe true
+
+                        do! vault.CloseFileTreeDirectoryCursors()
                     })
         )
 
@@ -3163,6 +3252,8 @@ Vitest.describe (
                         let windowState = createTestWindow (testWindowOptions windowId)
                         let mutable startupWasCompleteWhenClosed = false
                         let vault = ArcVault(windowState.Window)
+                        let fileTreeGate, releaseFileTree = TestHelpers.deferred ()
+                        vault.FileTreeUpdateTail <- fileTreeGate
                         let mutable dialogCount = 0
                         let mutable createdWindowCount = 0
 
@@ -3192,6 +3283,7 @@ Vitest.describe (
 
                             startupWasCompleteWhenClosed <- isArcStartedBeforeFileTreePublication ()
                             windowState.TriggerClose()
+                            releaseFileTree ()
 
                             match! openOperation with
                             | Ok _ -> failwith "Expected closing during the file-tree scan to cancel ARC opening."

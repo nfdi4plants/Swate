@@ -175,6 +175,15 @@ type FileTreeDirectoryCursor = {
     mutable Lookahead: Dirent option
 }
 
+/// Keeps only entries that are not already represented by their normalized path in the FileTree.
+/// Cursor restarts use this on each bounded page instead of relying on enumeration order.
+let filterUndiscoveredDirectoryEntries (fileTree: Dictionary<string, FileEntry>) (entries: FileEntry[]) : FileEntry[] =
+    entries
+    |> Array.filter (fun entry ->
+        let normalizedEntryPath = PathHelpers.normalizePath entry.path
+        not (fileTree.ContainsKey normalizedEntryPath)
+    )
+
 let openFileTreeDirectoryCursor (arcPath: string) (relativeDirectoryPath: string) = promise {
     let normalizedArcPath = normalizeRootPath arcPath
     let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
