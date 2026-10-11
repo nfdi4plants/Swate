@@ -7,7 +7,6 @@ open Main.Bindings.Path
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.DTOs.GitHistoryDto
 open Swate.Components.Page.GitHistory.Types
-open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 open Vitest
 open ElectronCore.TestHelpers
 
@@ -275,7 +274,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "opens a changed text file as a committed diff with zero-based viewer coordinates",
+            "opens a changed text file as pinned committed source metadata",
             fun () -> promise {
                 let root = repositoryRoot ()
 
@@ -322,22 +321,7 @@ Vitest.describe (
                             Vitest.expect(diff.Path).toBe change.Path
                             Vitest.expect(diff.ParentRevision).toEqual (Array.tryHead parents)
                             Vitest.expect(diff.Kind).toEqual change.Kind
-                            Vitest.expect(diff.BlockedReason).toEqual None
-                            Vitest.expect(diff.Parts.Length > 0).toBe true
-
-                            for part in diff.Parts do
-                                match part with
-                                | HunkRows(_, previous, current, _, _, rows) ->
-                                    Vitest.expect(rows.Length > 0).toBe true
-                                    let previousNumbers = rows |> Array.choose _.Previous |> Array.map _.Number
-                                    let currentNumbers = rows |> Array.choose _.Current |> Array.map _.Number
-
-                                    if previousNumbers.Length > 0 then
-                                        Vitest.expect(previousNumbers[0]).toBe previous.Start
-
-                                    if currentNumbers.Length > 0 then
-                                        Vitest.expect(currentNumbers[0]).toBe current.Start
-                                | _ -> failwith "Expected committed patch hunks."
+                            Vitest.expect(diff.PreviousPath).toEqual change.PreviousPath
                         })
             }
         )

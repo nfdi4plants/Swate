@@ -38,6 +38,7 @@
     <Compile Include="VersionControlLakeFs.test.fs" />
     <Compile Include="VersionControlTextDiff.test.fs" />
     <Compile Include="GitHistory.test.fs" />
+    <Compile Include="CommittedDiffAdapter.test.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Main\Main.fsproj" />

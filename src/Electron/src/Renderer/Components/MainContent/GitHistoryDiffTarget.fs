@@ -2,9 +2,6 @@ module Renderer.Components.MainContent.GitHistoryDiffTarget
 
 open Feliz
 open Renderer.Context.GitHistoryContext
-open Swate.Components.Page.GitComparison
-open Swate.Components.Page.GitComparison.GitPagedDiffTypes
-open Swate.Components.Page.GitHistory.Types
 
 let private shortRevision (revision: string) =
     revision.Substring(0, min 7 revision.Length)
@@ -17,35 +14,10 @@ let Main (revision: string, path: string) =
         history.state.Diff
         |> Option.filter (fun value -> value.Request.Revision = revision && value.Request.Path = path)
 
-    let value = diff |> Option.bind _.Value
-
-    let previousTitle =
-        match value with
-        | Some loaded ->
-            let previousPath = loaded.PreviousPath |> Option.defaultValue loaded.Path
-
-            match loaded.ParentRevision with
-            | Some parent -> $"{previousPath} @ {shortRevision parent}"
-            | None -> "Before the first version (empty)"
-        | None -> "Previous version"
-
-    let status =
+    let error =
         match diff with
-        | None ->
-            PagedDiffStatus.Failed
-                "This comparison is no longer available. Select the file again in the history sidebar."
-        | Some pending when pending.Loading -> PagedDiffStatus.Opening
-        | Some failed when failed.Error.IsSome -> PagedDiffStatus.Failed failed.Error.Value
-        | Some _ ->
-            match value |> Option.bind _.BlockedReason with
-            | Some reason -> PagedDiffStatus.Blocked(None, reason)
-            | None -> PagedDiffStatus.Ready
-
-    let changeKind =
-        match value |> Option.map _.Kind with
-        | Some GitHistoryChangeKind.Added -> GitDiffChangeKind.Added
-        | Some GitHistoryChangeKind.Deleted -> GitDiffChangeKind.Deleted
-        | _ -> GitDiffChangeKind.Modified
+        | None -> Some "This comparison is no longer available. Select the file again in the history sidebar."
+        | Some pending -> pending.Error
 
     Html.div [
         prop.className "swt:flex swt:h-full swt:w-full swt:min-h-0 swt:min-w-0 swt:flex-col"
@@ -81,17 +53,18 @@ let Main (revision: string, path: string) =
             Html.div [
                 prop.className "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:p-4"
                 prop.children [
-                    GitPagedDiffViewer.Viewer(
-                        parts = (value |> Option.map _.Parts |> Option.defaultValue [||]),
-                        status = status,
-                        progress = None,
-                        hasMore = false,
-                        outputComplete = true,
-                        previousTitle = previousTitle,
-                        currentTitle = $"{path} @ {shortRevision revision}",
-                        changeKind = changeKind,
-                        testIdPrefix = "git-history-diff"
-                    )
+                    match error with
+                    | Some message -> Html.p [ prop.role "alert"; prop.text message ]
+                    | None ->
+                        Html.div [
+                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:loading swt:loading-spinner swt:loading-sm"
+                                ]
+                                Html.span "Opening comparison…"
+                            ]
+                        ]
                 ]
             ]
         ]

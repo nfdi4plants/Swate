@@ -9,9 +9,24 @@ open Swate.Electron.Shared.DTOs.GitHistoryDto
 type GitHistoryDiffState = {
     Request: GitHistoryDiffRequest
     Loading: bool
-    Value: GitHistoryDiffDto option
     Error: string option
 }
+
+/// Rapid selections keep the original return page; workspace diffs have already closed.
+let returnPageForHistory (previous: PageState option) (current: PageState option) =
+    match current with
+    | Some(PageState.GitHistoryDiffPage _) -> previous
+    | Some(PageState.GitDiffPage diff) when diff.Committed.IsSome -> previous
+    | Some(PageState.GitDiffPage _) -> None
+    | other -> other
+
+let isHistorySelectionShown (request: GitHistoryDiffRequest) (current: PageState option) =
+    match current with
+    | Some(PageState.GitHistoryDiffPage(revision, path)) -> revision = request.Revision && path = request.Path
+    | Some(PageState.GitDiffPage diff) ->
+        diff.Committed
+        |> Option.exists (fun committed -> committed.Revision = request.Revision && committed.Path = request.Path)
+    | _ -> false
 
 type GitHistoryState = {
     Root: string option
@@ -87,6 +102,8 @@ let GitHistoryCtxProvider (children: ReactElement) =
     let diffRequestId = React.useRef 0
     let scrollPosition = React.useRef 0.0
     let previousMainView = React.useRef<PageState option> None
+    let livePage = React.useRef page.state
+    livePage.current <- page.state
 
     let observedGitStatus =
         React.useRef (git.state.Status.CurrentBranch, git.state.WorkspaceVersion)
@@ -253,11 +270,8 @@ let GitHistoryCtxProvider (children: ReactElement) =
                 |> Promise.start
 
     let openDiff (request: GitHistoryDiffRequest) =
-        match page.state with
-        | Some(PageState.GitHistoryDiffPage _) -> ()
-        // Workspace diffs own worker sessions that close when leaving the page.
-        | Some(PageState.GitDiffPage _) -> previousMainView.current <- None
-        | previous -> previousMainView.current <- previous
+        synchronizeRoot ()
+        previousMainView.current <- returnPageForHistory previousMainView.current livePage.current
 
         diffRequestId.current <- diffRequestId.current + 1
         let requestId = diffRequestId.current
@@ -271,38 +285,62 @@ let GitHistoryCtxProvider (children: ReactElement) =
                     Some {
                         Request = request
                         Loading = true
-                        Value = None
                         Error = None
                     }
         }
 
-        page.setState (Some(PageState.GitHistoryDiffPage(request.Revision, request.Path)))
+        let pendingPage = Some(PageState.GitHistoryDiffPage(request.Revision, request.Path))
+        livePage.current <- pendingPage
+        page.setState pendingPage
 
-        promise {
-            let! result =
-                Api.ipcGitHistoryApi.openDiff request
-                |> Promise.catch (fun error -> Error error.Message)
+        let stillSelected () =
+            liveRoot.current = requestedRoot
+            && diffRequestId.current = requestId
+            && isHistorySelectionShown request livePage.current
 
-            if liveRoot.current = requestedRoot && diffRequestId.current = requestId then
-                let value, error =
-                    match result with
-                    | Ok diff -> Some diff, None
-                    | Error message -> None, Some message
-
+        let settle error =
+            if stillSelected () then
                 publish {
                     latest.current with
                         Diff =
                             Some {
                                 Request = request
                                 Loading = false
-                                Value = value
                                 Error = error
                             }
                 }
+
+        promise {
+            let! result =
+                Api.ipcGitHistoryApi.openDiff request
+                |> Promise.catch (fun error -> Error error.Message)
+
+            if stillSelected () then
+                match result with
+                | Error message -> settle (Some message)
+                | Ok diff ->
+                    // The shared workflow owns the worker session and publishes GitDiffPage.
+                    let! opened = git.selectCommittedDiff requestedRoot diff
+
+                    match opened with
+                    | Ok() -> settle None
+                    | Error message -> settle (Some message)
         }
         |> Promise.start
 
     React.useEffect ((fun () -> synchronizeRoot ()), [| box root |])
+
+    React.useEffect (
+        (fun () ->
+            match latest.current.Diff with
+            | Some diff when not (isHistorySelectionShown diff.Request livePage.current) ->
+                diffRequestId.current <- diffRequestId.current + 1
+                previousMainView.current <- None
+                publish { latest.current with Diff = None }
+            | _ -> ()
+        ),
+        [| box page.state |]
+    )
 
     // Existing status refreshes notify history that its current-branch snapshot needs reloading.
     // Immutable file diffs stay pinned to their selected revisions.
@@ -347,7 +385,10 @@ let GitHistoryCtxProvider (children: ReactElement) =
                 fun () ->
                     diffRequestId.current <- diffRequestId.current + 1
                     publish { latest.current with Diff = None }
-                    page.setState previousMainView.current
+                    let returnPage = previousMainView.current
+                    previousMainView.current <- None
+                    livePage.current <- returnPage
+                    page.setState returnPage
             scrollTop = fun () -> scrollPosition.current
             saveScroll = fun position -> scrollPosition.current <- position
         },

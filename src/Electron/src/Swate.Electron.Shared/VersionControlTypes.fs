@@ -227,12 +227,16 @@ type ResumableLineDto =
     | Ready of line: DiffLineDto
     | Scanning of progress: ScanProgressDto * continuation: string * pending: PendingPreviewDto option
 
+/// A committed file selection. The main process resolves its first parent and rename source.
+type CommittedDiffRequestDto = { Revision: string; Path: string }
+
 /// Opens a diff of one path. PreparationTokenId and the encodings answer an earlier
 /// EncodingRequired blocker, and Continuation resumes an earlier Scanning result.
 type OpenTextDiffRequestDto = {
     OperationId: string
     Path: string
     PreviousPath: string option
+    Committed: CommittedDiffRequestDto option
     PreparationTokenId: string option
     PreviousEncoding: string option
     CurrentEncoding: string option

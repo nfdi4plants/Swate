@@ -10,7 +10,6 @@ open Fable.Electron.Main
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.DTOs.GitHistoryDto
 open Swate.Components.Page.GitHistory.Types
-open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 
 // These bindings deliberately live here: committed history has no dependency on
 // the workspace Git service and cannot write its index, worktree or references.
@@ -56,7 +55,6 @@ let private readOnlyEnvironment (nullFile: string) : obj = jsNative
 let private decodeUtf8 (bytes: obj) : string = jsNative
 
 let private maxOutputBytes = 16 * 1024 * 1024
-let private maxPatchBytes = 8 * 1024 * 1024
 let private hashPattern = Regex("^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
 
 let private validHash (value: string) =
@@ -481,278 +479,26 @@ let private validPath (path: string) =
         |> Array.exists (fun segment -> segment = ".." || segment = "." || segment = "")
     )
 
-let private unavailableBlob root revision path = promise {
-    let objectName = revision + ":" + path
-    let! kind = run root [| "cat-file"; "-t"; objectName |]
-
-    if kind.Trim() <> "blob" then
-        return Some "This change contains a Git submodule or another non-text object."
-    else
-        let! size = run root [| "cat-file"; "-s"; objectName |]
-
-        if Double.Parse(size.Trim()) > float maxOutputBytes then
-            return
-                Some "This committed file exceeds the 16 MiB inspection limit; its historical text diff is unavailable."
-        else
-            let! bytes = runRaw root maxOutputBytes [| "cat-file"; "blob"; objectName |]
-
-            let content =
-                Main.Bindings.Node.bufferSubarray bytes 0 4096
-                |> Main.Bindings.Node.bufferToUtf8String
-
-            if content.StartsWith("version https://git-lfs.github.com/spec/v1") then
-                return
-                    Some
-                        "This revision stores a Git LFS pointer. Historical research-file contents are unavailable in this viewer."
-            else
-                return None
-}
-
-let private hunkPattern =
-    Regex("^@@ -([0-9]+)(?:,([0-9]+))? \\+([0-9]+)(?:,([0-9]+))? @@")
-
-let private parsePatch (patch: string) =
-    let parts = ResizeArray<PagedPart>()
-    let rows = ResizeArray<PagedRow>()
-    let removed = ResizeArray<PagedLine>()
-    let added = ResizeArray<PagedLine>()
-    let mutable hunkId = ""
-    let mutable previousRange = { Start = 0.; Count = 0. }
-    let mutable currentRange = { Start = 0.; Count = 0. }
-    let mutable previousNumber = 0.
-    let mutable currentNumber = 0.
-    let mutable lastSide = ' '
-
-    let line number changed (content: string) =
-        let crlf = content.EndsWith('\r')
-
-        let text =
-            if crlf then
-                content.Substring(0, content.Length - 1)
-            else
-                content
-
-        {
-            Number = number
-            Ending = if crlf then PagedLineEnding.CRLF else PagedLineEnding.LF
-            OffsetUtf16 = 0.
-            TotalUtf16 = Some(float text.Length)
-            Text = text
-            Highlights =
-                if text.Length = 0 then
-                    [||]
-                else
-                    [|
-                        {
-                            Start = 0
-                            Length = text.Length
-                            Changed = changed
-                        }
-                    |]
-        }
-
-    let addRow kind previous current =
-        rows.Add {
-            Id = hunkId + ":" + string rows.Count
-            Kind = kind
-            Previous = previous
-            Current = current
-        }
-
-    let flushChanges () =
-        for index in 0 .. max removed.Count added.Count - 1 do
-            let previous = if index < removed.Count then Some removed[index] else None
-            let current = if index < added.Count then Some added[index] else None
-
-            let kind =
-                match previous, current with
-                | Some _, Some _ -> PagedRowKind.Replaced
-                | Some _, None -> PagedRowKind.Removed
-                | _ -> PagedRowKind.Added
-
-            addRow kind previous current
-
-        removed.Clear()
-        added.Clear()
-
-    let flushHunk () =
-        flushChanges ()
-
-        if hunkId <> "" then
-            parts.Add(HunkRows(hunkId, previousRange, currentRange, true, true, rows.ToArray()))
-
-        rows.Clear()
-
-    let noNewline item = {
-        item with
-            Ending =
-                if item.Ending = PagedLineEnding.CRLF then
-                    PagedLineEnding.CR
-                else
-                    PagedLineEnding.NoEnding
-    }
-
-    for content in patch.Split('\n') do
-        let header = hunkPattern.Match content
-
-        if header.Success then
-            flushHunk ()
-            hunkId <- "history-hunk-" + string parts.Count
-
-            let count (index: int) =
-                if header.Groups[index].Success then
-                    Double.Parse header.Groups[index].Value
-                else
-                    1.
-            // Git patches use one-based line numbers; the viewer uses zero-based
-            // positions and adds one when displaying a nonempty range.
-            let range (startIndex: int) (countIndex: int) : PagedRange =
-                let length = count countIndex
-                let start = Double.Parse header.Groups[startIndex].Value
-
-                {
-                    Start = (if length = 0.0 then start else start - 1.0)
-                    Count = length
-                }
-
-            previousRange <- range 1 2
-            currentRange <- range 3 4
-            previousNumber <- previousRange.Start
-            currentNumber <- currentRange.Start
-            lastSide <- ' '
-        elif hunkId <> "" && content.StartsWith("\\ No newline at end of file") then
-            match lastSide with
-            | '-' when removed.Count > 0 -> removed[removed.Count - 1] <- noNewline removed[removed.Count - 1]
-            | '+' when added.Count > 0 -> added[added.Count - 1] <- noNewline added[added.Count - 1]
-            | ' ' when rows.Count > 0 ->
-                let row = rows[rows.Count - 1]
-
-                rows[rows.Count - 1] <- {
-                    row with
-                        Previous = row.Previous |> Option.map noNewline
-                        Current = row.Current |> Option.map noNewline
-                }
-            | _ -> ()
-        elif hunkId <> "" && content.Length > 0 then
-            match content[0] with
-            | '-' ->
-                removed.Add(line previousNumber true (content.Substring 1))
-                previousNumber <- previousNumber + 1.
-                lastSide <- '-'
-            | '+' ->
-                added.Add(line currentNumber true (content.Substring 1))
-                currentNumber <- currentNumber + 1.
-                lastSide <- '+'
-            | ' ' ->
-                flushChanges ()
-
-                addRow
-                    PagedRowKind.Context
-                    (Some(line previousNumber false (content.Substring 1)))
-                    (Some(line currentNumber false (content.Substring 1)))
-
-                previousNumber <- previousNumber + 1.
-                currentNumber <- currentNumber + 1.
-                lastSide <- ' '
-            | _ -> ()
-
-    flushHunk ()
-    parts.ToArray()
-
+// History resolves immutable sources only. The shared text-diff service owns reading,
+// classification, paging and recovery for both history and workspace comparisons.
 let private loadDiff root revision path = promise {
     if not (validPath path) then
         failwith "Select a valid repository-relative changed path."
 
-    let! parent, changes = loadChanges root revision
-    let change = changes |> Array.tryFind (fun change -> change.Path = path)
+    let! parent = parentRevision root revision
+    let! names = run root (diffArguments revision parent [| "--name-status"; "-z" |])
+    let changes = parseChanges names
 
-    match change with
+    match changes |> Array.tryFind (fun change -> change.Path = path) with
     | None -> return failwith "This path is not a changed file in the selected commit."
     | Some change ->
-        let result parts blocked = {
+        return {
             Revision = revision
             ParentRevision = parent
             Path = change.Path
             PreviousPath = change.PreviousPath
             Kind = change.Kind
-            Parts = parts
-            BlockedReason = blocked
         }
-
-        let! blocked = promise {
-            if change.Path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) then
-                return Some "Excel workbooks are binary research files; a text diff is unavailable."
-            elif change.Insertions.IsNone || change.Deletions.IsNone then
-                return Some "This commit contains binary file content; a text diff is unavailable."
-            else
-                let! current =
-                    if change.Kind = GitHistoryChangeKind.Deleted then
-                        Promise.lift None
-                    else
-                        unavailableBlob root revision change.Path
-
-                match current, parent with
-                | Some reason, _ -> return Some reason
-                | None, Some previous when change.Kind <> GitHistoryChangeKind.Added ->
-                    return! unavailableBlob root previous (change.PreviousPath |> Option.defaultValue change.Path)
-                | _ -> return None
-        }
-
-        match blocked with
-        | Some reason -> return result [||] (Some reason)
-        | None ->
-            try
-                let patchOptions = [|
-                    "--patch"
-                    "--unified=3"
-                    "--diff-algorithm=myers"
-                    "--no-indent-heuristic"
-                |]
-
-                let! args = promise {
-                    match parent with
-                    | Some previous when
-                        change.Kind <> GitHistoryChangeKind.Added
-                        && change.Kind <> GitHistoryChangeKind.Deleted
-                        ->
-                        // Compare the selected file's blobs directly. Including both
-                        // paths in a tree diff could also include unrelated changes
-                        // to a copy source, or lose rename identity after filtering.
-                        let oldPath = change.PreviousPath |> Option.defaultValue change.Path
-                        let! oldObject = run root [| "rev-parse"; "--verify"; previous + ":" + oldPath |]
-                        let! newObject = run root [| "rev-parse"; "--verify"; revision + ":" + change.Path |]
-                        let oldHash, newHash = oldObject.Trim(), newObject.Trim()
-
-                        if not (validHash oldHash && validHash newHash) then
-                            failwith "The selected file objects are unavailable."
-
-                        return
-                            Array.concat [|
-                                [| "diff"; "--no-ext-diff"; "--no-textconv"; "--no-color" |]
-                                patchOptions
-                                [| oldHash; newHash; "--" |]
-                            |]
-                    | _ -> return Array.append (diffArguments revision parent patchOptions) [| change.Path |]
-                }
-
-                let! bytes = runRaw root maxPatchBytes args
-                let patch = decodeUtf8 bytes
-
-                let binaryMetadata =
-                    patch.Split('\n')
-                    |> Array.takeWhile (fun line -> not (line.StartsWith("@@ ")))
-                    |> Array.exists (fun line -> line = "GIT binary patch" || line.StartsWith("Binary files "))
-
-                if binaryMetadata then
-                    return result [||] (Some "This commit contains binary file content; a text diff is unavailable.")
-                else
-                    return result (parsePatch patch) None
-            with _ ->
-                return
-                    result
-                        [||]
-                        (Some
-                            "The committed patch could not be displayed. It may exceed the 8 MiB limit, use a non-UTF-8 encoding, or Git may be unavailable.")
 }
 
 let private protect operation = promise {
@@ -770,6 +516,13 @@ let private protect operation = promise {
                     message
             )
 }
+
+/// Resolves a selection against the captured workspace of a tracked diff operation.
+let prepareDiff root (request: GitHistoryDiffRequest) =
+    protect (fun () -> promise {
+        let! revision = verifyRevision root request.Revision
+        return! loadDiff root revision request.Path
+    })
 
 let api (event: IpcMainInvokeEvent) : IGitHistoryApi = {
     listHistory =

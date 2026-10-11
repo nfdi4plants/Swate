@@ -41,6 +41,7 @@
     <Compile Include="VersionControl\TextDiffWorkers.fs" />
     <Compile Include="VersionControl\ProviderComposition.fs" />
     <Compile Include="VersionControl\VersionControlRuntime.fs" />
+    <Compile Include="VersionControl\CommittedDiffSources.fs" />
     <Compile Include="VersionControl\Mappings.fs" />
     <Compile Include="VersionControl\VersionControlSettings.fs" />
     <Compile Include="VersionControl\WorkspaceSessionHost.fs" />
@@ -66,6 +67,7 @@
     <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="IPC\IUiSettingsApi.fs" />
     <Compile Include="IPC\IAppVersionApi.fs" />
+    <Compile Include="Workers\CommittedDiffAdapter.fs" />
     <Compile Include="Workers\TextDiffWorkerEntry.fs" />
     <Compile Include="AppMenu.fs" />
     <Compile Include="main.fs" />

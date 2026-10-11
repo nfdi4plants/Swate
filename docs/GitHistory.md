@@ -8,8 +8,8 @@ type changed. Each badge counts files, has a full accessible label and tooltip,
 and wraps within narrow sidebars. Zero categories are omitted; an empty commit
 shows a neutral **0 files** badge. **Counts unavailable** means its summary could not be loaded.
 Expand a commit to load its changed files.
-Click a file to compare that commit with its first parent in the existing paged
-diff viewer. The first commit compares with an empty tree. Merge commits use
+Click a file to compare that commit with its first parent through the same worker,
+page loader and diff viewer as workspace changes. The first commit compares with an empty tree. Merge commits use
 their first parent. File rows show the name, directory, change label and line
 counts; hover for the full path and rename source. **Close comparison** returns
 to the previous file or page. Workspace diff sessions close when leaving them,
@@ -34,7 +34,7 @@ host. It has no dependency on Electron, ARC state or a version-control provider.
 There is no main-content history page; that area is used for selected file diffs.
 
 `IGitHistoryApi` is a separate typed IPC bridge. All native Git reads, argument
-validation and patch parsing live in `Main/IPC/GitHistory.fs`. Calls resolve the
+validation and immutable source selection live in `Main/IPC/GitHistory.fs`. Calls resolve the
 vault of the calling window and require that folder to be the Git repository
 root. They never modify the index, files, branches or refs, and do not change the
 existing provider workflow.
@@ -52,12 +52,26 @@ isolated with `NUL` on Windows and `/dev/null` elsewhere, and inherited Git
 directory/configuration overrides are removed. Failures distinguish a folder
 outside Git from a missing Git executable and retain Git's diagnostic message.
 
-The history comparison shows a committed patch with three context lines per
-hunk, with whole-line highlights. Context expansion is unavailable for these
-patches. Binary files (including `.xlsx`), Git LFS pointers, submodules and
-non-UTF-8 patches show an unavailable explanation. Native reads have a 30-second
-timeout and a 16 MiB output limit; displayed patches have an 8 MiB limit. Recovery
-guidance is informational; there is no restore action.
+History comparisons use `GitDiffPageLoader` and `GitDiffTarget`, including background
+indexing, bounded pages, eviction and replay, expandable context, long-line slices,
+encoding choices and recovery after a worker session closes. The selected revisions
+stay pinned across encoding retries and reopens. The former eager patch parser and
+8 MiB patch limit have been removed. Binary classification, local LFS availability,
+storage budgets and indexing limits use the shared text-diff behavior.
+
+VersionControlService 0.2.1 accepts HEAD-versus-working-file sources. The small
+`CommittedDiffAdapter` at the worker boundary supplies a pinned parent and a private
+snapshot of the selected commit's current file to its existing handler. Git streams
+this snapshot into the worker's temporary directory before the first page opens;
+it never changes the repository or buffers a complete patch in the renderer.
+The snapshot requires temporary disk space even when the diff engine uses memory.
+It is removed when its session ends; encoding preparation retains its exact file
+identity for up to five minutes so retrying a chosen encoding remains valid. Worker
+exit removes the containing directory. The adapter preserves protocol output limits
+and forwards every paging and handle operation to the library. A future dependency
+API for two committed sources can replace this adapter without changing the loader
+or viewer. Native history metadata reads retain their 30-second timeout and 16 MiB
+output limit. Recovery guidance is informational; there is no restore action.
 
 ## Verification commands
 
@@ -77,7 +91,7 @@ npm --prefix src/Electron run start
 # Focused history integration tests; all Git commands are read-only.
 Push-Location tests/Electron.Core
 dotnet fable -o output -s --define SWATE_ENVIRONMENT
-npx vitest run output/GitHistory.test.js
+npx vitest run output/GitHistory.test.js output/CommittedDiffAdapter.test.js
 Pop-Location
 
 # Existing component and Electron regression suites (run sequentially).
@@ -93,6 +107,9 @@ recent `.fs`, `.md` or `.tsx` change for their text-diff scenario. They compare
 HEAD, index contents and workspace status before and after history reads.
 They also compare summaries with loaded file changes across two pinned pages,
 and verify root commits and available merges against independent Git output.
+The adapter tests use this checkout's existing modification, deletion and rename
+commits, exercise paging, replay, expansion and line reads, and check memory limits,
+encoding retries, cancellation cleanup and worker reuse without Git writes.
 Component unit tests cover status counting, and RTL tests verify all six badges,
 zero counts, unavailable summaries and the loaded-details fallback.
 If Fable project discovery fails with `NU1900` because NuGet's vulnerability
@@ -109,8 +126,9 @@ Fable version treats MSBuild warning output as a discovery failure.
   labels and displayed patch against its first parent.
 - Check the initial commit, a merge commit, an empty commit and a rename with
   unchanged contents. An empty text patch should remain a valid comparison.
-- Select binary and Git LFS files and confirm that their contents are described
-  as unavailable instead of displaying a pointer as the research file.
+- Select binary and Git LFS files. Check the shared binary explanation, and verify
+  that LFS comparisons use locally available content or explain which side is
+  unavailable instead of displaying a pointer as the research file.
 - Open history while editing a file and check that the main page is preserved.
   Load older commits, expand several entries, select files and close a diff.
   Check selected-file highlighting and retained sidebar scroll position.

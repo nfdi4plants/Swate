@@ -149,6 +149,8 @@ type GitDiffNextRequest = {
 type GitDiffPageData = {
     Path: string
     PreviousPath: string option
+    /// Immutable revision selection; None opens a workspace comparison.
+    Committed: CommittedDiffRequestDto option
     ChangeKind: GitDiffChangeKind option
     Generation: int
     Handle: DiffHandleDto option

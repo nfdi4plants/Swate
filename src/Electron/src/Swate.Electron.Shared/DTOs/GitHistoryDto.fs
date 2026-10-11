@@ -1,7 +1,6 @@
 module Swate.Electron.Shared.DTOs.GitHistoryDto
 
 open Swate.Components.Page.GitHistory.Types
-open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 
 type GitHistoryRequest = {
     /// Subsequent pages stay pinned to the first page's HEAD.
@@ -21,13 +20,11 @@ type GitHistoryRevisionRequest = { Revision: string }
 
 type GitHistoryDiffRequest = { Revision: string; Path: string }
 
-/// A committed patch, rendered by the same paged viewer as workspace changes.
+/// Immutable source metadata for the shared worker-backed diff pipeline.
 type GitHistoryDiffDto = {
     Revision: string
     ParentRevision: string option
     Path: string
     PreviousPath: string option
     Kind: GitHistoryChangeKind
-    Parts: PagedPart[]
-    BlockedReason: string option
 }

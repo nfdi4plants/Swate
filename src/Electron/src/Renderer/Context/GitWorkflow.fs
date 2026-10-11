@@ -11,6 +11,7 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.VersionControlTypes
+open Swate.Electron.Shared.DTOs.GitHistoryDto
 
 /// Large copies need time to settle before Git hashes their contents again.
 let private externalChangesRefreshDelayMs = 1500
@@ -573,6 +574,7 @@ type Msg =
     | InitRepositoryRequested
     | InitRepositoryCompleted of sessionId: int * result: Result<unit, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
+    | SelectCommittedDiffRequested of root: ArcRootPath * GitHistoryDiffDto * Reply<unit>
     | SelectChangeCompleted of
         requestId: int *
         path: string *
@@ -1591,6 +1593,7 @@ module GitDiffPageLoader =
             OperationId = deps.newOperationId ()
             Path = page.Path
             PreviousPath = page.PreviousPath
+            Committed = page.Committed
             PreparationTokenId = preparationTokenId
             PreviousEncoding = page.PreviousEncoding
             CurrentEncoding = page.CurrentEncoding
@@ -1598,12 +1601,12 @@ module GitDiffPageLoader =
             Continuation = None
         }
 
-    /// A diff page for the change that is still opening, and the command that opens it.
-    let start (deps: GitDependencies) (generation: int) (change: GitSidebarChange) =
+    let private startFor deps generation path previousPath changeKind committed =
         let page: GitDiffPageData = {
-            Path = change.Path
-            PreviousPath = change.OriginalPath
-            ChangeKind = Some(changeKindOf change)
+            Path = path
+            PreviousPath = previousPath
+            Committed = committed
+            ChangeKind = Some changeKind
             Generation = generation
             Handle = None
             SourceInfos = None
@@ -1639,6 +1642,28 @@ module GitDiffPageLoader =
         }
 
         openFresh deps page None
+
+    /// Workspace and committed selections share every loader state and request.
+    let start (deps: GitDependencies) (generation: int) (change: GitSidebarChange) =
+        startFor deps generation change.Path change.OriginalPath (changeKindOf change) None
+
+    let startCommitted (deps: GitDependencies) generation (diff: GitHistoryDiffDto) =
+        let kind =
+            match diff.Kind with
+            | Swate.Components.Page.GitHistory.Types.GitHistoryChangeKind.Added -> Paged.GitDiffChangeKind.Added
+            | Swate.Components.Page.GitHistory.Types.GitHistoryChangeKind.Deleted -> Paged.GitDiffChangeKind.Deleted
+            | _ -> Paged.GitDiffChangeKind.Modified
+
+        startFor
+            deps
+            generation
+            diff.Path
+            diff.PreviousPath
+            kind
+            (Some {
+                Revision = diff.Revision
+                Path = diff.Path
+            })
 
     let private evictedCopy (windowPage: GitDiffWindowPage) = {
         windowPage with
@@ -4833,6 +4858,24 @@ let private updateCore
         nextModel, Cmd.ofMsg RefreshRequested
     | SelectChangeRequested(_, reply) when model.CurrentArcPath.IsNone ->
         model, resolveReplyCmd reply (Error "No ARC is loaded.")
+    | SelectCommittedDiffRequested(root, _, reply) when root.IsNone || root <> model.CurrentArcPath ->
+        model, resolveReplyCmd reply (Error "The ARC changed before the comparison opened.")
+    | SelectCommittedDiffRequested(_, diff, reply) ->
+        let requestId = nextPageLoadRequestId model
+        let page, openCmd = GitDiffPageLoader.startCommitted deps requestId diff
+
+        {
+            model with
+                ErrorNotice = None
+                PageLoadRequestId = requestId
+                DiffPage = Some page
+                DiffReopen = None
+        },
+        Cmd.batch [
+            GitDiffPageLoader.publishCmd setPageState page
+            openCmd
+            resolveReplyCmd reply (Ok())
+        ]
     | SelectChangeRequested(change, reply) when not change.IsConflicted ->
         let requestId = nextPageLoadRequestId model
         let page, openCmd = GitDiffPageLoader.start deps requestId change
@@ -4843,6 +4886,7 @@ let private updateCore
                 PageLoadRequestId = requestId
                 SelectedChangePath = Some change.Path
                 DiffPage = Some page
+                DiffReopen = None
         },
         Cmd.batch [
             GitDiffPageLoader.publishCmd setPageState page
