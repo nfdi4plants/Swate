@@ -55,6 +55,6 @@ type ReactMDEditor =
 
     [<ReactComponent("default", "@uiw/react-markdown-preview")>]
     static member MarkdownPreview
-        (source: string, ?className: string, ?components: obj, ?rehypePlugins: obj[], ?wrapperElement: obj)
+        (source: string, ?className: string, ?components: obj, ?rehypePlugins: obj[], ?wrapperElement: obj, ?style: obj)
         =
         React.Imported()

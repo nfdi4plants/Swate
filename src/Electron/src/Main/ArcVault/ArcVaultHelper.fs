@@ -334,6 +334,11 @@ let createWindow () =
             Fable.Electron.Main.shell.openExternal url |> Promise.start
     )
 
+    // A reload starts a renderer that knows none of the diff handles the old one opened.
+    let windowId = window.id
+
+    window.webContents.onDidNavigate (fun _ _ _ _ -> Main.VersionControl.TextDiffHandles.windowReloaded windowId)
+
     window
 
 let loadWindow (window: BrowserWindow) = promise {

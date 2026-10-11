@@ -46,7 +46,7 @@ let createRuntime
     {
         Catalog =
             ProviderComposition.createCatalog [
-                ProviderComposition.createGitFactory noAccounts
+                ProviderComposition.createGitFactory noAccounts WorkspaceSessionHost.windowOwnerOf
                 ProviderComposition.createLakeFsFactory
                     (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
                     lakeFsCredentials

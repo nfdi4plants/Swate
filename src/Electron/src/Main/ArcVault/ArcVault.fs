@@ -1795,6 +1795,11 @@ module ArcVaultExtensions =
 
                 this.SetFileTree fileTree
 
+                // Every ARC open asks for the prewarm. It does nothing once the diff workers
+                // started, and a failed prewarm is tried again by the next open. Prewarming never
+                // throws and does not hold up the ARC.
+                Main.VersionControl.TextDiffWorkers.prewarm ()
+
         /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
         member internal this.FinalizeArcInitialization() =
             this.SetArcInitializationState false
@@ -2101,7 +2106,7 @@ type ArcVaults() =
 
                     currentHost.RunningOperationIdsForWindow id
                     |> Array.filter (fun operationId -> not (Set.contains operationId mutationIds))
-                    |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
+                    |> Array.iter (fun operationId -> currentHost.Cancel(operationId, Some id) |> ignore)
                 )
 
             if not vault.isCloseApproved then
@@ -2181,7 +2186,9 @@ type ArcVaults() =
                                         let operationIds = currentHost.RunningOperationIdsForWindow id
 
                                         operationIds
-                                        |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
+                                        |> Array.iter (fun operationId ->
+                                            currentHost.Cancel(operationId, Some id) |> ignore
+                                        )
 
                                         let waitForOperations = promise {
                                             do! currentHost.WhenOperationsComplete operationIds
@@ -2241,6 +2248,9 @@ type ArcVaults() =
             vault.isOperationCloseApproved <- false
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
+
+            // Runs before the vault disposal, whose session close waits for these operations.
+            Main.VersionControl.TextDiffHandles.windowClosed id
 
             if this.Vaults.ContainsKey(id) then
                 this.DisposeVault(id)

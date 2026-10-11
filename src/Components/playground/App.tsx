@@ -29,6 +29,7 @@ import ValidationPackageBrowserFixture from '../src/Page/ValidationPackageBrowse
 import SortableListFixture from '../src/Composite/SortableList/SortableList.sample.fs.ts'
 import DataAnnotator from '../src/Composite/Widgets/DataAnnotator/DataAnnotator.fs.ts'
 import {QuickAccessButton} from '../src/Primitive/Buttons/Buttons.fs.ts';
+import ChangelogSample from '../src/Page/Changelog/Changelog.sample.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -249,9 +250,8 @@ function DataAnnotatorContainer() {
 }
 
 const App = () => {
-    let [isActive, setIsActive] = React.useState(false)
     return (
-        <ArcFileEditor />
+        <ChangelogSample />
     );
 };
 

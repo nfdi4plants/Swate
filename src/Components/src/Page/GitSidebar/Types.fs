@@ -65,7 +65,6 @@ type GitSidebarPublishRenamePrompt = { CurrentName: string; Message: string }
 type GitSidebarCallbacks = {
     OnRefresh: unit -> unit
     OnFetch: unit -> unit
-    OnPull: unit -> unit
     OnPush: unit -> unit
     OnUpdateFromOnline: unit -> unit
     OnPrimarySaveSelection: GitSidebarCommitSelectionRequest -> unit
@@ -77,6 +76,7 @@ type GitSidebarCallbacks = {
     OnCancelPendingRemoteAction: unit -> unit
     OnSaveDownloadLargeFiles: bool -> unit
     OnSaveLfsAutoTrackThreshold: int -> unit
+    OnSaveDiffIndexingLimit: int -> unit
     OnCreateBranch: GitSidebarCreateBranchRequest -> unit
     OnSwitchBranch: string -> unit
     OnSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>

@@ -53,7 +53,7 @@ let private createRuntimeWithFactory
     {
         Catalog =
             ProviderComposition.createCatalog [
-                ProviderComposition.createGitFactory noAccounts
+                ProviderComposition.createGitFactory noAccounts WorkspaceSessionHost.windowOwnerOf
                 lakeFsFactory
             ]
         Bindings = bindings
@@ -462,20 +462,6 @@ Vitest.describe (
                         Vitest.expect(services.Maintenance).toBe false
                         Vitest.expect(services.RepositoryBrowser).toBe false
 
-                        let! wordDiff =
-                            api.getWordDiff {
-                                OperationId = "lakefs-word-diff"
-                                Path = "data.txt"
-                                RefreshTree = None
-                            }
-
-                        let! baseContent =
-                            api.getBaseContent {
-                                OperationId = "lakefs-base-content"
-                                Path = "data.txt"
-                                RefreshTree = None
-                            }
-
                         let! objects = api.listObjects (request "lakefs-list-objects")
 
                         let! materialize =
@@ -500,6 +486,7 @@ Vitest.describe (
                                 Settings = {
                                     AutoPolicyThresholdMb = Some 2
                                     MaterializeLargeObjects = false
+                                    DiffIndexingLimitMb = None
                                 }
                             }
 
@@ -514,8 +501,6 @@ Vitest.describe (
                         let! deduplicate = api.deduplicateStorage (request "lakefs-deduplicate")
                         let! repositoryUrl = api.getRepositoryWebUrl (request "lakefs-repository-url")
 
-                        expectServiceUnavailable "getWordDiff" wordDiff
-                        expectServiceUnavailable "getBaseContent" baseContent
                         expectServiceUnavailable "listObjects" objects
                         expectServiceUnavailable "materializeObject" materialize
                         expectServiceUnavailable "dematerializeObject" dematerialize

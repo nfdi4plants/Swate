@@ -24,6 +24,7 @@ let private failure: OperationFailureDto = {
     RecoveryAction = None
     Details = [||]
     RevisionEvidence = [||]
+    DiffDetail = None
 }
 
 let private expectOk result =

@@ -501,11 +501,64 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "Text diff workers",
+    fun () ->
+        Vitest.test (
+            "development builds load the worker next to the main bundle, packaged builds the unpacked copy",
+            fun () ->
+                let development =
+                    TextDiffWorkers.workerPath false "C:/Swate/resources" "C:/repo/.vite/build"
+
+                let packaged =
+                    TextDiffWorkers.workerPath true "C:/Swate/resources" "C:/repo/.vite/build"
+
+                Vitest.expect(development.Replace('\\', '/')).toBe "C:/repo/.vite/build/text-diff-worker.cjs"
+
+                Vitest.expect(packaged.Replace('\\', '/')).toBe
+                    "C:/Swate/resources/app.asar.unpacked/.vite/build/text-diff-worker.cjs"
+        )
+
+        Vitest.test (
+            "spools go to the Electron temp folder on Windows and macOS",
+            fun () ->
+                let tempRoot platform =
+                    TextDiffWorkers.tempRootFor
+                        platform
+                        (Some "/xdg/cache")
+                        "/home/carol"
+                        (fun () -> "/electron/temp")
+                        "Swate"
+
+                Vitest.expect(tempRoot "win32").toBe "/electron/temp"
+                Vitest.expect(tempRoot "darwin").toBe "/electron/temp"
+        )
+
+        Vitest.test (
+            "spools go to the XDG cache folder on Linux, with ~/.cache as the fallback",
+            fun () ->
+                let tempRoot xdgCacheHome =
+                    TextDiffWorkers.tempRootFor
+                        "linux"
+                        xdgCacheHome
+                        "/home/carol"
+                        (fun () -> failwith "Linux does not use the Electron temp folder.")
+                        "Swate"
+
+                let homeCache = Main.Bindings.Path.join [| "/home/carol"; ".cache"; "Swate" |]
+
+                Vitest.expect(tempRoot (Some "/xdg/cache")).toBe (Main.Bindings.Path.join [| "/xdg/cache"; "Swate" |])
+                Vitest.expect(tempRoot None).toBe homeCache
+                Vitest.expect(tempRoot (Some "relative/cache")).toBe homeCache
+                Vitest.expect(tempRoot (Some "")).toBe homeCache
+        )
+)
+
+Vitest.describe (
     "Provider composition",
     fun () ->
         let catalog () =
             ProviderComposition.createCatalog [
-                ProviderComposition.createGitFactory (source AuthStateDto.Empty [])
+                ProviderComposition.createGitFactory (source AuthStateDto.Empty []) WorkspaceSessionHost.windowOwnerOf
                 ProviderComposition.createLakeFsFactory
                     (ProviderComposition.lakeFsOptions "C:/settings" CaseInsensitive)
                     VersionControlService.LakeFs.LakeFsCredentials.unconfigured

@@ -3814,7 +3814,8 @@ Vitest.describe (
                 Vitest.vi.stubEnv ("SWATE_TEST_USER_DATA", Some rootPath)
 
                 let versionControlHost =
-                    Main.VersionControl.VersionControlRuntime.createProduction ()
+                    Main.VersionControl.VersionControlRuntime.createProduction
+                        Main.VersionControl.WorkspaceSessionHost.windowOwnerOf
                     |> Main.VersionControl.WorkspaceSessionHost.WorkspaceSessionHost
 
                 Main.VersionControl.WorkspaceSessionHost.initialize versionControlHost

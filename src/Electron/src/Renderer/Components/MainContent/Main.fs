@@ -66,6 +66,10 @@ module private LazyComponents =
         Renderer.Components.MainContent.SettingsPageTarget.SettingsPage()
 
     [<ReactLazyComponent>]
+    let LazyChangelogTarget (version: string) =
+        Renderer.Components.MainContent.ChangelogTarget.ChangelogTarget(version)
+
+    [<ReactLazyComponent>]
     let LazyMarkdownEditorTarget (content: string) =
         Renderer.Components.MainContent.MarkdownEditorTargetView.MarkdownEditorTarget(content)
 
@@ -76,6 +80,7 @@ module private LazyComponents =
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
+
     Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
         loadTemplates = MainHelper.loadTemplates,
         children =
@@ -85,6 +90,17 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
                     | Some _, Some PageState.ValidationPackageBrowser -> ValidationPackageBrowserTarget()
+                    | _, Some(PageState.Changelog(version, requestId)) ->
+                        Html.div [
+                            prop.key requestId
+                            prop.className "swt:flex swt:grow swt:min-w-0 swt:min-h-0"
+                            prop.children [
+                                React.Suspense(
+                                    [ LazyComponents.LazyChangelogTarget(version) ],
+                                    fallback = LazyComponents.FullPageLoadingSpinner("Loading changelog...")
+                                )
+                            ]
+                        ]
                     | _, Some PageState.SettingsPage ->
                         React.Suspense(
                             [ LazyComponents.LazySettingPage() ],
@@ -103,6 +119,11 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ LazyComponents.LazyMarkdownEditorTarget(content) ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading markdown editor...")
                         )
+                    | Some _, Some(PageState.PDFPage content) ->
+                        React.Suspense(
+                            [ PDFViewer.DisplayPDF.Main(content) ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading pdf...")
+                        )
                     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
                     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()
                     | Some _, Some(PageState.ErrorPage errMsg) -> ErrorViewTarget errMsg
@@ -114,7 +135,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ LazyComponents.ProvenanceGroupingTarget() ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
-                    | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
+                    | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
                         GitFileChoiceConflictTarget.Main choiceData
