@@ -1140,24 +1140,61 @@ Vitest.describe (
                 withTempArc
                     ignore
                     (fun arcPath -> promise {
-                        do! mkdirWatcherDirectoryAsync (join [| arcPath; "removed"; "nested" |])
+                        let parentPath = join [| arcPath; "parent" |]
+                        let removedPath = join [| parentPath; "removed" |]
+                        let removedDescendantPath = join [| removedPath; "nested" |]
+                        do! mkdirWatcherDirectoryAsync removedDescendantPath
+
+                        for index in 0..249 do
+                            do!
+                                writeWatcherTextFileAsync
+                                    (join [| parentPath; sprintf "entry-%03d.txt" index |])
+                                    "entry"
 
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath
 
-                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "removed")
-                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "removed/nested")
+                        do! vault.LoadNextFileTreeDirectoryPage "parent"
+                        let! firstSnapshot = vault.GetRendererFileTreeSnapshot()
+                        let firstPagePaths = firstSnapshot.entries.Keys |> Set.ofSeq
+
+                        Vitest.expect(firstSnapshot.directoryHasMore.["parent"]).toBe true
+
+                        vault.fileTree.[removedPath] <- FileEntry.create (basename removedPath, removedPath, true)
+
+                        vault.fileTree.[removedDescendantPath] <-
+                            FileEntry.create (basename removedDescendantPath, removedDescendantPath, true)
+
+                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "parent/removed")
+                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "parent/removed/nested")
+
+                        do! rmAsync removedPath (RmOptions(recursive = true, force = true))
 
                         let externalRemoval = {
                             EventName = "unlinkDir"
-                            RelativePath = "removed"
-                            AbsolutePath = join [| arcPath; "already-removed" |]
+                            RelativePath = "parent/removed"
+                            AbsolutePath = removedPath
                         }
 
                         do! vault.ApplyWatcherFileTreeEvents [ externalRemoval ]
 
-                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("removed")).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("removed/nested")).toBe false
+                        Vitest.expect(vault.fileTree.ContainsKey removedPath).toBe false
+                        Vitest.expect(vault.fileTree.ContainsKey removedDescendantPath).toBe false
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("parent")).toBe true
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("parent/removed")).toBe false
+
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("parent/removed/nested")).toBe false
+
+                        do! vault.LoadNextFileTreeDirectoryPage "parent"
+                        let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
+
+                        let newlyDiscoveredPaths =
+                            secondSnapshot.entries.Keys
+                            |> Seq.filter (fun path -> not (firstPagePaths.Contains path))
+                            |> Seq.toArray
+
+                        Vitest.expect(secondSnapshot.directoryHasMore.["parent"]).toBe true
+                        Vitest.expect(newlyDiscoveredPaths.Length).toBe 100
                     })
         )
 

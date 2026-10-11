@@ -646,11 +646,7 @@ module ArcVaultExtensions =
                                 removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
 
                                 if WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
-                                    let parentPath =
-                                        PathHelpers.tryGetParentPath event.RelativePath |> Option.defaultValue ""
-
                                     do! this.CloseFileTreeDirectoryCursors(underPath = event.RelativePath)
-                                    do! this.CloseFileTreeDirectoryCursor parentPath
 
                                 hasFileTreeChanges <- true
                         with fileTreeError ->
