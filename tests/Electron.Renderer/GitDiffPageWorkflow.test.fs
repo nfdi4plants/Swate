@@ -10,6 +10,7 @@ open Renderer.Context.GitWorkflow
 open Renderer.Types
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared.VersionControlTypes
+open Swate.Electron.Shared.DTOs.GitHistoryDto
 open Vitest
 
 module Paged = Swate.Components.Page.GitComparison.GitPagedDiffTypes
@@ -215,6 +216,17 @@ let private change path : GitSidebarChange = {
 
 let private select path =
     SelectChangeRequested(change path, ignore)
+
+let private committedDiff path : GitHistoryDiffDto = {
+    Revision = "revision-1"
+    ParentRevision = Some "parent-1"
+    Path = path
+    PreviousPath = Some "previous.txt"
+    Kind = Swate.Components.Page.GitHistory.Types.GitHistoryChangeKind.Renamed
+}
+
+let private selectCommitted path =
+    SelectCommittedDiffRequested(runningState.CurrentArcPath, committedDiff path, ignore)
 
 let private diffOf (state: GitState) =
     match state.DiffPage with
@@ -468,6 +480,181 @@ Vitest.describe (
                 Vitest.expect(page.SourceInfos.IsSome).toBe (true)
                 Vitest.expect(page.Pages |> Array.map pageParts).toEqual ([| [| "hunk:h1" |] |])
                 Vitest.expect(fake.PageStates.[fake.PageStates.Count - 1]).toEqual (Some(PageState.GitDiffPage page))
+            }
+        )
+
+        Vitest.test (
+            "Committed selections use the common paged loader and preserve their source through continuations",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                fake.OpenReply <-
+                    fun request ->
+                        match request.Continuation with
+                        | None -> succeeded (ResumableOpenDto.Scanning(progress false, "continued", None))
+                        | Some _ -> openedPage (diffPage "p1" None [| hunk "h1" |])
+
+                let! state = run fake (selectCommitted "new.txt") runningState
+
+                let expected: CommittedDiffRequestDto option =
+                    Some {
+                        Revision = "revision-1"
+                        Path = "new.txt"
+                    }
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(fake.Opens |> Seq.map _.Committed |> Seq.toArray).toEqual ([| expected; expected |])
+                Vitest.expect(fake.Opens.[0].PreviousPath).toEqual (Some "previous.txt")
+                Vitest.expect((diffOf state).Committed).toEqual (expected)
+                Vitest.expect((diffOf state).Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(fake.CurrentPageState).toEqual (Some(PageState.GitDiffPage(diffOf state)))
+            }
+        )
+
+        Vitest.test (
+            "Committed encoding choices and an expired session reopen the same revision",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                fake.OpenReply <-
+                    fun request ->
+                        match request.PreviousEncoding with
+                        | None ->
+                            succeeded (
+                                ResumableOpenDto.Ready(
+                                    OpenDiffResultDto.NotDiffable(
+                                        DiffBlockerDto.EncodingRequired(
+                                            DiffSideDto.Previous,
+                                            { Id = "encoding-token" },
+                                            [||]
+                                        )
+                                    )
+                                )
+                            )
+                        | Some _ ->
+                            openedOn (handleOfOpen fake.Opens.Count) (diffPage "p1" (Some "next") [| hunk "h1" |])
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-2" then
+                            failedWith "diff_session_closed" None
+                        else
+                            succeeded (ResumablePageDto.Ready(diffPage "p2" None [| hunk "h2" |]))
+
+                let! opening = run fake (selectCommitted "new.txt") runningState
+                let generation = (diffOf opening).Generation
+
+                let! encoded =
+                    run fake (diffMsg (GitDiffMsg.ChooseEncoding(generation, DiffSideDto.Previous, "latin1"))) opening
+
+                let! reopened = run fake (diffMsg (GitDiffMsg.LoadNext generation)) encoded
+                Vitest.expect(fake.Opens.Count).toBe (3)
+
+                let expected: CommittedDiffRequestDto option =
+                    Some {
+                        Revision = "revision-1"
+                        Path = "new.txt"
+                    }
+
+                Vitest.expect(fake.Opens |> Seq.map _.Committed |> Seq.toArray).toEqual (Array.create 3 expected)
+                Vitest.expect(fake.Opens.[1].PreparationTokenId).toEqual (Some "encoding-token")
+                Vitest.expect(fake.Opens.[2].PreparationTokenId).toEqual (None)
+                Vitest.expect(fake.Opens.[2].PreviousEncoding).toEqual (Some "latin1")
+                Vitest.expect((diffOf reopened).Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
+            "History and workspace selections replace each other and close the old session",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (diffPage "p1" None [| hunk "h1" |])
+                let! workspace = run fake (select "workspace.txt") runningState
+                let! history = run fake (selectCommitted "history.txt") workspace
+                Vitest.expect((diffOf history).Committed.IsSome).toBe (true)
+                let! workspace = run fake (select "workspace.txt") history
+                Vitest.expect((diffOf workspace).Committed).toEqual (None)
+                Vitest.expect(fake.Closes |> Seq.map _.HandleId |> Seq.toArray).toEqual ([| "diff-1"; "diff-2" |])
+            }
+        )
+
+        Vitest.test (
+            "An abandoned committed open releases its late handle after a workspace selection",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                fake.OpenReply <-
+                    fun request -> openedOn { Id = request.Path; Version = "1" } (diffPage "p1" None [| hunk "h1" |])
+
+                let opening, cmd =
+                    update fake.Dependencies fake.SetPageState (selectCommitted "history.txt") runningState
+
+                let! late = collectMessages cmd
+                let! workspace = run fake (select "workspace.txt") opening
+                let mutable state = workspace
+
+                for message in late do
+                    let! next = run fake message state
+                    state <- next
+
+                Vitest.expect((diffOf state).Path).toBe ("workspace.txt")
+                Vitest.expect((diffOf state).Committed).toEqual (None)
+                Vitest.expect(fake.Closes |> Seq.map _.HandleId |> Seq.toArray).toEqual ([| "history.txt" |])
+                Vitest.expect(fake.Cancels.Contains((diffOf opening).RunningOperations |> List.head)).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "Prepared history metadata from an old ARC never starts a worker open",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let! state =
+                    run fake (SelectCommittedDiffRequested(Some "C:/other", committedDiff "a.txt", ignore)) runningState
+
+                Vitest.expect(state.DiffPage).toEqual (None)
+                Vitest.expect(fake.Opens.Count).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "History navigation preserves the original return page across selections and drops workspace diffs",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                fake.OpenReply <- fun _ -> openedPage (diffPage "p1" None [| hunk "h1" |])
+                let! history = run fake (selectCommitted "history.txt") runningState
+                let previous = Some(PageState.TextPage "notes")
+                let returnPage = Renderer.Context.GitHistoryContext.returnPageForHistory
+
+                Vitest
+                    .expect(returnPage previous (Some(PageState.GitHistoryDiffPage("revision-2", "b.txt"))))
+                    .toEqual (previous)
+
+                Vitest.expect(returnPage previous (Some(PageState.GitDiffPage(diffOf history)))).toEqual (previous)
+                let! workspace = run fake (select "workspace.txt") history
+                Vitest.expect(returnPage previous (Some(PageState.GitDiffPage(diffOf workspace)))).toEqual (None)
+
+                Vitest
+                    .expect(
+                        Renderer.Context.GitHistoryContext.isHistorySelectionShown
+                            {
+                                Revision = "revision-1"
+                                Path = "history.txt"
+                            }
+                            (Some(PageState.GitDiffPage(diffOf history)))
+                    )
+                    .toBe (true)
+
+                Vitest
+                    .expect(
+                        Renderer.Context.GitHistoryContext.isHistorySelectionShown
+                            {
+                                Revision = "revision-1"
+                                Path = "history.txt"
+                            }
+                            (Some(PageState.TextPage "notes"))
+                    )
+                    .toBe (false)
             }
         )
 

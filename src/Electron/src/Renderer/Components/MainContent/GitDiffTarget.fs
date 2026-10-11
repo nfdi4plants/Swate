@@ -110,6 +110,7 @@ let nextPageKeyOf (page: GitDiffPageData) : string option =
 let Main (page: GitDiffPageData) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+    let history = Renderer.Context.GitHistoryContext.useGitHistoryCtx ()
     let send = gitStateCtx.sendDiffMsg
     let generation = page.Generation
     let indexingLimitMb = gitStateCtx.state.DiffIndexingLimitMb
@@ -255,7 +256,12 @@ let Main (page: GitDiffPageData) =
                         prop.testId "renderer-git-diff-close"
                         prop.className
                             "swt:btn swt:btn-ghost swt:btn-sm swt:ml-auto swt:shrink-0 swt:gap-2 swt:normal-case"
-                        prop.onClick (fun _ -> pageStateCtx.setState None)
+                        prop.onClick (fun _ ->
+                            if page.Committed.IsSome then
+                                history.closeDiff ()
+                            else
+                                pageStateCtx.setState None
+                        )
                         prop.children [
                             Html.span [
                                 prop.className "swt:iconify swt:fluent--dismiss-24-regular swt:size-4"

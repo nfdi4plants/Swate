@@ -18,6 +18,7 @@
     <Compile Include="Context\AuthStateContext.fs" />
     <Compile Include="Context\GitWorkflow.fs" />
     <Compile Include="Context\GitStateContext.fs" />
+    <Compile Include="Context\GitHistoryContext.fs" />
     <Compile Include="Context\LfsActivityContext.fs" />
     <Compile Include="Components\Helper\ArcViewSelection.fs" />
     <Compile Include="Components\Helper\ArcViewHelper.fs" />
@@ -28,6 +29,7 @@
     <Compile Include="Components\Helper\FileTargetConflictModal.fs" />
     <Compile Include="Components\Helper\GitMergeAbandonConfirmation.fs" />
     <Compile Include="Components\Helper\FileExplorerStateReconciliation.fs" />
+    <Compile Include="Components\LeftSidebar\GitHistorySidebar.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
@@ -63,6 +65,7 @@
     <Compile Include="Components\MainContent\NotesDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesSearchTarget.fs" />
     <Compile Include="Components\MainContent\GitDiffTarget.fs" />
+    <Compile Include="Components\MainContent\GitHistoryDiffTarget.fs" />
     <Compile Include="Components\MainContent\GitMergeConflictTarget.fs" />
     <Compile Include="Components\MainContent\GitFileChoiceConflictTarget.fs" />
     <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />

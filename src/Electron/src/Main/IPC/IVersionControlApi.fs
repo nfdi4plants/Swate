@@ -1188,7 +1188,72 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (Mappings.tryOpenDiffRequest policy request)
                 (fun hosted service openRequest context -> async {
                     let windowId = callingWindowId event
-                    let! opened = service.Open openRequest context
+
+                    let! prepared = async {
+                        match request.Committed with
+                        | None -> return Ok openRequest
+                        | Some selection when hosted.Binding.ProviderId <> ProviderComposition.gitProviderId ->
+                            return
+                                Error(
+                                    OperationFailure.create
+                                        Unsupported
+                                        "service_unavailable"
+                                        "Committed diffs require a Git workspace."
+                                )
+                        | Some selection ->
+                            let! resolved =
+                                GitHistory.prepareDiff hosted.Binding.WorkspaceRoot {
+                                    Revision = selection.Revision
+                                    Path = selection.Path
+                                }
+                                |> Async.AwaitPromise
+
+                            return
+                                resolved
+                                |> Result.mapError (OperationFailure.create Validation "diff_invalid_request")
+                                |> Result.bind (fun metadata ->
+                                    let encoded =
+                                        CommittedDiffSources.encode {
+                                            Revision = metadata.Revision
+                                            ParentRevision = metadata.ParentRevision
+                                            Path = metadata.Path
+                                        }
+
+                                    match RepositoryPath.tryCreate encoded with
+                                    | Error message ->
+                                        Error(OperationFailure.create Validation "diff_invalid_request" message)
+                                    | Ok path ->
+                                        let previousPath =
+                                            metadata.PreviousPath
+                                            |> Option.defaultValue metadata.Path
+                                            |> RepositoryPath.tryCreate
+
+                                        match previousPath with
+                                        | Error message ->
+                                            Error(OperationFailure.create Validation "diff_invalid_request" message)
+                                        | Ok previousPath ->
+                                            Ok {
+                                                openRequest with
+                                                    Path = path
+                                                    PreviousPath = Some previousPath
+                                            }
+                                )
+                    }
+
+                    let! opened =
+                        if context.Cancellation.IsCancellationRequested() then
+                            async.Return(
+                                Failed(
+                                    OperationFailure.create
+                                        Canceled
+                                        "operation_canceled"
+                                        "The diff request was canceled."
+                                )
+                            )
+                        else
+                            match prepared with
+                            | Error failure -> async.Return(Failed failure)
+                            | Ok prepared -> service.Open prepared context
 
                     match opened with
                     | Succeeded outcome

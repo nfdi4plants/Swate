@@ -12,6 +12,7 @@ open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 type LeftSidebarPage =
     | FileExplorer
     | Git
+    | GitHistory
 
 /// A conflicted file with the provider's combined preview. The handle and the
 /// workspace token are the ones the preview was taken with, so a confirmation is
@@ -148,6 +149,8 @@ type GitDiffNextRequest = {
 type GitDiffPageData = {
     Path: string
     PreviousPath: string option
+    /// Immutable revision selection; None opens a workspace comparison.
+    Committed: CommittedDiffRequestDto option
     ChangeKind: GitDiffChangeKind option
     Generation: int
     Handle: DiffHandleDto option
@@ -226,6 +229,7 @@ type PageState =
     | NotesSearchPage
     | ProvenanceGroupingPage
     | GitDiffPage of GitDiffPageData
+    | GitHistoryDiffPage of revision: string * path: string
     | GitMergeConflictPage of VersionControlConflictPage
     | GitFileChoiceConflictPage of VersionControlFileChoicePage
     | GitUnsupportedPage of GitUnsupportedPageData

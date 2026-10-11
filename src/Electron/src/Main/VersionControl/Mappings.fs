@@ -674,8 +674,28 @@ let tryOpenDiffRequest
     |> Result.bind (fun _ -> tryOptionalToken "previous encoding" request.PreviousEncoding)
     |> Result.bind (fun _ -> tryOptionalToken "current encoding" request.CurrentEncoding)
     |> Result.bind (fun _ -> tryOptionalToken "continuation" request.Continuation)
+    |> Result.bind (fun _ ->
+        match request.Committed with
+        | None -> Ok()
+        | Some selection when
+            selection.Path = request.Path
+            && not (isNull selection.Revision)
+            && CommittedDiffSources.validRevision (selection.Revision.ToLowerInvariant())
+            ->
+            Ok()
+        | Some _ -> Error(invalidDiffRequest "Select a valid committed revision and matching repository path.")
+    )
     |> Result.bind (fun _ -> tryRepositoryPath request.Path)
     |> Result.bind (fun path ->
+        let path =
+            match request.Committed with
+            | Some _ -> path
+            | None ->
+                RepositoryPath.value path
+                |> CommittedDiffSources.encodeWorkspacePath
+                |> RepositoryPath.tryCreate
+                |> Result.defaultWith failwith
+
         tryOptionalRepositoryPath request.PreviousPath
         |> Result.map (fun previousPath -> {
             OpenDiffRequest.Path = path

@@ -381,6 +381,7 @@ let private openRequest (operationId: string) (path: string) : OpenTextDiffReque
     OperationId = operationId
     Path = path
     PreviousPath = None
+    Committed = None
     PreparationTokenId = None
     PreviousEncoding = None
     CurrentEncoding = None
@@ -1150,6 +1151,7 @@ Vitest.describe (
                         OperationId = overLimit
                         Path = "data/a.txt"
                         PreviousPath = None
+                        Committed = None
                         PreparationTokenId = None
                         PreviousEncoding = None
                         CurrentEncoding = None

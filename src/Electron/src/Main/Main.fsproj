@@ -41,6 +41,7 @@
     <Compile Include="VersionControl\TextDiffWorkers.fs" />
     <Compile Include="VersionControl\ProviderComposition.fs" />
     <Compile Include="VersionControl\VersionControlRuntime.fs" />
+    <Compile Include="VersionControl\CommittedDiffSources.fs" />
     <Compile Include="VersionControl\Mappings.fs" />
     <Compile Include="VersionControl\VersionControlSettings.fs" />
     <Compile Include="VersionControl\WorkspaceSessionHost.fs" />
@@ -54,6 +55,7 @@
     <Compile Include="ArcVault\ArcVault.fs" />
     <Compile Include="Provenance\ProvenanceGroupingReader.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
+    <Compile Include="IPC\GitHistory.fs" />
     <Compile Include="IPC\FileSystemIO.fs" />
     <Compile Include="IPC\Delete.fs" />
     <Compile Include="IPC\Rename.fs" />
@@ -65,6 +67,7 @@
     <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="IPC\IUiSettingsApi.fs" />
     <Compile Include="IPC\IAppVersionApi.fs" />
+    <Compile Include="Workers\CommittedDiffAdapter.fs" />
     <Compile Include="Workers\TextDiffWorkerEntry.fs" />
     <Compile Include="AppMenu.fs" />
     <Compile Include="main.fs" />

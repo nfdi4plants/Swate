@@ -136,6 +136,8 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
                     | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
+                    | Some _, Some(PageState.GitHistoryDiffPage(revision, path)) ->
+                        GitHistoryDiffTarget.Main(revision, path)
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
                         GitFileChoiceConflictTarget.Main choiceData

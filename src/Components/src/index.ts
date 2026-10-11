@@ -77,6 +77,8 @@ export { default as FileExplorer } from './dist/Page/FileExplorer/FileExplorer.f
 export { default as GitPagedDiffViewer } from './dist/Page/GitComparison/GitPagedDiffViewer.fs';
 export * from './dist/Page/GitComparison/GitPagedDiff.Types.fs';
 export { default as GitSidebar } from './dist/Page/GitSidebar/GitSidebar.fs';
+export { GitHistory } from './dist/Page/GitHistory/GitHistory.fs';
+export * from './dist/Page/GitHistory/Types.fs';
 export { default as Landing } from './dist/Page/Landing/Landing.fs';
 export { default as Changelog } from './dist/Page/Changelog/Changelog.fs';
 export { default as SettingsPage } from './dist/Page/SettingsPage/SettingsPage.fs';

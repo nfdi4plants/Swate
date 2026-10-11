@@ -9,6 +9,8 @@ open Swate.Components.Page.ValidationPackageBrowser.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
+open Swate.Electron.Shared.DTOs.GitHistoryDto
+open Swate.Components.Page.GitHistory.Types
 open AuthTypes
 open FileIOTypes
 open VersionControlTypes
@@ -116,6 +118,13 @@ type IArcVaultsApi = {
 }
 
 /// Two Way Bridge: Renderer <-> Main
+/// Read-only Git history for the vault of the calling window.
+type IGitHistoryApi = {
+    listHistory: GitHistoryRequest -> JS.Promise<Result<GitHistoryPageDto, string>>
+    listChanges: GitHistoryRevisionRequest -> JS.Promise<Result<GitHistoryFileChange[], string>>
+    openDiff: GitHistoryDiffRequest -> JS.Promise<Result<GitHistoryDiffDto, string>>
+}
+
 /// Provider-neutral version control over the active vault. Every call names an
 /// operation id so the renderer can cancel it, and every result keeps the library's
 /// structured outcome.

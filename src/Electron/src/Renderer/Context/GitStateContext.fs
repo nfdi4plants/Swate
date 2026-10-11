@@ -10,7 +10,9 @@ open Swate.Components.Page.GitSidebarTypes
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared
 open Swate.Electron.Shared.VersionControlTypes
+open Swate.Electron.Shared.DTOs.GitHistoryDto
 
 open Renderer.Context.GitWorkflow
 
@@ -39,6 +41,7 @@ type GitStateController = {
     createBranch: GitSidebarCreateBranchRequest -> unit
     switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
+    selectCommittedDiff: ArcRootPath -> GitHistoryDiffDto -> JS.Promise<Result<unit, string>>
     confirmMergeResolution: GitMergeResolutionRequest -> unit
     abandonMerge: unit -> unit
     pruneLfsCache: unit -> unit
@@ -141,6 +144,7 @@ let GitStateCtx =
             createBranch = fun _ -> ()
             switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
+            selectCommittedDiff = fun _ _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> ()
             abandonMerge = fun () -> ()
             pruneLfsCache = fun () -> ()
@@ -252,6 +256,9 @@ let GitStateCtxProvider (children: ReactElement) =
     let selectChange (change: GitSidebarChange) =
         Promise.create (fun resolve _reject -> dispatch (SelectChangeRequested(change, resolve)))
 
+    let selectCommittedDiff root diff =
+        Promise.create (fun resolve _reject -> dispatch (SelectCommittedDiffRequested(root, diff, resolve)))
+
     let confirmMergeResolutionAction (request: GitMergeResolutionRequest) =
         dispatch (ConfirmMergeResolutionRequested request)
 
@@ -299,6 +306,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 createBranch = createBranchFrom
                 switchBranch = switchBranchTo
                 selectChange = selectChange
+                selectCommittedDiff = selectCommittedDiff
                 confirmMergeResolution = confirmMergeResolutionAction
                 abandonMerge = abandonMerge
                 pruneLfsCache = pruneLfsCache

@@ -1151,17 +1151,33 @@ export const SplitUnalignedHunkRendersEveryFragment: Story = {
   },
 };
 
-export const LongLineStaysInItsColumn: Story = {
-  render: () => (
-    <div style={{ height: "30rem" }}>
+type LongLineSide = "previous" | "current" | "both";
+
+function LongLineHarness({ side = "current", resize = false }: { side?: LongLineSide; resize?: boolean }) {
+  const [width, setWidth] = React.useState<number | undefined>(resize ? 800 : undefined);
+  return (
+    <div>
+      {resize && (
+        <div>
+          <button data-testid="git-paged-long-narrow" onClick={() => setWidth(360)}>Narrow viewer</button>
+          <button data-testid="git-paged-long-wide" onClick={() => setWidth(800)}>Widen viewer</button>
+        </div>
+      )}
+      <div style={{ height: "30rem", width, maxWidth: "100%" }}>
       <GitPagedDiffViewerComponent
         parts={[
-          PagedPart_HunkRows("long-hunk", range(0, 1), range(0, 1), true, true, [
+          PagedPart_HunkRows("long-hunk", range(0, 2), range(0, 2), true, true, [
             new PagedRow(
               "long-row",
               "replaced",
-              makeLine(0, "short previous line"),
-              makeLine(0, "x".repeat(3000), "lF", 0, 10000),
+              makeLine(0, side === "current" ? "short previous line" : "p".repeat(3000)),
+              makeLine(0, side === "previous" ? "short current line" : "x".repeat(3000), "lF", 0, side === "previous" ? undefined : 10000),
+            ),
+            new PagedRow(
+              "tab-ending-row",
+              "endingChanged",
+              makeLine(1, side === "current" ? "short previous line" : "tab\t".repeat(200), "cRLF"),
+              makeLine(1, side === "previous" ? "short current line" : "tab\t".repeat(200)),
             ),
           ]),
         ]}
@@ -1170,27 +1186,280 @@ export const LongLineStaysInItsColumn: Story = {
         hasMore={false}
         outputComplete={true}
         requestLineSlice={() => {}}
+        previousTitle="Before.txt"
+        currentTitle="After.txt"
         testIdPrefix="git-paged-long"
       />
+      </div>
     </div>
-  ),
+  );
+}
+
+function horizontalTrack(canvas: ReturnType<typeof within>, prefix: string, side: "previous" | "current") {
+  return canvas.getByTestId(`${prefix}-scroll-${side}`);
+}
+
+async function scrollHorizontally(element: HTMLElement, left: number) {
+  element.scrollLeft = left;
+  await fireEvent.scroll(element);
+}
+
+function lineViewport(line: HTMLElement) {
+  const viewport = line.closest<HTMLElement>("[data-diff-pane]");
+  if (!viewport) throw new Error("The diff line has no clipping viewport");
+  return viewport;
+}
+
+async function expectBalancedPanes(canvas: ReturnType<typeof within>, prefix: string) {
+  const previous = canvas.getByTestId(`${prefix}-pane-previous`).getBoundingClientRect();
+  const current = canvas.getByTestId(`${prefix}-pane-current`).getBoundingClientRect();
+  const scroll = canvas.getByTestId(`${prefix}-content`).parentElement as HTMLElement;
+  await expect(Math.abs(previous.width - current.width)).toBeLessThan(1.5);
+  await expect(previous.left).toBeGreaterThanOrEqual(scroll.getBoundingClientRect().left - 1);
+  await expect(current.right).toBeLessThanOrEqual(scroll.getBoundingClientRect().left + scroll.clientWidth + 1);
+  await expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth + 1);
+}
+
+async function expectLongLinePanes(canvasElement: HTMLElement, side: LongLineSide) {
+  const canvas = within(canvasElement);
+  await waitFor(() => expectBalancedPanes(canvas, "git-paged-long"));
+  for (const title of ["Before.txt", "After.txt"]) {
+    const element = canvas.getByText(title);
+    await expect(element).toBeVisible();
+    const box = element.getBoundingClientRect();
+    const pane = element.closest('[data-testid$="-pane-previous"], [data-testid$="-pane-current"]')!.getBoundingClientRect();
+    await expect(box.left).toBeGreaterThanOrEqual(pane.left);
+    await expect(box.right).toBeLessThanOrEqual(pane.right);
+  }
+  await expect(Math.abs(canvas.getByTestId("git-paged-long-row-long-row").getBoundingClientRect().height - 28)).toBeLessThan(1);
+
+  for (const lane of ["previous", "current"] as const) {
+    const track = horizontalTrack(canvas, "git-paged-long", lane);
+    const pane = canvas.getByTestId(`git-paged-long-pane-${lane}`).getBoundingClientRect();
+    const viewport = lineViewport(canvas.getByTestId(`git-paged-long-line-${lane}-0`));
+    const box = viewport.getBoundingClientRect();
+    await expect(Math.abs(box.left - pane.left)).toBeLessThan(1.5);
+    await expect(Math.abs(box.width - pane.width)).toBeLessThan(1.5);
+    await expect(track.scrollLeft).toBe(0);
+    if (side === lane || side === "both") {
+      await waitFor(() => expect(track.scrollWidth).toBeGreaterThan(track.clientWidth * 2));
+    } else {
+      await expect(track.scrollWidth).toBeLessThanOrEqual(track.clientWidth + 1);
+    }
+  }
+}
+
+export const LongLineStaysInItsColumn: Story = {
+  render: () => <LongLineHarness />,
+  play: async ({ canvasElement }) => expectLongLinePanes(canvasElement, "current"),
+};
+
+export const PreviousLongLineStaysInItsColumn: Story = {
+  render: () => <LongLineHarness side="previous" />,
+  play: async ({ canvasElement }) => expectLongLinePanes(canvasElement, "previous"),
+};
+
+const completeCjkLine = "汉".repeat(20);
+const completeEmojiLine = "⌚".repeat(20);
+
+function CompleteWideGlyphHarness({ text, prefix }: { text: string; prefix: string }) {
+  return (
+    <div style={{ height: "30rem", width: 440, maxWidth: "100%" }}>
+      <GitPagedDiffViewerComponent
+        parts={[
+          PagedPart_HunkRows("wide-glyph-hunk", range(0, 1), range(0, 1), true, true, [
+            new PagedRow("wide-glyph-row", "replaced", makeLine(0, "previous"), makeLine(0, text)),
+          ]),
+        ]}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        testIdPrefix={prefix}
+      />
+    </div>
+  );
+}
+
+async function expectCompleteWideGlyphTail(canvasElement: HTMLElement, prefix: string, line: string) {
+    const canvas = within(canvasElement);
+    await waitFor(() => expectBalancedPanes(canvas, prefix));
+    const current = horizontalTrack(canvas, prefix, "current");
+    const previous = horizontalTrack(canvas, prefix, "previous");
+    await waitFor(() => expect(current.scrollWidth).toBeGreaterThan(current.clientWidth));
+    await expect(current.clientWidth).toBeLessThanOrEqual(220);
+
+    // Measure the rendered final glyph, including any fallback font's CJK or emoji metrics.
+    const text = canvas.getByText(line, { exact: true }).firstChild;
+    if (!text || text.nodeType !== Node.TEXT_NODE) throw new Error("The wide-glyph line has no text node");
+    const lastGlyph = document.createRange();
+    lastGlyph.setStart(text, line.length - 1);
+    lastGlyph.setEnd(text, line.length);
+    const viewport = lineViewport(canvas.getByTestId(`${prefix}-line-current-0`));
+    await expect(lastGlyph.getBoundingClientRect().right).toBeGreaterThan(viewport.getBoundingClientRect().right);
+    await scrollHorizontally(current, current.scrollWidth);
+    await waitFor(async () => {
+      const glyph = lastGlyph.getBoundingClientRect();
+      const view = viewport.getBoundingClientRect();
+      await expect(glyph.left).toBeGreaterThanOrEqual(view.left - 1);
+      await expect(glyph.right).toBeLessThanOrEqual(view.right + 1);
+    });
+    await expect(previous.scrollLeft).toBe(0);
+    await expect(canvas.queryByTestId(`${prefix}-line-more-current-0`)).toBeNull();
+}
+
+export const CompleteCjkLineCanBeReadToItsLastGlyph: Story = {
+  render: () => <CompleteWideGlyphHarness text={completeCjkLine} prefix="git-paged-cjk" />,
+  play: async ({ canvasElement }) => expectCompleteWideGlyphTail(canvasElement, "git-paged-cjk", completeCjkLine),
+};
+
+export const CompleteEmojiLineCanBeReadToItsLastGlyph: Story = {
+  render: () => <CompleteWideGlyphHarness text={completeEmojiLine} prefix="git-paged-emoji" />,
+  play: async ({ canvasElement }) => expectCompleteWideGlyphTail(canvasElement, "git-paged-emoji", completeEmojiLine),
+};
+
+export const BothLongLinesScrollIndependently: Story = {
+  render: () => <LongLineHarness side="both" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const previousCell = canvas.getByTestId("git-paged-long-line-text-previous-0").getBoundingClientRect();
+    await expectLongLinePanes(canvasElement, "both");
+    const previous = horizontalTrack(canvas, "git-paged-long", "previous");
+    const current = horizontalTrack(canvas, "git-paged-long", "current");
+    const previousText = canvas.getByTestId("git-paged-long-line-text-previous-0");
     const currentText = canvas.getByTestId("git-paged-long-line-text-current-0");
-    const currentCell = currentText.getBoundingClientRect();
-    const loadMore = canvas.getByTestId("git-paged-long-line-more-current-0").getBoundingClientRect();
+    const previousStart = previousText.getBoundingClientRect().left;
+    const currentStart = currentText.getBoundingClientRect().left;
+    const rowTop = canvas.getByTestId("git-paged-long-row-long-row").getBoundingClientRect().top;
+    await scrollHorizontally(previous, 240);
+    await waitFor(() => expect(Math.abs(previousText.getBoundingClientRect().left - previousStart + 240)).toBeLessThan(1.5));
+    await expect(current.scrollLeft).toBe(0);
+    await expect(Math.abs(currentText.getBoundingClientRect().left - currentStart)).toBeLessThan(1);
+    await scrollHorizontally(current, 480);
+    await waitFor(() => expect(Math.abs(currentText.getBoundingClientRect().left - currentStart + 480)).toBeLessThan(1.5));
+    await expect(previous.scrollLeft).toBe(240);
+    previousText.dispatchEvent(new WheelEvent("wheel", { deltaX: 80, bubbles: true, cancelable: true }));
+    await waitFor(() => expect(previous.scrollLeft).toBe(320));
+    await expect(current.scrollLeft).toBe(480);
+    currentText.dispatchEvent(new WheelEvent("wheel", { deltaY: 80, shiftKey: true, bubbles: true, cancelable: true }));
+    await waitFor(() => expect(current.scrollLeft).toBe(560));
+    await expect(previous.scrollLeft).toBe(320);
+    await expect(Math.abs(canvas.getByTestId("git-paged-long-row-long-row").getBoundingClientRect().top - rowTop)).toBeLessThan(1);
+    await expectBalancedPanes(canvas, "git-paged-long");
 
-    // The line stays on one row, and the content grows wider than the view.
+    // Complete lines containing tabs can be read through their ending badge at the far right.
+    for (const side of ["previous", "current"] as const) {
+      const track = horizontalTrack(canvas, "git-paged-long", side);
+      const badge = canvas.getByTestId(`git-paged-long-ending-${side}-1`);
+      const viewport = lineViewport(canvas.getByTestId(`git-paged-long-line-${side}-1`));
+      await scrollHorizontally(track, track.scrollLeft + badge.getBoundingClientRect().right - viewport.getBoundingClientRect().right);
+      await waitFor(async () => {
+        const badge = canvas.getByTestId(`git-paged-long-ending-${side}-1`).getBoundingClientRect();
+        const view = lineViewport(canvas.getByTestId(`git-paged-long-line-${side}-1`)).getBoundingClientRect();
+        await expect(badge.left).toBeGreaterThanOrEqual(view.left - 1);
+        await expect(badge.right).toBeLessThanOrEqual(view.right + 1);
+      });
+    }
+
+    // Focusing a slice control reveals it in its own pane without moving the other lane.
+    await scrollHorizontally(current, 0);
+    const previousOffset = previous.scrollLeft;
+    const more = canvas.getByTestId("git-paged-long-line-more-current-0");
+    more.focus();
+    await waitFor(async () => {
+      await expect(current.scrollLeft).toBeGreaterThan(0);
+      const control = more.getBoundingClientRect();
+      const view = lineViewport(currentText).getBoundingClientRect();
+      await expect(control.left).toBeGreaterThanOrEqual(view.left - 1);
+      await expect(control.right).toBeLessThanOrEqual(view.right + 1);
+    });
+    await expect(previous.scrollLeft).toBe(previousOffset);
+  },
+};
+
+export const DividerResizesWithPointerAndKeyboard: Story = {
+  render: () => <LongLineHarness side="both" resize />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const divider = canvas.getByTestId("git-paged-long-divider");
     const scroll = canvas.getByTestId("git-paged-long-content").parentElement as HTMLElement;
-    await expect(Math.abs(canvas.getByTestId("git-paged-long-row-long-row").getBoundingClientRect().height - 28)).toBeLessThan(1);
-    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth);
-    await expect(currentText.scrollWidth).toBeLessThanOrEqual(currentText.clientWidth + 1);
-    await expect(currentCell.left).toBeGreaterThanOrEqual(previousCell.right - 1);
-    await expect(loadMore.left).toBeGreaterThanOrEqual(currentCell.left - 1);
-    await expect(loadMore.right).toBeLessThanOrEqual(currentCell.right + 1);
-    await expect(loadMore.top).toBeGreaterThanOrEqual(currentCell.top - 1);
-    await expect(loadMore.bottom).toBeLessThanOrEqual(currentCell.bottom + 1);
+    const split = () => Number(divider.getAttribute("aria-valuenow"));
+    const expectSplit = async (percent: number) => waitFor(async () => {
+      await expect(Math.abs(split() - percent)).toBeLessThan(0.1);
+      const previous = canvas.getByTestId("git-paged-long-pane-previous").getBoundingClientRect();
+      const current = canvas.getByTestId("git-paged-long-pane-current").getBoundingClientRect();
+      await expect(Math.abs(previous.width / (previous.width + current.width) * 100 - percent)).toBeLessThan(0.5);
+      await expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth + 1);
+    });
+    await expect(divider).toHaveAttribute("role", "separator");
+    await expect(divider).toHaveAttribute("aria-orientation", "vertical");
+    await expectSplit(50);
+    divider.focus();
+    await userEvent.keyboard("{ArrowLeft}");
+    await expectSplit(45);
+    await userEvent.keyboard("{ArrowRight}{ArrowRight}");
+    await expectSplit(55);
+    await userEvent.keyboard("{Enter}");
+    await expectSplit(50);
+    for (let step = 0; step < 10; step += 1) await userEvent.keyboard("{ArrowLeft}");
+    await expectSplit(15);
+    for (let step = 0; step < 20; step += 1) await userEvent.keyboard("{ArrowRight}");
+    await expectSplit(85);
+    await fireEvent.doubleClick(divider);
+    await expectSplit(50);
+
+    // Synthetic pointer events have no browser-owned pointer to capture. Stub only capture here;
+    // the gesture still exercises the viewer's pointer handlers and real layout geometry.
+    const capture = divider.setPointerCapture;
+    const release = divider.releasePointerCapture;
+    divider.setPointerCapture = () => {};
+    divider.releasePointerCapture = () => {};
+    try {
+      const drag = async (percent: number) => {
+        const view = scroll.getBoundingClientRect();
+        const start = divider.getBoundingClientRect();
+        const clientX = view.left + scroll.clientLeft + scroll.clientWidth * percent / 100;
+        await fireEvent.pointerDown(divider, { pointerId: 1, button: 0, buttons: 1, clientX: start.left + start.width / 2 });
+        await fireEvent.pointerMove(divider, { pointerId: 1, buttons: 1, clientX });
+        await fireEvent.pointerUp(divider, { pointerId: 1, button: 0, clientX });
+        await expect(document.activeElement).toBe(divider);
+      };
+      await drag(70);
+      await expectSplit(70);
+      await drag(-10);
+      await expectSplit(15);
+      await drag(110);
+      await expectSplit(85);
+      await fireEvent.doubleClick(divider);
+      await expectSplit(50);
+      for (const endGesture of ["pointercancel", "lostpointercapture"]) {
+        const view = scroll.getBoundingClientRect();
+        const clientX = (percent: number) => view.left + scroll.clientLeft + scroll.clientWidth * percent / 100;
+        await fireEvent.pointerDown(divider, { pointerId: 1, button: 0, buttons: 1, clientX: clientX(50) });
+        await fireEvent.pointerMove(divider, { pointerId: 1, buttons: 1, clientX: clientX(70) });
+        await expectSplit(70);
+        divider.dispatchEvent(new PointerEvent(endGesture, { pointerId: 1, bubbles: true }));
+        await fireEvent.pointerMove(divider, { pointerId: 1, buttons: 1, clientX: clientX(30) });
+        await fireEvent.pointerUp(divider, { pointerId: 1, button: 0, clientX: clientX(30) });
+        await expectSplit(70);
+        await fireEvent.doubleClick(divider);
+        await expectSplit(50);
+      }
+      await userEvent.click(canvas.getByTestId("git-paged-long-narrow"));
+      await waitFor(() => expect(scroll.clientWidth).toBeLessThanOrEqual(360));
+      await expectSplit(50);
+      await drag(70);
+      await expectSplit(70);
+      await userEvent.click(canvas.getByTestId("git-paged-long-wide"));
+      await waitFor(() => expect(scroll.clientWidth).toBeGreaterThan(360));
+      await expectSplit(70);
+      divider.focus();
+      await userEvent.keyboard("{Enter}");
+      await expectSplit(50);
+      await expectBalancedPanes(canvas, "git-paged-long");
+    } finally {
+      divider.setPointerCapture = capture;
+      divider.releasePointerCapture = release;
+    }
   },
 };
 
@@ -1240,7 +1509,9 @@ export const GapControlsStayInViewWithLongLines: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scroll = canvas.getByTestId("git-paged-wide-gap-content").parentElement as HTMLElement;
-    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
+    await expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth + 1);
+    const horizontal = horizontalTrack(canvas, "git-paged-wide-gap", "current");
+    await waitFor(() => expect(horizontal.scrollWidth).toBeGreaterThan(horizontal.clientWidth * 2));
 
     const expectInView = (testId: string) => expectControlInView(canvas, scroll, testId);
 
@@ -1249,9 +1520,9 @@ export const GapControlsStayInViewWithLongLines: Story = {
     await expectInView(start);
     await expectInView(end);
 
-    scroll.scrollLeft = scroll.scrollWidth;
-    await fireEvent.scroll(scroll);
-    await expect(scroll.scrollLeft).toBeGreaterThan(scroll.clientWidth);
+    await scrollHorizontally(horizontal, horizontal.scrollWidth);
+    await expect(horizontal.scrollLeft).toBeGreaterThan(horizontal.clientWidth);
+    await expect(scroll.scrollLeft).toBe(0);
     await waitFor(() => expectInView(start));
     await expectInView(end);
 
@@ -1302,7 +1573,9 @@ export const ContinueAndReloadControlsStayInViewWithLongLines: Story = {
     wideStopNextSpy.mockClear();
     const canvas = within(canvasElement);
     const scroll = canvas.getByTestId("git-paged-wide-stop-content").parentElement as HTMLElement;
-    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
+    await expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth + 1);
+    const horizontal = horizontalTrack(canvas, "git-paged-wide-stop", "current");
+    await waitFor(() => expect(horizontal.scrollWidth).toBeGreaterThan(horizontal.clientWidth * 2));
 
     const expectInView = (testId: string) => expectControlInView(canvas, scroll, testId);
     const reload = "git-paged-wide-stop-folded-replay-wide-old-page";
@@ -1312,9 +1585,9 @@ export const ContinueAndReloadControlsStayInViewWithLongLines: Story = {
     await expectInView(reload);
     await expectInView(next);
 
-    scroll.scrollLeft = scroll.scrollWidth;
-    await fireEvent.scroll(scroll);
-    await expect(scroll.scrollLeft).toBeGreaterThan(scroll.clientWidth);
+    await scrollHorizontally(horizontal, horizontal.scrollWidth);
+    await expect(horizontal.scrollLeft).toBeGreaterThan(horizontal.clientWidth);
+    await expect(scroll.scrollLeft).toBe(0);
     await waitFor(() => expectInView(reload));
     await expectInView(next);
 

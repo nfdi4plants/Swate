@@ -173,6 +173,12 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
             onClick = fun () -> toggleTarget LeftSidebarPage.Git
         )
         Layout.LayoutBtn(
+            iconClassName = "swt:fluent--history-24-regular",
+            tooltip = "Version history",
+            isActive = (leftSidebarTarget = LeftSidebarPage.GitHistory),
+            onClick = fun () -> toggleTarget LeftSidebarPage.GitHistory
+        )
+        Layout.LayoutBtn(
             iconClassName = "swt:fluent--cloud-beaker-24-regular",
             tooltip = "Download ARC from DataHUB",
             isActive = false,
@@ -257,23 +263,25 @@ let Main () =
                                 Renderer.Context.AuthStateContext.Provider(
                                     Renderer.Context.LfsActivityContext.LfsActivityCtxProvider(
                                         Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                            Swate
-                                                .Components
-                                                .Composite
-                                                .AnnotationTable
-                                                .AnnotationTableContextProvider
-                                                .AnnotationTableContextProvider(
-                                                    Layout.Main(
-                                                        children =
-                                                            React.Fragment [|
-                                                                children
-                                                                CloseWindowController.CloseWindowController()
-                                                            |],
-                                                        navbar = Renderer.Components.Navbar.Main(),
-                                                        ?leftSidebar = leftSidebar,
-                                                        ?leftActions = leftActions
+                                            Renderer.Context.GitHistoryContext.GitHistoryCtxProvider(
+                                                Swate
+                                                    .Components
+                                                    .Composite
+                                                    .AnnotationTable
+                                                    .AnnotationTableContextProvider
+                                                    .AnnotationTableContextProvider(
+                                                        Layout.Main(
+                                                            children =
+                                                                React.Fragment [|
+                                                                    children
+                                                                    CloseWindowController.CloseWindowController()
+                                                                |],
+                                                            navbar = Renderer.Components.Navbar.Main(),
+                                                            ?leftSidebar = leftSidebar,
+                                                            ?leftActions = leftActions
+                                                        )
                                                     )
-                                                )
+                                            )
                                         )
                                     )
                                 ),

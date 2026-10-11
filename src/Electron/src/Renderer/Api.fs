@@ -13,6 +13,9 @@ let ipcGitLabApi = Remoting.createIpc () |> Remoting.buildProxySender<IGitLabApi
 let ipcVersionControlApi =
     Remoting.createIpc () |> Remoting.buildProxySender<IVersionControlApi>
 
+let ipcGitHistoryApi =
+    Remoting.createIpc () |> Remoting.buildProxySender<IGitHistoryApi>
+
 let ipcArcVaultApi =
     Remoting.createIpc () |> Remoting.buildProxySender<IArcVaultsApi>
 
