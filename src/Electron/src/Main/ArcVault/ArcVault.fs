@@ -1400,9 +1400,17 @@ module ArcVaultExtensions =
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
-                match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
+                let arcPath = this.path.Value
+                let watcherEpoch = this.WatcherEpoch
+
+                match! ARC.LoadAsyncSwateZeroByteRepair arcPath with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
-                | Ok _ when this.window.isDestroyed () -> return raise (ArcLoadCancelledException this.window.id)
+                | Ok _ when
+                    not (WindowSend.isAlive this.window)
+                    || watcherEpoch <> this.WatcherEpoch
+                    || not (this.path |> Option.exists (fun path -> PathHelpers.pathsEqual path arcPath))
+                    ->
+                    return raise (ArcLoadCancelledException this.window.id)
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()
@@ -1442,19 +1450,25 @@ module ArcVaultExtensions =
         member internal this.EnsureInitialFileTreeRootPage(arcPath: string) =
             let capturedWatcherEpoch = this.WatcherEpoch
 
-            this.EnqueueFileTreeUpdate(fun () -> promise {
-                match this.path with
-                | Some currentArcPath when
-                    capturedWatcherEpoch = this.WatcherEpoch
-                    && PathHelpers.pathsEqual currentArcPath arcPath
-                    ->
-                    if this.fileTree.Count = 0 then
-                        let! rootPage = this.LoadInitialFileTreeRootPageCore arcPath
-                        this.fileTreeDirectoryHasMore.[""] <- rootPage.HasMore
-                        this.SetFileTree rootPage.Entries
+            let ensureCurrentLifecycle () =
+                if
+                    capturedWatcherEpoch <> this.WatcherEpoch
+                    || not (WindowSend.isAlive this.window)
+                    || not (this.path |> Option.exists (fun path -> PathHelpers.pathsEqual path arcPath))
+                then
+                    raise (ArcLoadCancelledException this.window.id)
 
-                    return this.fileTree
-                | _ -> return raise (ArcLoadCancelledException this.window.id)
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                ensureCurrentLifecycle ()
+
+                if this.fileTree.Count = 0 then
+                    let! rootPage = this.LoadInitialFileTreeRootPageCore arcPath
+                    ensureCurrentLifecycle ()
+                    this.fileTreeDirectoryHasMore.[""] <- rootPage.HasMore
+                    // The initialization publisher sends the path and tree together, in that order.
+                    this.fileTree <- rootPage.Entries
+
+                return this.fileTree
             })
 
         member this.StartFileWatcher(?usePolling: bool) =
@@ -1547,6 +1561,7 @@ module ArcVaultExtensions =
         }
 
         member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
+            let hadFileTree = this.fileTree.Count > 0
             do! this.StopFileWatcher()
 
             this.SetArcInitializationState false
@@ -1559,7 +1574,7 @@ module ArcVaultExtensions =
             with error ->
                 swatelogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
 
-            if not (this.window.isDestroyed ()) then
+            if hadFileTree && not (this.window.isDestroyed ()) then
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange None)
                 this.SetFileTree(Dictionary<string, FileEntry>())
         }
@@ -2112,10 +2127,7 @@ type ArcVaults() =
 
     member private this.RegisterVaultWithValidatedArc(path: string) =
         this.RegisterVaultCore(fun vault -> promise {
-            let initialization = vault.OpenARC(path)
-            let! fileTree = this.InitializeFileTreeForActiveVault(vault.window.id, vault, path)
-            vault.PublishArcInitializationSnapshot fileTree
-            do! initialization
+            do! this.InitializeFileTreeWhileArcLoads(vault.window.id, vault, path, fun () -> vault.OpenARC(path))
             vault.FinalizeArcInitialization()
         })
 
@@ -2218,6 +2230,32 @@ type ArcVaults() =
             return raise (ArcCreatedButClosedException targetWindowId)
     }
 
+    member private this.InitializeFileTreeWhileArcLoads
+        (windowId: int, vault: ArcVault, arcPath: string, initialize: unit -> JS.Promise<unit>)
+        =
+        promise {
+            // Observe both operations immediately; a root-read failure must not orphan ARC loading.
+            let initialization = initialize () |> Promise.result
+
+            let! publication =
+                promise {
+                    let! fileTree = this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
+                    vault.PublishArcInitializationSnapshot fileTree
+                }
+                |> Promise.result
+
+            if Result.isError publication then
+                do! vault.StopFileWatcher()
+
+            let! initialized = initialization
+
+            match publication, initialized with
+            | Error(ArcLoadCancelledException _), Error error
+            | Error error, _
+            | _, Error error -> return raise error
+            | Ok(), Ok() -> ()
+        }
+
     member private this.InitializeArcInCurrentVault
         (windowId: int, vault: ArcVault, arcPath: string, create: bool, initialize: unit -> JS.Promise<unit>)
         =
@@ -2232,10 +2270,7 @@ type ArcVaults() =
                     else
                         // Existing ARC metadata loading and the bounded root read can run together.
                         // Publishing the root first lets large ARCs leave the opening page immediately.
-                        let initialization = initialize ()
-                        let! fileTree = this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
-                        vault.PublishArcInitializationSnapshot fileTree
-                        do! initialization
+                        do! this.InitializeFileTreeWhileArcLoads(windowId, vault, arcPath, initialize)
                 }
 
                 try

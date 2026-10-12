@@ -984,8 +984,9 @@ Vitest.describe (
                         vault.FileTreeUpdateTail <- queueGate
                         let refresh = vault.RefreshFileTreeDirectory "dataset"
 
-                        do! vault.StopFileWatcher()
+                        let stopping = vault.StopFileWatcher()
                         releaseQueue ()
+                        do! stopping
                         do! refresh
 
                         Vitest.expect(containsPath stalePath vault).toBe false

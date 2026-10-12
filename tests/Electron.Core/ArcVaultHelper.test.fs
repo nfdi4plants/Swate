@@ -24,14 +24,66 @@ module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
 
 Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
+Vitest.vi.mock ("fs/promises", createObj [ "spy" ==> true ]) |> ignore
 
 [<Import("watch", "chokidar")>]
 let private watchMock: obj = jsNative
 
+[<Import("opendir", "fs/promises")>]
+let private openDirectoryMock: obj = jsNative
+
+[<Import("readdir", "fs/promises")>]
+let private directoryListingMock: obj = jsNative
+
 [<Emit("$0.mockReset()")>]
 let private resetWatchMock (_spy: obj) : unit = jsNative
 
-Vitest.beforeEach (fun () -> resetWatchMock watchMock)
+Vitest.beforeEach (fun () ->
+    resetWatchMock watchMock
+    resetWatchMock openDirectoryMock
+    resetWatchMock directoryListingMock
+)
+
+[<Emit("(() => { const read = $0.getMockImplementation(); $0.mockImplementationOnce((...args) => { $2(); return $1.then(() => read(...args)); }); })()")>]
+let private holdNextDirectoryListing (_spy: obj) (_gate: JS.Promise<unit>) (_started: unit -> unit) : unit = jsNative
+
+[<Emit("$0.mockImplementationOnce($1)")>]
+let private interceptNextDirectoryOpen (_spy: obj) (_open: string -> JS.Promise<Directory>) : unit = jsNative
+
+let private failNextInitialFileTreeRead () =
+    let error = exn "ENOENT: initial root-directory read failed"
+
+    interceptNextDirectoryOpen
+        openDirectoryMock
+        (fun _ ->
+            JS.Constructors.Promise.resolve (
+                { new Directory with
+                    member _.read() = promise { return raise error }
+                    member _.close() = JS.Constructors.Promise.resolve ()
+                }
+            )
+        )
+
+    error
+
+let private holdNextInitialFileTreeRead (gate: JS.Promise<unit>) =
+    let started, signalStarted = TestHelpers.deferred ()
+
+    interceptNextDirectoryOpen
+        openDirectoryMock
+        (fun _ ->
+            JS.Constructors.Promise.resolve (
+                { new Directory with
+                    member _.read() =
+                        signalStarted ()
+                        gate |> Promise.map (fun () -> Unchecked.defaultof<Dirent>)
+
+                    member _.close() = JS.Constructors.Promise.resolve ()
+                }
+            )
+        )
+
+    started
 
 [<Emit("$0.mockImplementationOnce(() => { let ready; let all; const watcher = { on(event, callback) { if (event === 'ready') { ready = callback; } if (event === 'all') { all = callback; } return watcher; }, close() { $4(); return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; $1(); $2(() => ready?.()); $3(eventName => path => all?.(eventName, path)); return watcher; })")>]
 let private interceptNextControlledPermanentWatch
@@ -2056,18 +2108,7 @@ Vitest.describe (
                     "Open Tree Transaction"
                     ignore
                     (fun arcPath -> promise {
-                        let movedPath = arcPath + "-during-tree-scan"
-                        let mutable movedForTreeFailure = false
-
-                        let windowState =
-                            createTestWindow {
-                                testWindowOptions 54 with
-                                    OnTitleWrite =
-                                        fun _ _ ->
-                                            if not movedForTreeFailure && existsSync arcPath then
-                                                movedForTreeFailure <- true
-                                                renameSync arcPath movedPath
-                            }
+                        let windowState = createTestWindow (testWindowOptions 54)
 
                         let vault = ArcVault(windowState.Window)
                         let vaults = ArcVaults()
@@ -2077,21 +2118,21 @@ Vitest.describe (
                             do! vault.StopFileWatcher()
                             vaults.Vaults.Clear()
 
-                            if existsSync movedPath then
-                                renameSync movedPath arcPath
                         }
 
                         let operation () = promise {
+                            let expectedError = failNextInitialFileTreeRead ()
                             let! result = vaults.OpenOrFocusArc(54, arcPath) |> Promise.result
 
                             match result with
-                            | Error error -> Vitest.expect(error.Message).toContain ("ENOENT")
+                            | Error error -> Vitest.expect(error).toBe (expectedError)
                             | Ok disposition -> failwithf "Expected file-tree failure, received %A." disposition
 
                             Vitest.expect(vault.path).toEqual (None)
                             Vitest.expect(vault.arc).toEqual (None)
                             Vitest.expect(vault.fileTree.Count).toBe (0)
                             Vitest.expect(vault.watcher).toEqual (None)
+                            Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe (0)
                             Vitest.expect(windowState.SentMessages |> Seq.exists isPathChangeMessage).toBe (false)
                             Vitest.expect(windowState.SentMessages |> Seq.exists isFileTreeMessage).toBe (false)
                         }
@@ -2105,18 +2146,7 @@ Vitest.describe (
             fun () -> promise {
                 let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-tree-transaction-current-"
                 let arcPath = join [| rootPath; "created-arc" |] |> PathHelpers.normalizePath
-                let movedPath = arcPath + "-during-tree-scan"
-                let mutable movedForTreeFailure = false
-
-                let windowState =
-                    createTestWindow {
-                        testWindowOptions 55 with
-                            OnTitleWrite =
-                                fun _ _ ->
-                                    if not movedForTreeFailure && existsSync arcPath then
-                                        movedForTreeFailure <- true
-                                        renameSync arcPath movedPath
-                    }
+                let windowState = createTestWindow (testWindowOptions 55)
 
                 let vault = ArcVault(windowState.Window)
                 let vaults = ArcVaults()
@@ -2129,20 +2159,20 @@ Vitest.describe (
                 }
 
                 let operation () = promise {
+                    let expectedError = failNextInitialFileTreeRead ()
                     let! result = vaults.CreateOrFocusArc(55, arcPath, "Created ARC") |> Promise.result
 
                     match result with
-                    | Error error -> Vitest.expect(error.Message).toContain ("ENOENT")
+                    | Error error -> Vitest.expect(error).toBe (expectedError)
                     | Ok disposition -> failwithf "Expected file-tree failure, received %A." disposition
 
                     Vitest.expect(vault.path).toEqual (None)
                     Vitest.expect(vault.arc).toEqual (None)
                     Vitest.expect(vault.fileTree.Count).toBe (0)
                     Vitest.expect(vault.watcher).toEqual (None)
+                    Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe (0)
                     Vitest.expect(windowState.SentMessages |> Seq.exists isPathChangeMessage).toBe (false)
                     Vitest.expect(windowState.SentMessages |> Seq.exists isFileTreeMessage).toBe (false)
-
-                    renameSync movedPath arcPath
 
                     let investigationPath =
                         ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
@@ -2163,21 +2193,11 @@ Vitest.describe (
                     "Open Tree Window Transaction"
                     ignore
                     (fun arcPath -> promise {
-                        let movedPath = arcPath + "-during-tree-scan"
-                        let mutable movedForTreeFailure = false
                         let callingVault = ArcVault((createTestWindow (testWindowOptions 56)).Window)
                         callingVault.path <- Some "C:/occupied-open-tree-transaction"
                         callingVault.SetArc(ARC("Occupied"))
 
-                        let targetWindow =
-                            createTestWindow {
-                                testWindowOptions 57 with
-                                    OnTitleWrite =
-                                        fun _ _ ->
-                                            if not movedForTreeFailure && existsSync arcPath then
-                                                movedForTreeFailure <- true
-                                                renameSync arcPath movedPath
-                            }
+                        let targetWindow = createTestWindow (testWindowOptions 57)
 
                         setBrowserWindowFactory (fun _ -> targetWindow.Window :> obj)
                         let vaults = ArcVaults()
@@ -2186,21 +2206,21 @@ Vitest.describe (
                         let cleanup () = promise {
                             vaults.Vaults.Clear()
 
-                            if existsSync movedPath then
-                                renameSync movedPath arcPath
                         }
 
                         let operation () = promise {
+                            let expectedError = failNextInitialFileTreeRead ()
                             let! result = vaults.OpenOrFocusArc(56, arcPath) |> Promise.result
 
                             match result with
-                            | Error error -> Vitest.expect(error.Message).toContain ("ENOENT")
+                            | Error error -> Vitest.expect(error).toBe (expectedError)
                             | Ok disposition -> failwithf "Expected file-tree failure, received %A." disposition
 
                             Vitest.expect(targetWindow.IsDestroyed()).toBe (true)
                             Vitest.expect(vaults.TryGetVault(57)).toEqual (None)
                             Vitest.expect(targetWindow.SendsAfterDestroy()).toBe (0)
                             Vitest.expect(targetWindow.SentMessages |> Seq.exists isPathChangeMessage).toBe (false)
+                            Vitest.expect(targetWindow.SentMessages |> Seq.exists isFileTreeMessage).toBe (false)
                         }
 
                         return! withAsyncCleanup cleanup operation
@@ -2212,21 +2232,11 @@ Vitest.describe (
             fun () -> promise {
                 let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-tree-transaction-window-"
                 let arcPath = join [| rootPath; "created-window-arc" |] |> PathHelpers.normalizePath
-                let movedPath = arcPath + "-during-tree-scan"
-                let mutable movedForTreeFailure = false
                 let callingVault = ArcVault((createTestWindow (testWindowOptions 58)).Window)
                 callingVault.path <- Some "C:/occupied-create-tree-transaction"
                 callingVault.SetArc(ARC("Occupied"))
 
-                let targetWindow =
-                    createTestWindow {
-                        testWindowOptions 59 with
-                            OnTitleWrite =
-                                fun _ _ ->
-                                    if not movedForTreeFailure && existsSync arcPath then
-                                        movedForTreeFailure <- true
-                                        renameSync arcPath movedPath
-                    }
+                let targetWindow = createTestWindow (testWindowOptions 59)
 
                 setBrowserWindowFactory (fun _ -> targetWindow.Window :> obj)
                 let vaults = ArcVaults()
@@ -2238,18 +2248,18 @@ Vitest.describe (
                 }
 
                 let operation () = promise {
+                    let expectedError = failNextInitialFileTreeRead ()
                     let! result = vaults.CreateOrFocusArc(58, arcPath, "Created Window ARC") |> Promise.result
 
                     match result with
-                    | Error error -> Vitest.expect(error.Message).toContain ("ENOENT")
+                    | Error error -> Vitest.expect(error).toBe (expectedError)
                     | Ok disposition -> failwithf "Expected file-tree failure, received %A." disposition
 
                     Vitest.expect(targetWindow.IsDestroyed()).toBe (true)
                     Vitest.expect(vaults.TryGetVault(59)).toEqual (None)
                     Vitest.expect(targetWindow.SendsAfterDestroy()).toBe (0)
                     Vitest.expect(targetWindow.SentMessages |> Seq.exists isPathChangeMessage).toBe (false)
-
-                    renameSync movedPath arcPath
+                    Vitest.expect(targetWindow.SentMessages |> Seq.exists isFileTreeMessage).toBe (false)
 
                     let investigationPath =
                         ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
@@ -2313,6 +2323,7 @@ Vitest.describe (
                             let treeMessageIndex = messages |> Array.findIndex isFileTreeMessage
 
                             Vitest.expect(pathMessageIndexes.Length).toBe (1)
+                            Vitest.expect(messages |> Array.filter isFileTreeMessage |> Array.length).toBe (1)
                             Vitest.expect(wasReadyAtPathPublication).toBe (true)
                             Vitest.expect(pathMessageIndexes.[0] < treeMessageIndex).toBe (true)
                         }
@@ -2886,13 +2897,19 @@ Vitest.describe (
 
                         ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
+                        let readGate, releaseRead = TestHelpers.deferred ()
+                        let readStarted, signalReadStarted = TestHelpers.deferred ()
+
                         try
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
+                            holdNextDirectoryListing directoryListingMock readGate signalReadStarted
                             let openOperation = api.openARCByPath arcPath
+                            do! readStarted
                             do! waitUntil "ARC parse pending in the IPC-opened vault" isArcOpening
                             arcWasOpeningWhenClosed <- isArcOpening ()
                             targetWindowState.TriggerClose()
+                            releaseRead ()
 
                             match! openOperation with
                             | Ok _ -> failwith "Expected closing the loading ARC window to cancel the operation."
@@ -2917,6 +2934,7 @@ Vitest.describe (
 
                             ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
                         with error ->
+                            releaseRead ()
                             ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
                             ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
                             return raise error
@@ -2967,7 +2985,10 @@ Vitest.describe (
                                 && vault.isInitializingArc
                             | None -> false
 
+                        let treeGate, releaseTree = TestHelpers.deferred ()
+
                         let targetWindowState = createTestWindow (testWindowOptions targetWindowId)
+
                         let mutable startupWasCompleteWhenClosed = false
 
                         let mutable dialogCount = 0
@@ -2987,6 +3008,8 @@ Vitest.describe (
                         ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
                         let cleanup () = promise {
+                            releaseTree ()
+
                             match targetVault with
                             | Some vault -> do! vault.StopFileWatcher()
                             | None -> ()
@@ -2997,7 +3020,10 @@ Vitest.describe (
 
                         let operation () = promise {
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+                            let readStarted = holdNextInitialFileTreeRead treeGate
                             let openOperation = api.openARCByPath arcPath
+
+                            do! readStarted
 
                             do!
                                 waitUntil
@@ -3006,6 +3032,7 @@ Vitest.describe (
 
                             startupWasCompleteWhenClosed <- isArcStartedBeforeFileTreePublication ()
                             targetWindowState.TriggerClose()
+                            releaseTree ()
                             let! openResult = openOperation
 
                             Vitest.expect(createdWindowCount).toBe (1)
@@ -3097,13 +3124,19 @@ Vitest.describe (
                             createObj [ "response" ==> 0; "checkboxChecked" ==> false ]
                         )
 
+                        let readGate, releaseRead = TestHelpers.deferred ()
+                        let readStarted, signalReadStarted = TestHelpers.deferred ()
+
                         try
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
 
+                            holdNextDirectoryListing directoryListingMock readGate signalReadStarted
                             let openOperation = api.openARCByPath arcPath
+                            do! readStarted
                             do! waitUntil "ARC parse pending in the current vault" isArcOpening
                             arcWasOpeningWhenClosed <- isArcOpening ()
                             windowState.TriggerClose()
+                            releaseRead ()
 
                             match! openOperation with
                             | Ok _ -> failwith "Expected closing the current ARC window to cancel the operation."
@@ -3126,6 +3159,7 @@ Vitest.describe (
                                 Vitest.expect(windowState.TitleWritesAfterDestroy()).toBe (0)
                                 Vitest.expect(dialogCount).toBe (0)
                         with error ->
+                            releaseRead ()
                             ARC_VAULTS.Vaults.Remove(windowId) |> ignore
                             do! vault.StopFileWatcher()
                             return raise error
@@ -3590,8 +3624,17 @@ Vitest.describe (
                     Vitest.expect(initializationWasActiveWhenClosed).toBe (true)
                     Vitest.expect(writeWasBusyWhenClosed).toBe (true)
                     Vitest.expect(windowState.PreventedCloseCount()).toBe (0)
-                    // The dirty-state notification is the only send; no save-before-close request follows it.
-                    Vitest.expect(windowState.SentMessages.Count).toBe (1)
+                    // Activity notifications are allowed; no save-before-close request follows them.
+                    Vitest.expect(getDirtyStateTransitions windowState.SentMessages).toEqual [| true |]
+
+                    Vitest
+                        .expect(
+                            windowState.SentMessages
+                            |> Seq.forall (fun args -> tryGetDirtyStateMessage args |> Option.isSome)
+                        )
+                        .toBe
+                        true
+
                     Vitest.expect(windowState.IsDestroyed()).toBe (true)
                     Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(windowId)).toBe (false)
 
@@ -3930,6 +3973,8 @@ Vitest.describe (
                         && not vault.hasUnsavedArcChanges
                     | None -> false
 
+                let treeGate, releaseTree = TestHelpers.deferred ()
+
                 let targetWindowState =
                     createTestWindow {
                         testWindowOptions targetWindowId with
@@ -3953,6 +3998,8 @@ Vitest.describe (
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
                 let cleanup () = promise {
+                    releaseTree ()
+
                     match targetVault with
                     | Some vault -> do! vault.StopFileWatcher()
                     | None -> ()
@@ -3970,7 +4017,10 @@ Vitest.describe (
                         initGit = false
                     }
 
+                    let readStarted = holdNextInitialFileTreeRead treeGate
                     let createOperation = api.createARC request
+
+                    do! readStarted
 
                     do!
                         waitUntil
@@ -3979,6 +4029,7 @@ Vitest.describe (
 
                     startupWasCompleteWhenClosed <- isArcStartedBeforeFileTreePublication ()
                     targetWindowState.TriggerClose()
+                    releaseTree ()
 
                     match! createOperation with
                     | Ok(CreateArcOutcome.CreatedButClosed createdPath) ->
