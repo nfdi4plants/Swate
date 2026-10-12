@@ -3842,8 +3842,6 @@ Vitest.describe (
                                         |> Option.exists (fun vault -> vault.path.IsNone && vault.arc.IsNone)
                     }
 
-                let mutable arcWasLoadingAfterWriteWhenClosed = false
-
                 setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
 
                 setBrowserWindowFactory (fun _ ->
@@ -3863,7 +3861,12 @@ Vitest.describe (
 
                 Main.VersionControl.WorkspaceSessionHost.initialize versionControlHost
 
+                let readGate, releaseRead = TestHelpers.deferred ()
+                let readStarted, signalReadStarted = TestHelpers.deferred ()
+
                 let cleanup () = promise {
+                    releaseRead ()
+
                     match loadingVault with
                     | Some vault -> do! vault.StopFileWatcher()
                     | None -> ()
@@ -3883,10 +3886,12 @@ Vitest.describe (
                         initGit = true
                     }
 
+                    holdNextDirectoryListing directoryListingMock readGate signalReadStarted
                     let createOperation = api.createARC request
-                    do! waitUntil "post-write ARC reload pending" isArcLoadingAfterWrite
-                    arcWasLoadingAfterWriteWhenClosed <- isArcLoadingAfterWrite ()
+                    do! readStarted
+                    Vitest.expect(isArcLoadingAfterWrite ()).toBe (true)
                     targetWindowState.TriggerClose()
+                    releaseRead ()
 
                     match! createOperation with
                     | Ok(CreateArcOutcome.CreatedButClosed createdPath) ->
@@ -3902,7 +3907,6 @@ Vitest.describe (
                     Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
                     Vitest.expect(targetPathWasAssigned).toBe (true)
                     Vitest.expect(creationReachedPostWriteLoad).toBe (true)
-                    Vitest.expect(arcWasLoadingAfterWriteWhenClosed).toBe (true)
                     Vitest.expect(targetWindowState.IsDestroyed()).toBe (true)
                     Vitest.expect(loadingVault.IsSome).toBe (true)
                     Vitest.expect(loadingVault.Value.watcher.IsNone).toBe (true)
