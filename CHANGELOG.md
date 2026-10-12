@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Fixed
 
-- A very long line no longer pushes the current version out of the diff view. The previous and the current version sit side by side, split in half at first, and you can drag the line between them to change the split. Each side has its own horizontal scrollbar, and a third one below scrolls both sides together. (by @caroott)
+- The diff view keeps both versions in view next to each other, with a draggable separator and a horizontal scrollbar for each side and one for both, so a long line no longer hides the current version. #1391 (by @caroott)
 
 ## 2.5.0 - 2026-10-09
 

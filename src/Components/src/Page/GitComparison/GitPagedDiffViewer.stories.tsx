@@ -1440,7 +1440,7 @@ export const SharedScrollBarClampKeepsThePanes: Story = {
 };
 
 export const SeparatorDragResizesThePanes: Story = {
-  render: () => <PaneHarness prefix="git-paged-split" previous={"p".repeat(3000)} current={"c".repeat(3000)} />,
+  render: () => <PaneHarness prefix="git-paged-split" previous={"p".repeat(3000)} current={"c".repeat(1200)} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scroll = canvas.getByTestId("git-paged-split-content").parentElement as HTMLElement;
@@ -1457,9 +1457,9 @@ export const SeparatorDragResizesThePanes: Story = {
     const dragTo = async (share: number) => {
       const view = scroll.getBoundingClientRect();
       const x = view.left + scroll.clientLeft + scroll.clientWidth * share;
-      fireEvent.pointerDown(handle, { clientX: view.left + scroll.clientWidth / 2, clientY: view.top + 40, isPrimary: true });
-      fireEvent.pointerMove(document, { clientX: x, clientY: view.top + 40, isPrimary: true });
-      fireEvent.pointerUp(document, { clientX: x, clientY: view.top + 40, isPrimary: true });
+      fireEvent.pointerDown(handle, { clientX: view.left + scroll.clientWidth / 2, clientY: view.top + 40, buttons: 1, isPrimary: true });
+      fireEvent.pointerMove(document, { clientX: x, clientY: view.top + 40, buttons: 1, isPrimary: true });
+      fireEvent.pointerUp(document, { clientX: x, clientY: view.top + 40, buttons: 0, isPrimary: true });
     };
 
     await dragTo(0.3);
@@ -1470,7 +1470,16 @@ export const SeparatorDragResizesThePanes: Story = {
     await near(previousBar.getBoundingClientRect().width, previousCell().width);
     await near(currentBar.getBoundingClientRect().width, currentCell().width);
 
-    // The shared bar still has twice the range of the wider pane.
+    // The handle sits on the border and takes the pointer there. The current cell takes it elsewhere.
+    const handleBox = handle.getBoundingClientRect();
+    await expect(Math.abs(handleBox.left + handleBox.width / 2 - previousCell().right)).toBeLessThan(4);
+    const onHandle = document.elementFromPoint(handleBox.left + handleBox.width / 2, handleBox.top + handleBox.height / 2);
+    await expect(handle.contains(onHandle)).toBe(true);
+    const cell = currentCell();
+    const inCell = document.elementFromPoint(cell.left + cell.width / 2, cell.top + cell.height / 2);
+    await expect(canvas.getByTestId("git-paged-split-line-current-0").contains(inCell)).toBe(true);
+
+    // The shared bar still has twice the larger range of the two panes.
     const bothBar = hscrollBar(canvas, "git-paged-split", "both");
     const range = (bar: HTMLElement) => bar.scrollWidth - bar.clientWidth;
     await expect(Math.abs(range(bothBar) - 2 * Math.max(range(previousBar), range(currentBar)))).toBeLessThan(4);
@@ -1484,6 +1493,12 @@ export const SeparatorDragResizesThePanes: Story = {
     // The share stops at the lower bound.
     await dragTo(0.05);
     await waitFor(() => near(previousCell().width, scroll.clientWidth * 0.15));
+
+    // A press on the handle leaves the focus on the scroller.
+    scroll.focus();
+    await userEvent.pointer({ keys: "[MouseLeft>]", target: handle });
+    await userEvent.pointer({ keys: "[/MouseLeft]" });
+    await expect(document.activeElement).toBe(scroll);
   },
 };
 

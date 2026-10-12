@@ -1229,7 +1229,7 @@ type GitPagedDiffViewer =
         let gridRootRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let overlayRef: IRefValue<HTMLElement option> = React.useElementRef ()
         // The share of the width the previous pane takes. The custom property --paged-split on the
-        // grid root carries it to the layout, so dragging the separator renders nothing.
+        // grid root carries it to the layout, so dragging the separator re-renders no rows.
         let splitRatio = React.useRef 0.5
         let previousBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let currentBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
@@ -1375,19 +1375,22 @@ type GitPagedDiffViewer =
 
                     // A horizontal step moves the text of the pane under the pointer.
                     let scrollPane (wheel: WheelEvent) (amount: float) =
+                        let bounds = bodyScroll.getBoundingClientRect ()
+                        let width = float bodyScroll.clientWidth
+                        let onPrevious = wheel.clientX < bounds.left + width * splitRatio.current
+
                         let scale =
                             match int wheel.deltaMode with
                             | 1 -> float GitPagedDiffDisplay.RowHeightPx
-                            | 2 -> float bodyScroll.clientWidth / 2.0
+                            | 2 ->
+                                width
+                                * (if onPrevious then
+                                       splitRatio.current
+                                   else
+                                       1.0 - splitRatio.current)
                             | _ -> 1.0
 
-                        let bounds = bodyScroll.getBoundingClientRect ()
-
-                        let bar =
-                            if wheel.clientX < bounds.left + float bodyScroll.clientWidth * splitRatio.current then
-                                previousBarRef
-                            else
-                                currentBarRef
+                        let bar = if onPrevious then previousBarRef else currentBarRef
 
                         bar.current
                         |> Option.iter (fun element -> element.scrollLeft <- element.scrollLeft + amount * scale)
@@ -2348,8 +2351,8 @@ type GitPagedDiffViewer =
                                     ]
                             ]
                         ]
-                        // The range of this bar is twice the range of the wider pane, so half of its
-                        // position moves each pane to the same column. The percentages are shares of
+                        // The range of this bar is twice the larger range of the two panes, so half of
+                        // its position moves each pane to the same column. The percentages are shares of
                         // the bar, which is as wide as the strip.
                         Html.div [
                             prop.testId $"{prefix}-hscroll-both"
@@ -2398,6 +2401,9 @@ type GitPagedDiffViewer =
                     prop.children [
                         Html.div [
                             prop.className "swt:pointer-events-auto swt:absolute swt:top-0 swt:bottom-0"
+                            // A press on the handle must not take the focus from the scroller, so the
+                            // scroll keys keep working after a drag.
+                            prop.onMouseDown (fun event -> event.preventDefault ())
                             prop.style [ style.custom ("left", "var(--paged-split, 50%)") ]
                             prop.children [
                                 SplitResizer.SplitResizer(
