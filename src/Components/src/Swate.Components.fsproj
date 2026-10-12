@@ -140,6 +140,7 @@
     <Compile Include="Primitive\ErrorModal\ErrorModal.fs" />
     <Compile Include="Primitive\ErrorModal\Provider.fs" />
     <Compile Include="Primitive\Navbar\Navbar.fs" />
+    <Compile Include="Primitive\SplitResizer\SplitResizer.fs" />
 
     <Compile Include="Composite\Tree\Types.fs" />
     <Compile Include="Composite\Tree\Helper.fs" />
