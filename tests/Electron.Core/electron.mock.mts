@@ -3,6 +3,8 @@ let fromWebContentsMock: ((webContents: unknown) => unknown) | undefined;
 let browserWindowFactoryMock: ((options: unknown) => object) | undefined;
 let showOpenDialogMock: ((...args: unknown[]) => unknown) | undefined;
 let showMessageBoxMock: ((...args: unknown[]) => unknown) | undefined;
+let fromIdMock: ((id: number) => unknown) | undefined;
+let applicationMenu: Menu | undefined;
 
 // Electron Forge supplies these globals to the main process at build time.
 Object.assign(globalThis, {
@@ -17,6 +19,8 @@ export const __electronMock = {
         browserWindowFactoryMock = undefined;
         showOpenDialogMock = undefined;
         showMessageBoxMock = undefined;
+        fromIdMock = undefined;
+        applicationMenu = undefined;
     },
     setBrowserWindowFactory: (handler: (options: unknown) => object) => {
         browserWindowFactoryMock = handler;
@@ -29,6 +33,9 @@ export const __electronMock = {
     },
     setShowMessageBox: (handler: (...args: unknown[]) => unknown) => {
         showMessageBoxMock = handler;
+    },
+    setBrowserWindowFromId: (handler: (id: number) => unknown) => {
+        fromIdMock = handler;
     },
 };
 
@@ -63,6 +70,49 @@ export class BrowserWindow {
 
     static getAllWindows = () => [];
     static fromWebContents = (webContents: unknown) => fromWebContentsMock?.(webContents);
+    static fromId = (id: number) => fromIdMock?.(id);
+}
+
+type MenuOptions = {
+    id?: string; label?: string; role?: string; submenu?: MenuOptions[] | Menu;
+    click?: (item: MenuItem, window: unknown, event: unknown) => void;
+};
+
+export class MenuItem {
+    id: string;
+    label: string;
+    role?: string;
+    submenu?: Menu;
+    enabled = true;
+    private onClick?: MenuOptions['click'];
+    constructor(options: MenuOptions) {
+        this.id = options.id ?? '';
+        this.label = options.label ?? '';
+        this.role = options.role;
+        this.onClick = options.click;
+        this.submenu = Array.isArray(options.submenu) ? Menu.buildFromTemplate(options.submenu) : options.submenu;
+    }
+    click(event: unknown, window: unknown, _webContents: unknown) {
+        this.onClick?.(this, window, event);
+    }
+}
+
+export class Menu {
+    items: MenuItem[] = [];
+    static getApplicationMenu = () => applicationMenu;
+    static setApplicationMenu = (menu: Menu) => { applicationMenu = menu; };
+    static buildFromTemplate(template: (MenuOptions | MenuItem)[]) {
+        const menu = new Menu();
+        menu.items = template.map(item => item instanceof MenuItem ? item : new MenuItem(item));
+        return menu;
+    }
+    getMenuItemById(id: string): MenuItem | undefined {
+        for (const item of this.items) {
+            if (item.id === id) return item;
+            const nested = item.submenu?.getMenuItemById(id);
+            if (nested) return nested;
+        }
+    }
 }
 
 export const contextBridge = { exposeInMainWorld: noop };

@@ -16,8 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.5.0 - 2026-10-09
+
 ### ✨ Added
 
+- Check for new Swate versions on App startup. Shows a "Update" Button (next to the authentication Avatar) if a new version is available. #1207 (by @Freymaurer)
+- After update to new version display release notes for the new version. #1207 (by @Freymaurer)
+- Add app window tab "Help", with "Check for updates ...", "Release Notes" and "About". (by @Freymaurer)
 - Add setting to adjust UI scaling. This can also be done using the keyboard shortcuts "Ctrl + +" or "Ctrl + -" (or "⌘ + +" / "⌘ + -" on MacOS). #1165 (by @Freymaurer)
 - Add display of PDFs (read-only) in Swate using the built-in browser compatibility of Electron. #1326 (by @Rookabu)
 - A new Git sidebar setting, "Background indexing limit (MB)", decides how much of a large diff Swate reads ahead while you look at it. With a value from 1 to 63 the diff stays in memory and writes no temporary files. #1388 (by @caroott)
