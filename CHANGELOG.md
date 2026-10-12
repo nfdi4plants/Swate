@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+- The diff view gives the previous and the current version half of the width each, so a very long line no longer pushes the current version out of view. Each half has its own horizontal scrollbar, and a third one below them scrolls both halves together. (by @caroott)
+
 ## 2.5.0 - 2026-10-09
 
 ### ✨ Added

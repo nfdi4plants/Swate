@@ -1176,21 +1176,208 @@ export const LongLineStaysInItsColumn: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const previousCell = canvas.getByTestId("git-paged-long-line-text-previous-0").getBoundingClientRect();
-    const currentText = canvas.getByTestId("git-paged-long-line-text-current-0");
-    const currentCell = currentText.getBoundingClientRect();
-    const loadMore = canvas.getByTestId("git-paged-long-line-more-current-0").getBoundingClientRect();
-
-    // The line stays on one row, and the content grows wider than the view.
     const scroll = canvas.getByTestId("git-paged-long-content").parentElement as HTMLElement;
+    const previousCell = canvas.getByTestId("git-paged-long-line-previous-0").getBoundingClientRect();
+    const currentCell = canvas.getByTestId("git-paged-long-line-current-0").getBoundingClientRect();
+    const pane = scroll.clientWidth / 2;
+
+    // The body does not scroll sideways, and each side takes half of its width.
+    await expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth + 1);
+    await expect(Math.abs(previousCell.width - pane)).toBeLessThan(2);
+    await expect(Math.abs(currentCell.width - pane)).toBeLessThan(2);
+    await expect(Math.abs(currentCell.left - previousCell.right)).toBeLessThan(2);
+
+    // The line stays on one row. Only the bar of the long side has a range.
     await expect(Math.abs(canvas.getByTestId("git-paged-long-row-long-row").getBoundingClientRect().height - 28)).toBeLessThan(1);
-    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth);
-    await expect(currentText.scrollWidth).toBeLessThanOrEqual(currentText.clientWidth + 1);
-    await expect(currentCell.left).toBeGreaterThanOrEqual(previousCell.right - 1);
-    await expect(loadMore.left).toBeGreaterThanOrEqual(currentCell.left - 1);
-    await expect(loadMore.right).toBeLessThanOrEqual(currentCell.right + 1);
-    await expect(loadMore.top).toBeGreaterThanOrEqual(currentCell.top - 1);
-    await expect(loadMore.bottom).toBeLessThanOrEqual(currentCell.bottom + 1);
+    const currentBar = hscrollBar(canvas, "git-paged-long", "current");
+    await expect(currentBar.scrollWidth).toBeGreaterThan(currentBar.clientWidth);
+    const previousBar = hscrollBar(canvas, "git-paged-long", "previous");
+    await expect(previousBar.scrollWidth).toBeLessThanOrEqual(previousBar.clientWidth);
+
+    // At the end of its bar the control lies inside the visible box of the current pane.
+    await scrollBar(currentBar, currentBar.scrollWidth);
+    await waitFor(() => {
+      const box = canvas.getByTestId("git-paged-long-line-text-current-0").parentElement!.getBoundingClientRect();
+      const loadMore = canvas.getByTestId("git-paged-long-line-more-current-0").getBoundingClientRect();
+      expect(loadMore.left).toBeGreaterThanOrEqual(box.left - 1);
+      expect(loadMore.right).toBeLessThanOrEqual(box.right + 1);
+      expect(loadMore.top).toBeGreaterThanOrEqual(box.top - 1);
+      expect(loadMore.bottom).toBeLessThanOrEqual(box.bottom + 1);
+    });
+  },
+};
+
+// The bar of a side scrolls the text of that pane. The bar of both moves both panes.
+function hscrollBar(canvas: ReturnType<typeof within>, prefix: string, name: "previous" | "current" | "both") {
+  return canvas.getByTestId(`${prefix}-hscroll-${name}`) as HTMLElement;
+}
+
+async function scrollBar(bar: HTMLElement, left: number) {
+  bar.scrollLeft = left;
+  await fireEvent.scroll(bar);
+}
+
+// One replaced row whose two sides have the given text.
+function PaneHarness({ prefix, previous, current }: { prefix: string; previous: string; current: string }) {
+  return (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={[
+          PagedPart_HunkRows("pane-hunk", range(0, 1), range(0, 1), true, true, [
+            new PagedRow("pane-row", "replaced", makeLine(0, previous), makeLine(0, current)),
+          ]),
+        ]}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        previousTitle="Previous pane title"
+        currentTitle="Current pane title"
+        testIdPrefix={prefix}
+      />
+    </div>
+  );
+}
+
+const leftOf = (element: HTMLElement) => element.getBoundingClientRect().left;
+
+export const ScrollBarMovesOnlyItsSide: Story = {
+  render: () => <PaneHarness prefix="git-paged-side" previous={"p".repeat(3000)} current={"c".repeat(2000)} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const previousText = canvas.getByTestId("git-paged-side-line-text-previous-0");
+    const currentText = canvas.getByTestId("git-paged-side-line-text-current-0");
+    const numbers = ["previous", "current"].map(
+      (side) => canvas.getByTestId(`git-paged-side-line-${side}-0`).firstElementChild as HTMLElement,
+    );
+    const before = { previous: leftOf(previousText), current: leftOf(currentText), numbers: numbers.map(leftOf) };
+
+    await scrollBar(hscrollBar(canvas, "git-paged-side", "current"), 300);
+    await waitFor(() => expect(Math.abs(leftOf(currentText) - (before.current - 300))).toBeLessThan(1));
+    await expect(Math.abs(leftOf(previousText) - before.previous)).toBeLessThan(1);
+    for (const [index, number] of numbers.entries()) {
+      await expect(Math.abs(leftOf(number) - before.numbers[index])).toBeLessThan(1);
+    }
+  },
+};
+
+export const FocusedControlScrollsItsBarIntoView: Story = {
+  render: () => (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={[
+          PagedPart_HunkRows("focus-hunk", range(0, 1), range(0, 1), true, true, [
+            new PagedRow(
+              "focus-row",
+              "replaced",
+              makeLine(0, "short previous line"),
+              makeLine(0, "x".repeat(3000), "lF", 0, 10000),
+            ),
+          ]),
+        ]}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        requestLineSlice={() => {}}
+        testIdPrefix="git-paged-focus"
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const loadMore = canvas.getByTestId("git-paged-focus-line-more-current-0");
+    const box = canvas.getByTestId("git-paged-focus-line-text-current-0").parentElement as HTMLElement;
+    const bar = hscrollBar(canvas, "git-paged-focus", "current");
+
+    loadMore.focus();
+    await waitFor(() => expect(bar.scrollLeft).toBeGreaterThan(0));
+    await waitFor(() => {
+      const control = loadMore.getBoundingClientRect();
+      const visible = box.getBoundingClientRect();
+      expect(control.left).toBeGreaterThanOrEqual(visible.left - 1);
+      expect(control.right).toBeLessThanOrEqual(visible.right + 1);
+    });
+    await expect(box.scrollLeft).toBe(0);
+  },
+};
+
+export const SharedScrollBarMovesBothSides: Story = {
+  render: () => <PaneHarness prefix="git-paged-both" previous={"p".repeat(3000)} current={"c".repeat(400)} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const previousText = canvas.getByTestId("git-paged-both-line-text-previous-0");
+    const currentText = canvas.getByTestId("git-paged-both-line-text-current-0");
+    const previousBar = hscrollBar(canvas, "git-paged-both", "previous");
+    const currentBar = hscrollBar(canvas, "git-paged-both", "current");
+    const bothBar = hscrollBar(canvas, "git-paged-both", "both");
+    const before = { previous: leftOf(previousText), current: leftOf(currentText) };
+
+    // Each side moves by half of the position of the shared bar.
+    await scrollBar(bothBar, 600);
+    await waitFor(() => expect(previousBar.scrollLeft).toBe(300));
+    await waitFor(() => expect(currentBar.scrollLeft).toBe(300));
+    await waitFor(() => expect(Math.abs(leftOf(previousText) - (before.previous - 300))).toBeLessThan(1));
+    await waitFor(() => expect(Math.abs(leftOf(currentText) - (before.current - 300))).toBeLessThan(1));
+
+    // The shorter side stops at the end of its own range.
+    const currentMax = currentBar.scrollWidth - currentBar.clientWidth;
+    await scrollBar(bothBar, 2 * (currentMax + 200));
+    await waitFor(() => expect(previousBar.scrollLeft).toBe(currentMax + 200));
+    await waitFor(() => expect(Math.abs(currentBar.scrollLeft - currentMax)).toBeLessThan(1));
+  },
+};
+
+export const HorizontalWheelMovesThePaneUnderThePointer: Story = {
+  render: () => <PaneHarness prefix="git-paged-wheel" previous={"p".repeat(3000)} current={"c".repeat(3000)} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = canvas.getByTestId("git-paged-wheel-content").parentElement as HTMLElement;
+    const previousBar = hscrollBar(canvas, "git-paged-wheel", "previous");
+    const currentBar = hscrollBar(canvas, "git-paged-wheel", "current");
+    const view = scroll.getBoundingClientRect();
+
+    await fireEvent.wheel(scroll, { deltaX: 120, deltaY: 0, clientX: view.left + view.width * 0.75, clientY: view.top + 40 });
+    await waitFor(() => expect(currentBar.scrollLeft).toBe(120));
+    await expect(previousBar.scrollLeft).toBe(0);
+
+    await fireEvent.wheel(scroll, { deltaX: 120, deltaY: 0, clientX: view.left + view.width * 0.25, clientY: view.top + 40 });
+    await waitFor(() => expect(previousBar.scrollLeft).toBe(120));
+    await expect(currentBar.scrollLeft).toBe(120);
+  },
+};
+
+export const ArrowKeysMoveBothSides: Story = {
+  render: () => <PaneHarness prefix="git-paged-keys" previous={"p".repeat(3000)} current={"c".repeat(3000)} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = canvas.getByTestId("git-paged-keys-content").parentElement as HTMLElement;
+    const previousBar = hscrollBar(canvas, "git-paged-keys", "previous");
+    const currentBar = hscrollBar(canvas, "git-paged-keys", "current");
+
+    scroll.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await waitFor(() => expect(previousBar.scrollLeft).toBe(40));
+    await waitFor(() => expect(currentBar.scrollLeft).toBe(40));
+
+    await userEvent.keyboard("{ArrowLeft}");
+    await waitFor(() => expect(previousBar.scrollLeft).toBe(0));
+    await waitFor(() => expect(currentBar.scrollLeft).toBe(0));
+  },
+};
+
+export const HeaderHalvesMatchThePanes: Story = {
+  render: () => <PaneHarness prefix="git-paged-header" previous={"p".repeat(3000)} current={"c".repeat(3000)} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = canvas.getByTestId("git-paged-header-content").parentElement as HTMLElement;
+    const header = canvas.getByTestId("git-paged-header-grid").firstElementChild as HTMLElement;
+    const halves = Array.from(header.children) as HTMLElement[];
+
+    await expect(halves).toHaveLength(2);
+    for (const half of halves) {
+      await waitFor(() => expect(Math.abs(half.getBoundingClientRect().width - scroll.clientWidth / 2)).toBeLessThan(2));
+    }
   },
 };
 
@@ -1240,7 +1427,9 @@ export const GapControlsStayInViewWithLongLines: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scroll = canvas.getByTestId("git-paged-wide-gap-content").parentElement as HTMLElement;
-    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
+    const currentBar = hscrollBar(canvas, "git-paged-wide-gap", "current");
+    const bothBar = hscrollBar(canvas, "git-paged-wide-gap", "both");
+    await expect(currentBar.scrollWidth).toBeGreaterThan(currentBar.clientWidth * 2);
 
     const expectInView = (testId: string) => expectControlInView(canvas, scroll, testId);
 
@@ -1249,15 +1438,25 @@ export const GapControlsStayInViewWithLongLines: Story = {
     await expectInView(start);
     await expectInView(end);
 
-    scroll.scrollLeft = scroll.scrollWidth;
-    await fireEvent.scroll(scroll);
-    await expect(scroll.scrollLeft).toBeGreaterThan(scroll.clientWidth);
+    await scrollBar(currentBar, currentBar.scrollWidth);
+    await scrollBar(bothBar, bothBar.scrollWidth);
+    await waitFor(() => expect(currentBar.scrollLeft).toBeGreaterThan(currentBar.clientWidth));
     await waitFor(() => expectInView(start));
     await expectInView(end);
 
     await userEvent.click(canvas.getByTestId(start));
     await waitFor(() => expect(canvas.queryByTestId(start)).toBeNull());
     await waitFor(() => expectInView("git-paged-wide-gap-gap-expand-start-wide-gap-right"));
+
+    // One press revealed the first hidden line on both sides, and each lies in its own pane.
+    const view = scroll.getBoundingClientRect();
+    const middle = view.left + scroll.clientWidth / 2;
+    const previousLine = canvas.getByTestId("git-paged-wide-gap-line-previous-0").getBoundingClientRect();
+    const currentLine = canvas.getByTestId("git-paged-wide-gap-line-current-0").getBoundingClientRect();
+    await expect(previousLine.left).toBeGreaterThanOrEqual(view.left - 2);
+    await expect(previousLine.right).toBeLessThanOrEqual(middle + 2);
+    await expect(currentLine.left).toBeGreaterThanOrEqual(middle - 2);
+    await expect(currentLine.right).toBeLessThanOrEqual(view.left + scroll.clientWidth + 2);
   },
 };
 
@@ -1302,19 +1501,21 @@ export const ContinueAndReloadControlsStayInViewWithLongLines: Story = {
     wideStopNextSpy.mockClear();
     const canvas = within(canvasElement);
     const scroll = canvas.getByTestId("git-paged-wide-stop-content").parentElement as HTMLElement;
-    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
+    const currentBar = hscrollBar(canvas, "git-paged-wide-stop", "current");
+    const bothBar = hscrollBar(canvas, "git-paged-wide-stop", "both");
+    await expect(currentBar.scrollWidth).toBeGreaterThan(currentBar.clientWidth * 2);
 
     const expectInView = (testId: string) => expectControlInView(canvas, scroll, testId);
     const reload = "git-paged-wide-stop-folded-replay-wide-old-page";
     const next = "git-paged-wide-stop-continue-button";
 
-    await expect(scroll.scrollLeft).toBe(0);
+    await expect(currentBar.scrollLeft).toBe(0);
     await expectInView(reload);
     await expectInView(next);
 
-    scroll.scrollLeft = scroll.scrollWidth;
-    await fireEvent.scroll(scroll);
-    await expect(scroll.scrollLeft).toBeGreaterThan(scroll.clientWidth);
+    await scrollBar(currentBar, currentBar.scrollWidth);
+    await scrollBar(bothBar, bothBar.scrollWidth);
+    await waitFor(() => expect(currentBar.scrollLeft).toBeGreaterThan(currentBar.clientWidth));
     await waitFor(() => expectInView(reload));
     await expectInView(next);
 
