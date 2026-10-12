@@ -463,7 +463,7 @@ module internal GitPagedDiffDisplay =
 
     /// The width of the text area of one side as a CSS length, wide enough for the longest line of
     /// that side. The rows use a monospace font, so the width counts characters. Controls beside a
-    /// line need room of their own. The text area of a side is never narrower than its pane.
+    /// line need room of their own.
     let textWidth (side: PagedDiffSide) (rows: Row[]) =
         let lines = sideLines side rows
 
@@ -485,11 +485,6 @@ module internal GitPagedDiffDisplay =
     /// binding for the style declaration.
     [<Emit("$0.style.setProperty($1, $2)")>]
     let setStyleProperty (_element: HTMLElement) (_name: string) (_value: string) : unit = jsNative
-
-    /// The nearest ancestor of the element, or the element itself, that matches the selector.
-    /// Fable.Browser.Dom has no binding that returns a typed element.
-    [<Emit("$0.closest($1)")>]
-    let closest (_element: HTMLElement) (_selector: string) : HTMLElement = jsNative
 
     let endingText ending =
         match ending with
@@ -699,7 +694,7 @@ type GitPagedDiffViewer =
                     // text. The box clips the area, and the scroll bar of the side shifts it. A clip
                     // box is no scroll container, so focusing a control cannot scroll it.
                     Html.div [
-                        prop.custom ("data-text-box", "true")
+                        prop.custom ("data-text-box", side)
                         prop.className "swt:min-w-0 swt:overflow-clip"
                         prop.children [
                             Html.div [
@@ -908,14 +903,10 @@ type GitPagedDiffViewer =
                 prop.children children
             ]
 
-        // A full-width row whose controls sit in a wrapper. The row keeps its background and
-        // borders across the whole width, and the wrapper spans both panes.
         let controlRow (className: string) (innerClassName: string) (children: ReactElement list) : ReactElement =
             Html.div [
-                prop.className $"swt:col-span-2 {className}"
-                prop.children [
-                    Html.div [ prop.className innerClassName; prop.children children ]
-                ]
+                prop.className $"swt:col-span-2 {className} {innerClassName}"
+                prop.children children
             ]
 
         // A header row takes exactly one display row.
@@ -1237,7 +1228,8 @@ type GitPagedDiffViewer =
         let gridRootRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let previousBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let currentBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
-        let bothBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        // The range of the shared bar at its last scroll event.
+        let bothMax = React.useRef 0.0
         let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
@@ -1418,6 +1410,9 @@ type GitPagedDiffViewer =
                                 scrollPane wheel wheel.deltaX
 
                             moveLogical (wheel.deltaY * scale)
+                        elif not wheel.ctrlKey && wheel.deltaX <> 0.0 then
+                            // The vertical scroll goes on natively, and the side part moves the pane.
+                            scrollPane wheel wheel.deltaX
 
                     let onKeyDown (event: Event) =
                         let keyboard = unbox<KeyboardEvent> event
@@ -1431,14 +1426,15 @@ type GitPagedDiffViewer =
                             && (keyboard.key = "ArrowLeft" || keyboard.key = "ArrowRight")
                             && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey || keyboard.shiftKey)
                         then
-                            // The bar spans twice the range of a pane, so each pane moves by half the step.
+                            // Each pane steps from its own position.
                             event.preventDefault ()
 
-                            bothBarRef.current
-                            |> Option.iter (fun element ->
-                                element.scrollLeft <-
-                                    element.scrollLeft + (if keyboard.key = "ArrowLeft" then -80.0 else 80.0)
-                            )
+                            for bar in [ previousBarRef; currentBarRef ] do
+                                bar.current
+                                |> Option.iter (fun element ->
+                                    element.scrollLeft <-
+                                        element.scrollLeft + (if keyboard.key = "ArrowLeft" then -40.0 else 40.0)
+                                )
                         elif isCapped () then
                             let modifierFree = not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey)
 
@@ -1494,13 +1490,12 @@ type GitPagedDiffViewer =
 
                         // A control outside the visible part of its text box gets its bar moved, so
                         // the user sees what has the focus.
-                        match Option.ofObj (GitPagedDiffDisplay.closest target "[data-text-box]") with
+                        match target.closest "[data-text-box]" |> Option.map unbox<HTMLElement> with
                         | Some box ->
-                            let cell = GitPagedDiffDisplay.closest box "[data-side]"
-
                             let bar =
                                 if
-                                    cell.getAttribute "data-side" = GitPagedDiffDisplay.sideName PagedDiffSide.Previous
+                                    box.getAttribute "data-text-box" = GitPagedDiffDisplay.sideName
+                                        PagedDiffSide.Previous
                                 then
                                     previousBarRef
                                 else
@@ -2311,7 +2306,7 @@ type GitPagedDiffViewer =
                                     Html.div [
                                         prop.ref barRef
                                         prop.testId $"{prefix}-hscroll-{side}"
-                                        prop.className "swt:min-w-0 swt:overflow-x-auto swt:overflow-y-hidden"
+                                        prop.className "swt:h-3 swt:min-w-0 swt:overflow-x-auto swt:overflow-y-hidden"
                                         prop.style barStyle
                                         prop.onScroll (fun event ->
                                             let bar = event.currentTarget :?> HTMLElement
@@ -2341,16 +2336,22 @@ type GitPagedDiffViewer =
                         // The range of this bar is twice the range of the wider pane, so half of its
                         // position moves each pane to the same column.
                         Html.div [
-                            prop.ref bothBarRef
                             prop.testId $"{prefix}-hscroll-both"
-                            prop.className "swt:overflow-x-auto swt:overflow-y-hidden"
+                            prop.className "swt:h-3 swt:overflow-x-auto swt:overflow-y-hidden"
                             prop.style barStyle
                             prop.onScroll (fun event ->
                                 let bar = event.currentTarget :?> HTMLElement
+                                let range = float bar.scrollWidth - float bar.clientWidth
 
-                                for barRef in [ previousBarRef; currentBarRef ] do
-                                    barRef.current
-                                    |> Option.iter (fun element -> element.scrollLeft <- bar.scrollLeft / 2.0)
+                                // A range that shrinks under the bar clamps it. The panes keep their
+                                // positions then, since the user did not move the bar.
+                                let clamped = range < bothMax.current && bar.scrollLeft >= range - 1.0
+                                bothMax.current <- range
+
+                                if not clamped then
+                                    for barRef in [ previousBarRef; currentBarRef ] do
+                                        barRef.current
+                                        |> Option.iter (fun element -> element.scrollLeft <- bar.scrollLeft / 2.0)
                             )
                             prop.children [
                                 Html.div [

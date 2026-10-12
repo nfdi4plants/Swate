@@ -1217,16 +1217,34 @@ async function scrollBar(bar: HTMLElement, left: number) {
   await fireEvent.scroll(bar);
 }
 
-// One replaced row whose two sides have the given text.
-function PaneHarness({ prefix, previous, current }: { prefix: string; previous: string; current: string }) {
+// Replaced rows whose two sides have the given text. The gutter reserves room for the vertical
+// scrollbar, which headless Chromium hides otherwise.
+function PaneHarness({
+  prefix,
+  previous,
+  current,
+  rowCount = 1,
+  gutter = false,
+}: {
+  prefix: string;
+  previous: string;
+  current: string;
+  rowCount?: number;
+  gutter?: boolean;
+}) {
+  const rows = Array.from(
+    { length: rowCount },
+    (_, index) => new PagedRow(`pane-row-${index}`, "replaced", makeLine(index, previous), makeLine(index, current)),
+  );
+  const body = `[data-testid="${prefix}-grid"] > div:nth-child(2)`;
+
   return (
     <div style={{ height: "30rem" }}>
+      {gutter && (
+        <style>{`${body} { scrollbar-gutter: stable; }`}</style>
+      )}
       <GitPagedDiffViewerComponent
-        parts={[
-          PagedPart_HunkRows("pane-hunk", range(0, 1), range(0, 1), true, true, [
-            new PagedRow("pane-row", "replaced", makeLine(0, previous), makeLine(0, current)),
-          ]),
-        ]}
+        parts={[PagedPart_HunkRows("pane-hunk", range(0, rowCount), range(0, rowCount), true, true, rows)]}
         status={PagedDiffStatus_Ready()}
         progress={new PagedProgress(100, 100, true)}
         hasMore={false}
@@ -1298,7 +1316,7 @@ export const FocusedControlScrollsItsBarIntoView: Story = {
       expect(control.left).toBeGreaterThanOrEqual(visible.left - 1);
       expect(control.right).toBeLessThanOrEqual(visible.right + 1);
     });
-    await expect(box.scrollLeft).toBe(0);
+    await expect(canvas.getByTestId("git-paged-focus-line-current-0").scrollLeft).toBe(0);
   },
 };
 
@@ -1366,18 +1384,85 @@ export const ArrowKeysMoveBothSides: Story = {
   },
 };
 
+export const ArrowKeysKeepTheOwnPositionOfEachPane: Story = {
+  render: () => <PaneHarness prefix="git-paged-step" previous={"p".repeat(3000)} current={"c".repeat(3000)} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = canvas.getByTestId("git-paged-step-content").parentElement as HTMLElement;
+    const previousBar = hscrollBar(canvas, "git-paged-step", "previous");
+    const currentBar = hscrollBar(canvas, "git-paged-step", "current");
+
+    await scrollBar(currentBar, 300);
+    scroll.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await waitFor(() => expect(currentBar.scrollLeft).toBe(340));
+    await expect(previousBar.scrollLeft).toBe(40);
+  },
+};
+
+// The longest line of the previous side shrinks while the shared bar sits at its end.
+function ShrinkingLineHarness() {
+  const [previous, setPrevious] = React.useState("p".repeat(3000));
+
+  return (
+    <>
+      <button data-testid="git-paged-shrink-button" onClick={() => setPrevious("p".repeat(1000))}>
+        Shrink
+      </button>
+      <PaneHarness prefix="git-paged-shrink" previous={previous} current={"c".repeat(2000)} />
+    </>
+  );
+}
+
+export const SharedScrollBarClampKeepsThePanes: Story = {
+  render: () => <ShrinkingLineHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const previousBar = hscrollBar(canvas, "git-paged-shrink", "previous");
+    const currentBar = hscrollBar(canvas, "git-paged-shrink", "current");
+    const bothBar = hscrollBar(canvas, "git-paged-shrink", "both");
+
+    await scrollBar(bothBar, bothBar.scrollWidth);
+    await waitFor(() => expect(previousBar.scrollLeft).toBeGreaterThan(1000));
+    // The scroll event of the browser follows the one fired above and moves the panes again.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await scrollBar(currentBar, 100);
+    await waitFor(() => expect(currentBar.scrollLeft).toBe(100));
+    const before = bothBar.scrollLeft;
+
+    await userEvent.click(canvas.getByTestId("git-paged-shrink-button"));
+
+    // The browser clamps the shared bar, and the panes stay where the user put them.
+    await waitFor(() => expect(bothBar.scrollLeft).toBeLessThan(before - 1));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await expect(currentBar.scrollLeft).toBe(100);
+  },
+};
+
 export const HeaderHalvesMatchThePanes: Story = {
-  render: () => <PaneHarness prefix="git-paged-header" previous={"p".repeat(3000)} current={"c".repeat(3000)} />,
+  render: () => (
+    <PaneHarness
+      prefix="git-paged-header"
+      previous={"p".repeat(3000)}
+      current={"c".repeat(3000)}
+      rowCount={60}
+      gutter
+    />
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scroll = canvas.getByTestId("git-paged-header-content").parentElement as HTMLElement;
     const header = canvas.getByTestId("git-paged-header-grid").firstElementChild as HTMLElement;
     const halves = Array.from(header.children) as HTMLElement[];
+    const bars = (["previous", "current"] as const).map((side) => hscrollBar(canvas, "git-paged-header", side));
 
+    // The gutter takes room from the rows. The header and the bars match the rows.
+    await expect(scroll.offsetWidth).toBeGreaterThan(scroll.clientWidth);
     await expect(halves).toHaveLength(2);
-    for (const half of halves) {
-      await waitFor(() => expect(Math.abs(half.getBoundingClientRect().width - scroll.clientWidth / 2)).toBeLessThan(2));
+    for (const box of [...halves, ...bars]) {
+      await waitFor(() => expect(Math.abs(box.getBoundingClientRect().width - scroll.clientWidth / 2)).toBeLessThan(2));
     }
+    for (const bar of bars) await expect(bar.getBoundingClientRect().height).toBeGreaterThanOrEqual(10);
   },
 };
 
@@ -1439,6 +1524,7 @@ export const GapControlsStayInViewWithLongLines: Story = {
     await expectInView(end);
 
     await scrollBar(currentBar, currentBar.scrollWidth);
+    await expect(currentBar.scrollLeft).toBeGreaterThan(0);
     await scrollBar(bothBar, bothBar.scrollWidth);
     await waitFor(() => expect(currentBar.scrollLeft).toBeGreaterThan(currentBar.clientWidth));
     await waitFor(() => expectInView(start));
@@ -1514,6 +1600,7 @@ export const ContinueAndReloadControlsStayInViewWithLongLines: Story = {
     await expectInView(next);
 
     await scrollBar(currentBar, currentBar.scrollWidth);
+    await expect(currentBar.scrollLeft).toBeGreaterThan(0);
     await scrollBar(bothBar, bothBar.scrollWidth);
     await waitFor(() => expect(currentBar.scrollLeft).toBeGreaterThan(currentBar.clientWidth));
     await waitFor(() => expectInView(reload));
