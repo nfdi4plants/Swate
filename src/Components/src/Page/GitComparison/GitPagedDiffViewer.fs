@@ -8,6 +8,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Page
 open Swate.Components.Page.GitComparison.GitPagedDiffTypes
+open Swate.Components.Primitive.SplitResizer
 
 module internal GitPagedDiffDisplay =
 
@@ -1181,7 +1182,7 @@ type GitPagedDiffViewer =
                 style.top 0
                 style.left 0
                 style.custom ("transform", $"translateY({props.Start}px)")
-                style.custom ("gridTemplateColumns", "repeat(2, minmax(0, 1fr))")
+                style.custom ("gridTemplateColumns", "minmax(0, var(--paged-split, 50%)) minmax(0, 1fr)")
                 match props.Row.Content with
                 | GitPagedDiffDisplay.Continue _ -> ()
                 | _ -> style.height props.Height
@@ -1226,6 +1227,10 @@ type GitPagedDiffViewer =
         ) =
         let rowHeight = GitPagedDiffDisplay.RowHeightPx
         let gridRootRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        let overlayRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        // The share of the width the previous pane takes. The custom property --paged-split on the
+        // grid root carries it to the layout, so dragging the separator renders nothing.
+        let splitRatio = React.useRef 0.5
         let previousBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let currentBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
         // The range and the position of the shared bar at its last scroll event.
@@ -1379,7 +1384,7 @@ type GitPagedDiffViewer =
                         let bounds = bodyScroll.getBoundingClientRect ()
 
                         let bar =
-                            if wheel.clientX < bounds.left + float bodyScroll.clientWidth / 2.0 then
+                            if wheel.clientX < bounds.left + float bodyScroll.clientWidth * splitRatio.current then
                                 previousBarRef
                             else
                                 currentBarRef
@@ -2181,7 +2186,7 @@ type GitPagedDiffViewer =
         Html.div [
             prop.ref gridRootRef
             prop.testId $"{prefix}-grid"
-            prop.className "swt:flex swt:min-h-0 swt:flex-1 swt:flex-col"
+            prop.className "swt:relative swt:flex swt:min-h-0 swt:flex-1 swt:flex-col"
             // The rows and the scroll bars share these lengths. The scroll bars write the scroll
             // positions (--paged-scroll-previous and --paged-scroll-current) straight to this
             // element, so a render never resets them.
@@ -2192,8 +2197,11 @@ type GitPagedDiffViewer =
             ]
             prop.children [
                 Html.div [
-                    prop.className "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
-                    prop.style [ style.custom ("width", stripWidth) ]
+                    prop.className "swt:grid swt:divide-x swt:divide-base-content/10"
+                    prop.style [
+                        style.custom ("width", stripWidth)
+                        style.custom ("gridTemplateColumns", "minmax(0, var(--paged-split, 50%)) minmax(0, 1fr)")
+                    ]
                     prop.children [
                         for label, title in [ "Previous", previousTitle; "Current", currentTitle ] do
                             Html.div [
@@ -2301,7 +2309,13 @@ type GitPagedDiffViewer =
                     prop.style [ style.custom ("width", stripWidth) ]
                     prop.children [
                         Html.div [
-                            prop.className "swt:grid swt:grid-cols-2"
+                            prop.className "swt:grid"
+                            prop.style [
+                                style.custom (
+                                    "gridTemplateColumns",
+                                    "minmax(0, var(--paged-split, 50%)) minmax(0, 1fr)"
+                                )
+                            ]
                             prop.children [
                                 for side, barRef in [ "previous", previousBarRef; "current", currentBarRef ] do
                                     Html.div [
@@ -2335,7 +2349,8 @@ type GitPagedDiffViewer =
                             ]
                         ]
                         // The range of this bar is twice the range of the wider pane, so half of its
-                        // position moves each pane to the same column.
+                        // position moves each pane to the same column. The percentages are shares of
+                        // the bar, which is as wide as the strip.
                         Html.div [
                             prop.testId $"{prefix}-hscroll-both"
                             prop.className "swt:h-3 swt:overflow-x-auto swt:overflow-y-hidden"
@@ -2366,10 +2381,41 @@ type GitPagedDiffViewer =
                                         style.height 1
                                         style.custom (
                                             "width",
-                                            "calc(2 * (var(--paged-number-column) + max(var(--paged-text-previous), var(--paged-text-current))))"
+                                            "calc(100% + 2 * max(0px, var(--paged-number-column) + var(--paged-text-previous) - var(--paged-split, 50%), var(--paged-number-column) + var(--paged-text-current) - (100% - var(--paged-split, 50%))))"
                                         )
                                     ]
                                 ]
+                            ]
+                        ]
+                    ]
+                ]
+                // The overlay is as wide as the panes and ends above the shared bar. Only the
+                // handle takes pointer events.
+                Html.div [
+                    prop.ref overlayRef
+                    prop.className "swt:pointer-events-none swt:absolute swt:top-0 swt:left-0 swt:bottom-3"
+                    prop.style [ style.custom ("width", stripWidth) ]
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:pointer-events-auto swt:absolute swt:top-0 swt:bottom-0"
+                            prop.style [ style.custom ("left", "var(--paged-split, 50%)") ]
+                            prop.children [
+                                SplitResizer.SplitResizer(
+                                    overlayRef,
+                                    false,
+                                    (fun ratio ->
+                                        splitRatio.current <- ratio
+
+                                        gridRootRef.current
+                                        |> Option.iter (fun root ->
+                                            GitPagedDiffDisplay.setStyleProperty
+                                                root
+                                                "--paged-split"
+                                                $"{ratio * 100.0}%%"
+                                        )
+                                    ),
+                                    testId = $"{prefix}-split-resizer"
+                                )
                             ]
                         ]
                     ]
