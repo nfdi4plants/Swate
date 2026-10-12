@@ -1228,8 +1228,9 @@ type GitPagedDiffViewer =
         let gridRootRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let previousBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let currentBarRef: IRefValue<HTMLElement option> = React.useElementRef ()
-        // The range of the shared bar at its last scroll event.
+        // The range and the position of the shared bar at its last scroll event.
         let bothMax = React.useRef 0.0
+        let bothLeft = React.useRef 0.0
         let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
@@ -2343,10 +2344,16 @@ type GitPagedDiffViewer =
                                 let bar = event.currentTarget :?> HTMLElement
                                 let range = float bar.scrollWidth - float bar.clientWidth
 
-                                // A range that shrinks under the bar clamps it. The panes keep their
-                                // positions then, since the user did not move the bar.
-                                let clamped = range < bothMax.current && bar.scrollLeft >= range - 1.0
+                                // A range that shrinks under the bar clamps it back to the new end.
+                                // The panes keep their positions then, since the user did not move
+                                // the bar. A move of the user to the end goes forward.
+                                let clamped =
+                                    range < bothMax.current
+                                    && bar.scrollLeft >= range - 1.0
+                                    && bar.scrollLeft < bothLeft.current
+
                                 bothMax.current <- range
+                                bothLeft.current <- bar.scrollLeft
 
                                 if not clamped then
                                     for barRef in [ previousBarRef; currentBarRef ] do
