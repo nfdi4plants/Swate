@@ -151,8 +151,7 @@ Vitest.describe (
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
                     vault.path <- Some arcPath
-                    let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage arcPath
-                    vault.fileTree <- initialRootPage.Entries
+                    do! vault.EnsureInitialFileTreeRootPage arcPath |> Promise.map ignore
 
                     let! ensureResult = ensureNotesFolderAndRefreshFileTree vault arcPath
                     assertEnsureSucceeded ensureResult

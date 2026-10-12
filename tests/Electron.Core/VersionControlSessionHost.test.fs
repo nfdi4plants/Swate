@@ -1887,8 +1887,7 @@ Vitest.describe (
                         datasetPath
                         (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
 
-                    let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage fixture.RepoRoot
-                    vault.fileTree <- initialRootPage.Entries
+                    do! vault.EnsureInitialFileTreeRootPage fixture.RepoRoot |> Promise.map ignore
                     do! vault.RefreshFileTreeDirectory "dataset"
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
                     Vitest.expect(vault.isBusyWriting).toBe false
@@ -2144,8 +2143,7 @@ Vitest.describe (
 
                     try
                         let vault = registerVault 93 workspace
-                        let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage workspace
-                        vault.fileTree <- initialRootPage.Entries
+                        do! vault.EnsureInitialFileTreeRootPage workspace |> Promise.map ignore
                         do! vault.RefreshFileTreeDirectory "dataset"
                         Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
 
@@ -2215,8 +2213,7 @@ Vitest.describe (
                             datasetPath
                             (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
 
-                        let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage coreOnlyRoot
-                        vault.fileTree <- initialRootPage.Entries
+                        do! vault.EnsureInitialFileTreeRootPage coreOnlyRoot |> Promise.map ignore
                         do! vault.RefreshFileTreeDirectory "dataset"
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 52)
                         let firstGate, releaseFirst = deferred ()

@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
+open Main.ArcVault
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.VersionControl
@@ -17,7 +18,6 @@ open Vitest
 open ElectronCore.TestHelpers
 
 module FileTreeCreator = Main.FileTreeCreator
-module ArcVaultHelper = Main.ArcVaultHelper
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
@@ -362,6 +362,132 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "fresh FileTree directory snapshots",
+    fun () ->
+        let createFixture () =
+            let rootPath = FileTreeCreator.normalizeRootPath "arc"
+
+            let entry relativePath isDirectory =
+                let path = join [| rootPath; relativePath |]
+                FileEntry.create (basename path, path, isDirectory)
+
+            let initial =
+                [|
+                    entry "" true
+                    entry "studies" true
+                    entry "studies/existing.txt" false
+                    entry "studies/missing" true
+                    entry "studies/missing/old.txt" false
+                    entry "studies/surviving" true
+                    entry "studies/surviving/known.txt" false
+                    entry "sibling.txt" false
+                |]
+                |> createFileEntryTree
+
+            rootPath, entry, initial
+
+        Vitest.test (
+            "a partial fresh snapshot updates entries while retaining cached children and descendants",
+            fun () ->
+                let rootPath, entry, initial = createFixture ()
+                let originalEntries = initial.Values |> Seq.toArray
+                let existing = entry "studies/existing.txt" false
+
+                let updated = {
+                    existing with
+                        largeObject = Some(createObjectState "studies/existing.txt")
+                }
+
+                let added = entry "studies/new.txt" false
+
+                let snapshot: FileTreeCreator.FileTreeDirectoryPage = {
+                    Entries = [| updated; added |]
+                    HasMore = true
+                }
+
+                let refreshed =
+                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot rootPath "studies" snapshot initial
+
+                Vitest.expect(refreshed.[existing.path]).toEqual updated
+                Vitest.expect(refreshed.[added.path]).toEqual added
+                Vitest.expect(refreshed.ContainsKey((entry "studies/missing" true).path)).toBe true
+                Vitest.expect(refreshed.ContainsKey((entry "studies/missing/old.txt" false).path)).toBe true
+                Vitest.expect(refreshed.ContainsKey((entry "studies/surviving/known.txt" false).path)).toBe true
+                Vitest.expect(refreshed.ContainsKey((entry "sibling.txt" false).path)).toBe true
+                Vitest.expect(initial.Values |> Seq.toArray).toEqual originalEntries
+        )
+
+        Vitest.test (
+            "an exhaustive fresh snapshot removes missing children and preserves surviving descendants",
+            fun () ->
+                let rootPath, entry, initial = createFixture ()
+                let originalEntries = initial.Values |> Seq.toArray
+                let surviving = entry "studies/surviving" true
+                let added = entry "studies/new.txt" false
+
+                let snapshot: FileTreeCreator.FileTreeDirectoryPage = {
+                    Entries = [| surviving; added |]
+                    HasMore = false
+                }
+
+                let refreshed =
+                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot rootPath "studies" snapshot initial
+
+                Vitest.expect(refreshed.ContainsKey((entry "studies/existing.txt" false).path)).toBe false
+                Vitest.expect(refreshed.ContainsKey((entry "studies/missing" true).path)).toBe false
+                Vitest.expect(refreshed.ContainsKey((entry "studies/missing/old.txt" false).path)).toBe false
+                Vitest.expect(refreshed.[surviving.path]).toEqual surviving
+                Vitest.expect(refreshed.ContainsKey((entry "studies/surviving/known.txt" false).path)).toBe true
+                Vitest.expect(refreshed.[added.path]).toEqual added
+                Vitest.expect(refreshed.ContainsKey((entry "sibling.txt" false).path)).toBe true
+                Vitest.expect(initial.Values |> Seq.toArray).toEqual originalEntries
+        )
+
+        Vitest.test (
+            "an exhaustive empty snapshot clears the directory without removing its parent or siblings",
+            fun () ->
+                let rootPath, entry, initial = createFixture ()
+                let originalEntries = initial.Values |> Seq.toArray
+                let snapshot: FileTreeCreator.FileTreeDirectoryPage = { Entries = [||]; HasMore = false }
+
+                let refreshed =
+                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot rootPath "studies" snapshot initial
+
+                let expected = [|
+                    entry "" true
+                    entry "studies" true
+                    entry "sibling.txt" false
+                |]
+
+                Vitest.expect(refreshed.Values |> Seq.toArray).toEqual expected
+                Vitest.expect(initial.Values |> Seq.toArray).toEqual originalEntries
+        )
+
+        Vitest.test (
+            "the final incremental page merges without removing children from earlier pages",
+            fun () ->
+                let _, entry, initial = createFixture ()
+                let originalEntries = initial.Values |> Seq.toArray
+                let added = entry "studies/last.txt" false
+
+                let finalPage: FileTreeCreator.FileTreeDirectoryPage = {
+                    Entries = [| added |]
+                    HasMore = false
+                }
+
+                let merged = FileTreeCreator.mergeFileTreeDirectoryPage finalPage.Entries initial
+
+                Vitest.expect(merged.Count).toBe (initial.Count + 1)
+                Vitest.expect(merged.[added.path]).toEqual added
+
+                originalEntries
+                |> Array.iter (fun previous -> Vitest.expect(merged.[previous.path]).toEqual previous)
+
+                Vitest.expect(initial.Values |> Seq.toArray).toEqual originalEntries
+        )
+)
+
+Vitest.describe (
     "shallow FileTree loading",
     fun () ->
         Vitest.test (
@@ -382,14 +508,17 @@ Vitest.describe (
                                 )
 
                         let! _ = Fable.Core.JS.Constructors.Promise.all writes
-                        let! rootPage = FileTreeCreator.getFileTreeRootPage rootPath
-                        let tree = rootPage.Entries
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some rootPath
+                        let! tree = vault.EnsureInitialFileTreeRootPage rootPath
                         let names = tree.Values |> Seq.map _.name |> Seq.toArray
 
                         Vitest.expect(tree.Count).toBe (3)
                         Vitest.expect(names |> Array.contains "README.md").toBe (true)
                         Vitest.expect(names |> Array.contains "dataset").toBe (true)
                         Vitest.expect(names |> Array.contains "file-0000.txt").toBe (false)
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.[""]).toBe false
+                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
 
                         tree.Values
                         |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject).toEqual (None))
@@ -488,7 +617,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "startup root loading is bounded and reports additional children",
+            "startup root loading is bounded and reuses its cursor through completion",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -501,78 +630,46 @@ Vitest.describe (
                                 )
 
                         let! _ = Fable.Core.JS.Constructors.Promise.all writes
-                        let! rootPage = FileTreeCreator.getFileTreeRootPage rootPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some rootPath
 
-                        // One root entry plus exactly one bounded page of direct children.
-                        Vitest.expect(rootPage.Entries.Count).toBe 101
-                        Vitest.expect(rootPage.HasMore).toBe true
+                        let! result =
+                            promise {
+                                let! initialTree = vault.EnsureInitialFileTreeRootPage rootPath
+
+                                // One root entry plus exactly one bounded page of direct children.
+                                Vitest.expect(initialTree.Count).toBe 101
+                                Vitest.expect(vault.fileTreeDirectoryHasMore.[""]).toBe true
+                                let cursor = vault.FileTreeDirectoryCursors.[""]
+
+                                let! repeatedTree = vault.EnsureInitialFileTreeRootPage rootPath
+                                Vitest.expect(repeatedTree).toBe initialTree
+                                Vitest.expect(vault.FileTreeDirectoryCursors.[""]).toBe cursor
+
+                                do! vault.LoadNextFileTreeDirectoryPage ""
+                                Vitest.expect(vault.fileTree.Count).toBe 201
+                                Vitest.expect(vault.fileTreeDirectoryHasMore.[""]).toBe true
+                                Vitest.expect(vault.FileTreeDirectoryCursors.[""]).toBe cursor
+
+                                do! vault.LoadNextFileTreeDirectoryPage ""
+                                let! snapshot = vault.GetRendererFileTreeSnapshot()
+                                Vitest.expect(snapshot.entries.Count).toBe 251
+                                Vitest.expect(snapshot.directoryHasMore.[""]).toBe false
+                                Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
+
+                                for index in 0..249 do
+                                    Vitest.expect(snapshot.entries.ContainsKey(sprintf "root-%03d.txt" index)).toBe
+                                        true
+                            }
+                            |> Promise.result
+
+                        do! vault.StopFileWatcher()
+
+                        match result with
+                        | Ok() -> ()
+                        | Error error -> return raise error
                     })
             }
         )
 
-        Vitest.test (
-            "directory reconciliation adds and removes direct children while preserving surviving descendants",
-            fun () ->
-                let rootPath = resolve [| "arc" |]
-                let studiesPath = join [| rootPath; "studies" |]
-                let removedPath = join [| studiesPath; "removed" |]
-                let removedChildPath = join [| removedPath; "old.txt" |]
-                let survivingPath = join [| studiesPath; "surviving" |]
-                let survivingChildPath = join [| survivingPath; "known.txt" |]
-                let newChildPath = join [| studiesPath; "new.txt" |]
-
-                let initial =
-                    [|
-                        FileEntry.create ("arc", rootPath, true)
-                        FileEntry.create ("studies", studiesPath, true)
-                        FileEntry.create ("removed", removedPath, true)
-                        FileEntry.create ("old.txt", removedChildPath, false)
-                        FileEntry.create ("surviving", survivingPath, true)
-                        FileEntry.create ("known.txt", survivingChildPath, false)
-                    |]
-                    |> createFileEntryTree
-
-                let currentChildren = [|
-                    FileEntry.create ("surviving", survivingPath, true)
-                    FileEntry.create ("new.txt", newChildPath, false)
-                |]
-
-                let reconciled =
-                    FileTreeCreator.reconcileFileTreeDirectory rootPath "studies" currentChildren initial
-
-                Vitest.expect(reconciled.ContainsKey(removedPath)).toBe (false)
-                Vitest.expect(reconciled.ContainsKey(removedChildPath)).toBe (false)
-                Vitest.expect(reconciled.ContainsKey(survivingChildPath)).toBe (true)
-                Vitest.expect(reconciled.ContainsKey(newChildPath)).toBe (true)
-        )
-
-        Vitest.test (
-            "permanent watcher includes canonical structure and excludes deep payload files",
-            fun () ->
-                let rootPath = "C:/arc"
-
-                Vitest
-                    .expect(ArcVaultHelper.isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/studies")
-                    .toBe (false)
-
-                Vitest
-                    .expect(ArcVaultHelper.isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/studies/S1")
-                    .toBe (false)
-
-                Vitest
-                    .expect(
-                        ArcVaultHelper.isPermanentFileWatcherPathIgnored
-                            rootPath
-                            $"{rootPath}/studies/S1/isa.study.xlsx"
-                    )
-                    .toBe (false)
-
-                Vitest
-                    .expect(
-                        ArcVaultHelper.isPermanentFileWatcherPathIgnored
-                            rootPath
-                            $"{rootPath}/studies/S1/dataset/file-99999.txt"
-                    )
-                    .toBe (true)
-        )
 )

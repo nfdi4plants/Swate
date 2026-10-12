@@ -6,7 +6,7 @@ open Fable.Electron
 open Main.Bindings
 open Main.Bindings.Filesystem
 open Main.ArcMerge
-open Main.ArcVaultHelper
+open Main.WatcherConfiguration
 open Main.ArcVaultTypes
 open Main.Bindings.Path
 open Swate.Components.Shared

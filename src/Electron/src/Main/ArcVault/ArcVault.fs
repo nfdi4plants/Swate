@@ -14,6 +14,8 @@ open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.ArcMerge
 open Main.ArcVaultHelper
+open Main.LoadedDirectoryWatcher
+open Main.WatcherConfiguration
 open Main.FileImportCoordinator
 open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -27,188 +29,6 @@ type internal FileWatcherReadyOutcome =
     | Ready
     | WatcherError of exn
     | Cancelled
-
-type internal LoadedDirectoryWatcherState = {
-    LifecycleActive: bool
-    MutationActive: bool
-    Generation: int
-    ActiveGeneration: int option
-    EstablishmentCancellation: (int * (unit -> unit)) option
-    Watcher: Chokidar.IWatcher option
-    LoadedDirectories: Set<string>
-    PendingHandoffs: Set<string>
-    MutationQueueTail: JS.Promise<unit>
-    WatcherTransitionTail: JS.Promise<unit>
-    Refreshes: Map<string, bool>
-}
-
-[<RequireQualifiedAccess>]
-module private LoadedDirectoryWatcherState =
-
-    let initial = {
-        LifecycleActive = true
-        MutationActive = false
-        Generation = 0
-        ActiveGeneration = None
-        EstablishmentCancellation = None
-        Watcher = None
-        LoadedDirectories = Set.empty
-        PendingHandoffs = Set.empty
-        MutationQueueTail = JS.Constructors.Promise.resolve ()
-        WatcherTransitionTail = JS.Constructors.Promise.resolve ()
-        Refreshes = Map.empty
-    }
-
-/// Owns the single changing value for the loaded-directory watcher subsystem.
-/// ArcVault keeps an immutable reference to this controller; every change replaces the immutable snapshot.
-type internal LoadedDirectoryWatcherController() =
-    let state = ref LoadedDirectoryWatcherState.initial
-
-    member _.Current = state.Value
-
-    member private _.Update transition = state.Value <- transition state.Value
-
-    member this.BeginEstablishment() =
-        state.Value.EstablishmentCancellation
-        |> Option.iter (fun (_, cancel) -> cancel ())
-
-        let cancel = ref ignore
-
-        let cancellation =
-            JS.Constructors.Promise.Create(fun resolve _ -> cancel.Value <- fun () -> resolve ())
-
-        let generation = state.Value.Generation + 1
-
-        state.Value <- {
-            state.Value with
-                Generation = generation
-                EstablishmentCancellation = Some(generation, cancel.Value)
-        }
-
-        generation, cancellation
-
-    member this.CompleteEstablishment generation =
-        this.Update(fun current ->
-            match current.EstablishmentCancellation with
-            | Some(currentGeneration, _) when currentGeneration = generation -> {
-                current with
-                    EstablishmentCancellation = None
-              }
-            | _ -> current
-        )
-
-    member this.ActivateGeneration(generation, watcher) =
-        let previous = state.Value.Watcher
-
-        this.Update(fun current -> {
-            current with
-                ActiveGeneration = Some generation
-                Watcher = Some watcher
-        })
-
-        previous
-
-    member this.RetireWatcher() =
-        let previous = state.Value.Watcher
-
-        this.Update(fun current -> {
-            current with
-                ActiveGeneration = None
-                Watcher = None
-        })
-
-        previous
-
-    member this.BeginMutation() =
-        this.Update(fun current -> { current with MutationActive = true })
-
-    member this.EndMutation() =
-        this.Update(fun current -> { current with MutationActive = false })
-
-    member this.ActivateLifecycle() =
-        this.Update(fun current -> { current with LifecycleActive = true })
-
-    member this.StopLifecycle() =
-        this.Update(fun current -> {
-            current with
-                LifecycleActive = false
-                LoadedDirectories = Set.empty
-                PendingHandoffs = Set.empty
-                Refreshes = Map.empty
-        })
-
-    member this.ClearLifecycleData() =
-        this.Update(fun current -> {
-            current with
-                LoadedDirectories = Set.empty
-                PendingHandoffs = Set.empty
-                Refreshes = Map.empty
-        })
-
-    member this.ClearLoadedDirectories() =
-        this.Update(fun current -> {
-            current with
-                LoadedDirectories = Set.empty
-        })
-
-    member this.ClearPendingHandoffs() =
-        this.Update(fun current -> {
-            current with
-                PendingHandoffs = Set.empty
-        })
-
-    member this.RemoveLoadedDirectory path =
-        this.Update(fun current -> {
-            current with
-                LoadedDirectories = current.LoadedDirectories.Remove path
-                PendingHandoffs = current.PendingHandoffs.Remove path
-        })
-
-    member this.RemovePendingHandoff path =
-        this.Update(fun current -> {
-            current with
-                PendingHandoffs = current.PendingHandoffs.Remove path
-        })
-
-    member this.AddLoadedDirectory(path, pendingHandoff) =
-        this.Update(fun current ->
-            let next = {
-                current with
-                    LoadedDirectories = current.LoadedDirectories.Add path
-            }
-
-            if pendingHandoff then
-                {
-                    next with
-                        PendingHandoffs = next.PendingHandoffs.Add path
-                }
-            else
-                next
-        )
-
-    member this.AddLoadedDirectoriesToPendingHandoffs() =
-        this.Update(fun current -> {
-            current with
-                PendingHandoffs = Set.union current.PendingHandoffs current.LoadedDirectories
-        })
-
-    member this.SetMutationQueueTail promise =
-        this.Update(fun current -> {
-            current with
-                MutationQueueTail = promise
-        })
-
-    member this.SetLifecycleTail promise =
-        this.Update(fun current -> {
-            current with
-                WatcherTransitionTail = promise
-        })
-
-    member this.UpdateRefreshes update =
-        this.Update(fun current -> {
-            current with
-                Refreshes = update current.Refreshes
-        })
 
 type ArcLoadCancelledException(targetWindowId: int) =
     inherit exn($"Loading the ARC was cancelled because window {targetWindowId} was closed.")
@@ -317,12 +137,6 @@ type ArcVault(window: BrowserWindow) =
     member internal this.IncrementWatcherEpoch() = watcherEpoch <- watcherEpoch + 1
 
     member internal _.LoadedDirectoryWatcherController = loadedDirectoryWatcherController
-
-    member internal _.PendingLoadedDirectoryHandoffs =
-        loadedDirectoryWatcherController.Current.PendingHandoffs
-
-    member internal _.LoadedDirectoryRefreshes =
-        loadedDirectoryWatcherController.Current.Refreshes
 
     member internal this.FileTreeUpdateTail
         with get () = fileTreeUpdateTail
@@ -711,12 +525,13 @@ module ArcVaultExtensions =
         }
 
         member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string, ?watcherGeneration: int) =
+            let controller = this.LoadedDirectoryWatcherController
             let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
             let capturedWatcherEpoch = this.WatcherEpoch
             let capturedArcPath = this.path
 
             let watcherOwnsActiveLifecycle () =
-                let state = this.LoadedDirectoryWatcherController.Current
+                let state = controller.Current
 
                 state.LifecycleActive
                 && watcherGeneration
@@ -730,15 +545,10 @@ module ArcVaultExtensions =
                    | _ -> false
 
             if watcherOwnsActiveLifecycle () && this.PendingFileTreeReset.IsNone then
-                match this.LoadedDirectoryRefreshes.TryFind normalizedRelativePath with
-                | Some _ ->
-                    this.LoadedDirectoryWatcherController.UpdateRefreshes(fun refreshes ->
-                        refreshes.Add(normalizedRelativePath, true)
-                    )
+                match controller.Current.Refreshes.TryFind normalizedRelativePath with
+                | Some _ -> controller.UpdateRefreshes(fun refreshes -> refreshes.Add(normalizedRelativePath, true))
                 | None ->
-                    this.LoadedDirectoryWatcherController.UpdateRefreshes(fun refreshes ->
-                        refreshes.Add(normalizedRelativePath, false)
-                    )
+                    controller.UpdateRefreshes(fun refreshes -> refreshes.Add(normalizedRelativePath, false))
 
                     let rec refreshWhileDirty () = promise {
                         try
@@ -753,18 +563,14 @@ module ArcVaultExtensions =
                         if
                             lifecycleIsCurrent ()
                             && this.PendingFileTreeReset.IsNone
-                            && this.LoadedDirectoryRefreshes.TryFind normalizedRelativePath = Some true
+                            && controller.Current.Refreshes.TryFind normalizedRelativePath = Some true
                             && this.IsFileTreeDirectoryLoaded normalizedRelativePath
                         then
-                            this.LoadedDirectoryWatcherController.UpdateRefreshes(fun refreshes ->
-                                refreshes.Add(normalizedRelativePath, false)
-                            )
+                            controller.UpdateRefreshes(fun refreshes -> refreshes.Add(normalizedRelativePath, false))
 
                             return! refreshWhileDirty ()
                         elif lifecycleIsCurrent () then
-                            this.LoadedDirectoryWatcherController.UpdateRefreshes(fun refreshes ->
-                                refreshes.Remove normalizedRelativePath
-                            )
+                            controller.UpdateRefreshes(fun refreshes -> refreshes.Remove normalizedRelativePath)
                     }
 
                     refreshWhileDirty () |> Promise.start
@@ -920,7 +726,7 @@ module ArcVaultExtensions =
 
         member private this.CatchUpPendingLoadedDirectoryHandoffs(arcPath: string, generation: int) = promise {
             let controller = this.LoadedDirectoryWatcherController
-            let pendingDirectories = this.PendingLoadedDirectoryHandoffs |> Seq.toArray
+            let pendingDirectories = controller.Current.PendingHandoffs |> Seq.toArray
 
             for relativePath in pendingDirectories do
                 let canPublish () =
@@ -936,14 +742,7 @@ module ArcVaultExtensions =
                     let! page = readFileTreeDirectoryPrefix arcPath relativePath 0 (max 100 knownChildCount)
 
                     if canPublish () then
-                        let nextFileTree =
-                            if page.HasMore then
-                                mergeFileTreeDirectoryPage page.Entries this.fileTree
-                            else
-                                reconcileFileTreeDirectory arcPath relativePath page.Entries this.fileTree
-
-                        this.fileTreeDirectoryHasMore.[relativePath] <- page.HasMore
-                        this.SetFileTree nextFileTree
+                        this.PublishFreshFileTreeDirectorySnapshot(arcPath, relativePath, page)
                         controller.RemovePendingHandoff relativePath
         }
 
@@ -1382,6 +1181,17 @@ module ArcVaultExtensions =
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererSnapshot)
 
+        /// Publishes a fresh directory listing and its paging metadata together.
+        /// Callers own lifecycle checks and any asynchronous cursor cleanup.
+        member private this.PublishFreshFileTreeDirectorySnapshot
+            (arcPath: string, relativeDirectoryPath: string, snapshot: FileTreeDirectoryPage)
+            =
+            let nextFileTree =
+                applyFreshFileTreeDirectorySnapshot arcPath relativeDirectoryPath snapshot this.fileTree
+
+            this.fileTreeDirectoryHasMore.[relativeDirectoryPath] <- snapshot.HasMore
+            this.SetFileTree nextFileTree
+
         member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) =
             let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
             let capturedWatcherEpoch = this.WatcherEpoch
@@ -1423,25 +1233,17 @@ module ArcVaultExtensions =
                             let shouldPublishInitialRead =
                                 wasLoaded
                                 || System.String.IsNullOrWhiteSpace normalizedRelativePath
-                                || this.PendingLoadedDirectoryHandoffs.Contains normalizedRelativePath
+                                || controller.Current.PendingHandoffs.Contains normalizedRelativePath
 
                             if lifecycleIsCurrent () && shouldPublishInitialRead then
+                                // Preserve the metadata update before awaiting cursor closure.
+                                // The publisher also sets it alongside the completed tree snapshot.
                                 this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- page.HasMore
 
                                 if not page.HasMore then
                                     do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
 
-                                let nextFileTree =
-                                    if page.HasMore then
-                                        mergeFileTreeDirectoryPage page.Entries this.fileTree
-                                    else
-                                        reconcileFileTreeDirectory
-                                            arcPath
-                                            normalizedRelativePath
-                                            page.Entries
-                                            this.fileTree
-
-                                this.SetFileTree nextFileTree
+                                this.PublishFreshFileTreeDirectorySnapshot(arcPath, normalizedRelativePath, page)
 
                                 if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
                                     controller.AddLoadedDirectory(normalizedRelativePath, false)

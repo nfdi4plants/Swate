@@ -238,10 +238,6 @@ module MainToRendererIpc =
         versionControlOperationStarted: OperationRequestDto -> unit
     }
 
-    type IHasUnsavedArcChangesRendererApi = {
-        arcUnsavedChangesUpdate: bool -> unit
-    }
-
     type IAppVersionRendererApi = {
         appVersionChanged: AppVersionState -> unit
     }

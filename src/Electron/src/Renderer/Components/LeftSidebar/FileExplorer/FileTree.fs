@@ -666,7 +666,6 @@ type FileTree =
                             includeDefaultContextMenuItems = false,
                             delegateHorizontalScrollToParent = true,
                             truncateOverflowingItemNames = true,
-                            automaticallyLoadChildren = false,
                             hasMoreChildren =
                                 (fun item ->
                                     item.Path

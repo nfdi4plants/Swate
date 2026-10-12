@@ -314,60 +314,41 @@ type FileTreeRootPage = {
     HasMore: bool
 }
 
-/// Builds the bounded startup snapshot: the ARC root and the first page of its immediate children.
-let getFileTreeRootPage (path: string) : Fable.Core.JS.Promise<FileTreeRootPage> = promise {
-    let normalizedArcPath = normalizeRootPath path
-    let! rootEntry = getFileEntry normalizedArcPath
-
-    if not rootEntry.isDirectory then
-        return {
-            Entries = createFileEntryTree [| rootEntry |]
-            HasMore = false
-        }
-    else
-        let! page = readFileTreeDirectoryPrefix normalizedArcPath "" 0 100
-
-        return {
-            Entries = createFileEntryTree (Array.append [| rootEntry |] page.Entries)
-            HasMore = page.HasMore
-        }
-}
-
-/// Reconciles one directory's direct children while retaining known descendants of surviving directories.
-let reconcileFileTreeDirectory
-    (arcPath: string)
-    (relativeDirectoryPath: string)
-    (currentChildren: FileEntry[])
-    (fileTree: Dictionary<string, FileEntry>)
-    : Dictionary<string, FileEntry> =
-    let directoryPath = resolveFileTreeDirectory arcPath relativeDirectoryPath
-    let nextTree = Dictionary<string, FileEntry>(fileTree)
-
-    let currentByPath =
-        currentChildren
-        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path, entry)
-        |> Map.ofArray
-
-    let knownDirectChildren =
-        nextTree.Values
-        |> Seq.filter (fun entry ->
-            PathHelpers.pathsEqual (dirname (PathHelpers.normalizePath entry.path)) directoryPath
-        )
-        |> Seq.toArray
-
-    knownDirectChildren
-    |> Array.iter (fun knownChild ->
-        let normalizedChildPath = PathHelpers.normalizePath knownChild.path
-
-        if not (currentByPath.ContainsKey normalizedChildPath) then
-            removePathAndDescendantsInPlace normalizedChildPath nextTree
-    )
-
-    currentChildren |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
-    nextTree
-
 /// Adds or replaces a page without removing direct children that belong to pages not read by this request.
 let mergeFileTreeDirectoryPage (entries: FileEntry[]) (fileTree: Dictionary<string, FileEntry>) =
     let nextTree = Dictionary<string, FileEntry>(fileTree)
     entries |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
+    nextTree
+
+/// Applies a fresh listing read from the start of a directory: only an exhaustive
+/// snapshot may remove missing children. Incremental cursor pages, including the
+/// final page, must use mergeFileTreeDirectoryPage instead.
+let applyFreshFileTreeDirectorySnapshot
+    (arcPath: string)
+    (relativeDirectoryPath: string)
+    (snapshot: FileTreeDirectoryPage)
+    (fileTree: Dictionary<string, FileEntry>)
+    : Dictionary<string, FileEntry> =
+    let nextTree = mergeFileTreeDirectoryPage snapshot.Entries fileTree
+
+    if not snapshot.HasMore then
+        let directoryPath = resolveFileTreeDirectory arcPath relativeDirectoryPath
+
+        let currentPaths =
+            snapshot.Entries
+            |> Array.map (fun entry -> PathHelpers.normalizePath entry.path)
+            |> Set.ofArray
+
+        // Enumerate the unchanged input while pruning the merged copy.
+        fileTree.Values
+        |> Seq.iter (fun entry ->
+            let path = PathHelpers.normalizePath entry.path
+
+            if
+                PathHelpers.pathsEqual (dirname path) directoryPath
+                && not (currentPaths.Contains path)
+            then
+                removePathAndDescendantsInPlace path nextTree
+        )
+
     nextTree

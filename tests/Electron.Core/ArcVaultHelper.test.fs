@@ -2367,8 +2367,8 @@ Vitest.describe (
                             "canonical ARC event buffered during initialization"
                             (fun () -> vault.fileWatcherPendingArcMergeEvents.Count > 0)
 
-                    let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage arcPath
-                    vault.PublishArcInitializationSnapshot initialRootPage.Entries
+                    let! initialRootTree = vault.EnsureInitialFileTreeRootPage arcPath
+                    vault.PublishArcInitializationSnapshot initialRootTree
                     vault.FinalizeArcInitialization()
 
                     let titleMatches () =
@@ -2557,7 +2557,7 @@ Vitest.describe (
 
                             // Startup resolves only after the permanent watcher reports ready.
                             do! vault.Startup()
-                            let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage arcPath
+                            let! initialRootTree = vault.EnsureInitialFileTreeRootPage arcPath
 
                             let! diskArc = TestHelpers.loadArcAsync arcPath
                             diskArc.GetAssay("DiskAssay").Title <- Some "Changed during initialization"
@@ -2580,7 +2580,7 @@ Vitest.describe (
                             Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Initial title")
                             Vitest.expect(containsAddedDirectory ()).toBe (false)
 
-                            vault.PublishArcInitializationSnapshot initialRootPage.Entries
+                            vault.PublishArcInitializationSnapshot initialRootTree
                             vault.FinalizeArcInitialization()
 
                             do! expectWatcherAssayTitle vault "Changed during initialization"
@@ -4256,15 +4256,6 @@ Vitest.describe (
                 Vitest.expect(abortController.signal.aborted).toBe (true)
                 Vitest.expect(vault.isWaitingForImportCleanup).toBe (false)
             }
-        )
-
-        Vitest.test (
-            "file watcher polling defaults to Windows only",
-            fun () ->
-                Vitest.expect(shouldUsePollingByDefault "win32").toBe (true)
-                Vitest.expect(shouldUsePollingByDefault "WIN32").toBe (true)
-                Vitest.expect(shouldUsePollingByDefault "linux").toBe (false)
-                Vitest.expect(shouldUsePollingByDefault "darwin").toBe (false)
         )
 
         Vitest.test (

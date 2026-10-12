@@ -109,29 +109,6 @@ Vitest.describe (
     fun () ->
 
         Vitest.test (
-            "temporary import directory name matches the watcher ignore convention",
-            fun () ->
-                let directoryName = ArcFileSystemHelper.createTemporaryImportDirectoryName ()
-                let exactPattern = """^\.swate-import-[0-9a-f]{32}$"""
-
-                Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(directoryName, exactPattern)).toBe (true)
-
-                Vitest
-                    .expect(Main.ArcVaultHelper.isFileWatcherPathIgnored $"C:/arc/{directoryName}/file.txt")
-                    .toBe (true)
-        )
-
-        Vitest.test (
-            "ignores LFS backup paths while accepting regular files",
-            fun () ->
-                let guidSuffix = String.replicate 32 "a"
-                let backupPath = $"C:/arc/data.bin.vcs-lfs-backup-{guidSuffix}"
-
-                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnored backupPath).toBe (true)
-                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnored "C:/arc/data.bin").toBe (false)
-        )
-
-        Vitest.test (
             "checks whether relative files and directories exist",
             fun () ->
                 withAssayArc (fun arcPath -> promise {

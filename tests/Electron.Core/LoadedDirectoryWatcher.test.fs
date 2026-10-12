@@ -118,10 +118,9 @@ let private withLoadedDirectoryFixtureUsingWindow window testBody = promise {
 
         let vault = ArcVault(window)
         vault.path <- Some rootPath
-        let! initialRootPage = Main.FileTreeCreator.getFileTreeRootPage rootPath
-        vault.fileTree <- initialRootPage.Entries
 
         try
+            do! vault.EnsureInitialFileTreeRootPage rootPath |> Promise.map ignore
             do! testBody vault rootPath datasetPath nestedPath
             do! vault.StopFileWatcher()
             do! TestHelpers.removeDirectoryAsync rootPath
@@ -158,6 +157,85 @@ let private findEntryOutsidePage (paths: string[]) (page: Main.FileTreeCreator.F
 Vitest.describe (
     "loaded FileTree directory watching",
     fun () ->
+        Vitest.test (
+            "fresh snapshot publication waits for cursor closure and uses the latest tree and paging metadata",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                let mutable inspectPublication: unit -> unit = ignore
+
+                let window =
+                    recordingWindow (fun (args: obj[]) ->
+                        if args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate") then
+                            inspectPublication ()
+                    )
+
+                do!
+                    withLoadedDirectoryFixtureUsingWindow
+                        window
+                        (fun vault rootPath datasetPath _ -> promise {
+                            let closeStarted, signalCloseStarted = TestHelpers.deferred ()
+                            let closeGate, releaseClose = TestHelpers.deferred ()
+                            let lateChildPath = join [| datasetPath; "loaded-during-cursor-close.txt" |]
+                            let publications = ResizeArray<bool * bool>()
+
+                            inspectPublication <-
+                                fun () ->
+                                    publications.Add(
+                                        vault.fileTreeDirectoryHasMore.[""],
+                                        containsPath lateChildPath vault
+                                    )
+
+                            let directory =
+                                { new Directory with
+                                    member _.read() =
+                                        JS.Constructors.Promise.resolve (unbox null)
+
+                                    member _.close() =
+                                        signalCloseStarted ()
+                                        closeGate
+                                }
+
+                            vault.FileTreeDirectoryCursors.[""] <- {
+                                Directory = directory
+                                Lookahead = None
+                            }
+
+                            vault.fileTreeDirectoryHasMore.[""] <- true
+
+                            let refresh = vault.RefreshFileTreeDirectory ""
+
+                            try
+                                do! closeStarted
+                                Vitest.expect(vault.fileTreeDirectoryHasMore.[""]).toBe false
+                                Vitest.expect(publications.Count).toBe 0
+
+                                let latestTree =
+                                    System.Collections.Generic.Dictionary<string, FileEntry>(vault.fileTree)
+
+                                latestTree.[lateChildPath] <-
+                                    FileEntry.create (basename lateChildPath, lateChildPath, false)
+
+                                vault.fileTree <- latestTree
+                            finally
+                                releaseClose ()
+
+                            do! refresh
+                            Vitest.expect(publications.ToArray()).toEqual [| false, true |]
+                            Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
+
+                            let! rendererSnapshot = vault.GetRendererFileTreeSnapshot()
+                            Vitest.expect(rendererSnapshot.directoryHasMore.[""]).toBe false
+
+                            Vitest
+                                .expect(rendererSnapshot.entries.ContainsKey("dataset/loaded-during-cursor-close.txt"))
+                                .toBe
+                                true
+
+                            Vitest.expect(rendererSnapshot.entries.ContainsKey("dataset")).toBe true
+                        })
+            }
+        )
+
         Vitest.test (
             "partial refresh preserves a cached child absent from the returned page",
             TestOptions(timeout = 15000),
@@ -293,7 +371,9 @@ Vitest.describe (
                         do!
                             waitUntil
                                 "queued loaded-directory deletion"
-                                (fun () -> vault.LoadedDirectoryRefreshes.ContainsKey "dataset")
+                                (fun () ->
+                                    vault.LoadedDirectoryWatcherController.Current.Refreshes.ContainsKey "dataset"
+                                )
 
                         do! writeFileAsync recreatedPath "recreated" TextEncoding.Utf8
                         releaseQueue ()
@@ -937,7 +1017,7 @@ Vitest.describe (
                         // the permanent watcher close is still pending.
                         vault.QueueLoadedDirectoryRefresh "dataset"
 
-                        Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Refreshes.IsEmpty).toBe true
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
 
                         releasePermanentClose ()
@@ -946,8 +1026,8 @@ Vitest.describe (
 
                         Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
-                        Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.PendingHandoffs.Count).toBe 0
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Refreshes.IsEmpty).toBe true
                         Vitest.expect(containsPath latePath vault).toBe false
                     })
             }
@@ -1096,7 +1176,9 @@ Vitest.describe (
                         do!
                             waitUntil
                                 "active watcher event during replacement"
-                                (fun () -> vault.LoadedDirectoryRefreshes.ContainsKey "dataset")
+                                (fun () ->
+                                    vault.LoadedDirectoryWatcherController.Current.Refreshes.ContainsKey "dataset"
+                                )
 
                         signalReplacementReady ()
                         do! replacement
