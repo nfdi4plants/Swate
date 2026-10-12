@@ -7,6 +7,7 @@ open Swate.Components
 open Swate.Components.Composite.Workspace.Types
 open Swate.Components.Composite.Workspace.Context
 open Swate.Components.Composite.Widgets.Types
+open Swate.Components.Primitive.SplitResizer
 
 [<Erase; Mangle(false)>]
 type PaneNode =
@@ -49,75 +50,12 @@ type PaneNode =
     static member SplitNodeResizer(splitId, splitContainerRef: IRefValue<option<HTMLElement>>, dir: SplitDirection) =
 
         let dispatchCtx = useWorkspaceDispatchCtx ()
-        let draggingRef = React.useRef false
-        let draggingUi, setIsDraggingUi = React.useState false
-        let pointerPosition, setPointerPosition = React.useState (None: Rect option)
-        let throttledPointerPosition = React.useThrottle (pointerPosition, 20)
 
-        // Using effect to watch over throttledPointerPosition. This is the only dependency outputting a float, so no chance to enter loops or unexpected behavior.
-        React.useEffect (
-            (fun () ->
-                match splitContainerRef.current, pointerPosition with
-                | None, _
-                | Some null, _
-                | _, None -> ()
-                | Some splitContainer, Some pointerPos ->
-                    console.log $"Pointer position: {pointerPos.X}, {pointerPos.Y}"
-                    let rect = splitContainer.getBoundingClientRect ()
-
-                    let directionalPointerPosition =
-                        match dir with
-                        | SplitDirection.Horizontal -> (float pointerPos.X - rect.left) / rect.width
-                        | SplitDirection.Vertical -> (float pointerPos.Y - rect.top) / rect.height
-
-                    let clampedRatio =
-                        match throttledPointerPosition with
-                        | Some pos -> Some(max 0.15 (min 0.85 directionalPointerPosition))
-                        | None -> None
-
-                    match clampedRatio with
-                    | Some clamped -> dispatchCtx.dispatch (SetSplitRatio(splitId, clamped))
-                    | None -> ()
-            ),
-            [| box throttledPointerPosition |]
+        SplitResizer.SplitResizer(
+            splitContainerRef,
+            (dir = SplitDirection.Vertical),
+            (fun ratio -> dispatchCtx.dispatch (SetSplitRatio(splitId, ratio)))
         )
-
-        // Register the drag handler event
-        // This is not throttled, therefore minimal logic inside the event listener
-        React.useEffectOnce (
-            (fun () ->
-                let onMove (e: PointerEvent) =
-                    if draggingRef.current then
-                        setPointerPosition (Some { X = int e.clientX; Y = int e.clientY })
-
-                let stop (_: PointerEvent) =
-                    draggingRef.current <- false
-                    setIsDraggingUi false
-
-                Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
-                Browser.Dom.document.addEventListener ("pointerup", unbox stop)
-
-                FsReact.createDisposable (fun () ->
-                    Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
-                    Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
-                )
-            )
-        )
-
-        Html.div [
-            prop.onPointerDown (fun _ ->
-                draggingRef.current <- true
-                setIsDraggingUi true
-            )
-            prop.data ("active", if draggingUi then "true" else "false")
-            prop.className [
-                "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-transparent swt:hover:bg-primary swt:z-10 swt:absolute swt:data-[active=true]:bg-primary"
-                match dir with
-                | SplitDirection.Horizontal ->
-                    "swt:w-1.5 swt:cursor-col-resize swt:h-full swt:top-0 swt:bottom-0 swt:-left-1"
-                | SplitDirection.Vertical -> "swt:h-1.5 swt:cursor-row-resize swt:w-full"
-            ]
-        ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member SplitNode(splitId: SplitId, dir: SplitDirection, ratio: float, l1: Layout, l2: Layout, ?key: string) =
