@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.5.1 - 2026-10-12
+
+### 🐛 Fixed
+
+- The diff view keeps both versions in view next to each other, with a draggable separator and a horizontal scrollbar for each side and one for both, so a long line no longer hides the current version. #1391 (by @caroott)
+
 ## 2.5.0 - 2026-10-09
 
 ### ✨ Added
