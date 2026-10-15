@@ -105,10 +105,10 @@ module private FileExplorerHelper =
 type FileExplorer =
 
     [<ReactComponent>]
-    static member private LoadMoreControl(directoryId: string, onLoadMore: unit -> unit) =
+    static member private LoadMoreControl(testId: string, onLoadMore: unit -> unit) =
         Html.li [
-            prop.key $"{directoryId}-load-more"
-            prop.testId $"file-explorer-load-more-{directoryId}"
+            prop.key testId
+            prop.testId testId
             prop.className "swt:list-none swt:py-1 swt:pl-1"
             prop.children [
                 Html.button [
@@ -156,7 +156,9 @@ type FileExplorer =
             ?getCopyRelativePath: FileItem -> string option,
             ?includeDefaultContextMenuItems: bool,
             ?hasMoreChildren: FileItem -> bool,
-            ?onLoadMoreChildren: FileItem -> unit
+            ?onLoadMoreChildren: FileItem -> unit,
+            ?hasMoreRootItems: bool,
+            ?onLoadMoreRootItems: unit -> unit
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
@@ -342,7 +344,7 @@ type FileExplorer =
 
                                         if hasMoreChildren item then
                                             FileExplorer.LoadMoreControl(
-                                                item.Id,
+                                                $"file-explorer-load-more-{item.Id}",
                                                 (fun () ->
                                                     onLoadMoreChildren |> Option.iter (fun loadMore -> loadMore item)
                                                 )
@@ -400,7 +402,15 @@ type FileExplorer =
                         Html.ul [
                             prop.testId "file-explorer-container"
                             prop.className listClassName
-                            prop.children (model.Items |> List.map renderItem)
+                            prop.children [
+                                yield! model.Items |> List.map renderItem
+
+                                if defaultArg hasMoreRootItems false then
+                                    FileExplorer.LoadMoreControl(
+                                        "file-explorer-root-load-more",
+                                        (fun () -> onLoadMoreRootItems |> Option.iter (fun loadMore -> loadMore ()))
+                                    )
+                            ]
                         ]
                     ]
                 ]

@@ -25,7 +25,79 @@ let private isRendered (name: string) = RTL.screen.queryByText(name).IsSome
 let private loadMoreButton directoryId =
     (RTL.screen.getByTestId $"file-explorer-load-more-{directoryId}").querySelector ("button") :?> HTMLButtonElement
 
+let private rootLoadMoreButton () =
+    (RTL.screen.getByTestId "file-explorer-root-load-more").querySelector ("button") :?> HTMLButtonElement
+
 Vitest.afterEach (fun () -> RTL.cleanup ())
+
+Vitest.test (
+    "root pages append on request and exhaustion removes the root load-more button",
+    fun () ->
+        let mutable requests = 0
+        let clicked = ResizeArray<FileItem>()
+
+        let explorer itemCount hasMore =
+            FileExplorer.FileExplorer(
+                initialItems = List.init itemCount (createChild "root"),
+                hasMoreRootItems = hasMore,
+                onLoadMoreRootItems = (fun () -> requests <- requests + 1),
+                onItemClick = clicked.Add,
+                selectedItemId = Some "root-019"
+            )
+
+        let rendered = RTL.render (explorer 100 true)
+        Vitest.expect(requests).toBe 0
+        Vitest.expect(isRendered "root-099").toBe true
+        Vitest.expect(isRendered "root-100").toBe false
+
+        RTL.fireEvent.click (rootLoadMoreButton ())
+        Vitest.expect(requests).toBe 1
+        Vitest.expect(clicked.Count).toBe 0
+
+        rendered.rerender (explorer 200 true)
+        Vitest.expect(isRendered "root-000").toBe true
+        Vitest.expect(isRendered "root-199").toBe true
+        Vitest.expect((RTL.screen.getByText "root-019").classList.contains "swt:text-primary").toBe true
+
+        RTL.fireEvent.click (rootLoadMoreButton ())
+        rendered.rerender (explorer 250 false)
+        Vitest.expect(isRendered "root-249").toBe true
+        Vitest.expect(RTL.screen.queryByText("Load more").IsNone).toBe true
+        Vitest.expect(requests).toBe 2
+)
+
+Vitest.test (
+    "root and directory pagination request their own pages independently",
+    fun () ->
+        let mutable rootRequests = 0
+        let directoryRequests = ResizeArray<FileItem>()
+        let folder = createFolder "root" 0
+
+        let explorer hasMoreRootItems =
+            FileExplorer.FileExplorer(
+                initialItems = [ folder ],
+                hasMoreRootItems = hasMoreRootItems,
+                onLoadMoreRootItems = (fun () -> rootRequests <- rootRequests + 1),
+                hasMoreChildren = (fun _ -> true),
+                onLoadMoreChildren = directoryRequests.Add
+            )
+
+        let rendered = RTL.render (explorer false)
+        Vitest.expect(RTL.screen.queryByTestId("file-explorer-root-load-more").IsNone).toBe true
+
+        rendered.rerender (explorer true)
+        RTL.fireEvent.click (rootLoadMoreButton ())
+        Vitest.expect(rootRequests).toBe 1
+        Vitest.expect(directoryRequests.Count).toBe 0
+
+        RTL.fireEvent.click (loadMoreButton "root")
+        Vitest.expect(rootRequests).toBe 1
+        Vitest.expect(directoryRequests.ToArray()).toEqual [| folder |]
+
+        rendered.rerender (explorer false)
+        Vitest.expect(RTL.screen.queryByTestId("file-explorer-root-load-more").IsNone).toBe true
+        Vitest.expect(RTL.screen.queryByTestId("file-explorer-load-more-root").IsSome).toBe true
+)
 
 Vitest.test (
     "an expanded directory renders all supplied children",

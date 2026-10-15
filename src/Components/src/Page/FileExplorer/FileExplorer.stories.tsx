@@ -56,6 +56,28 @@ const ManualPaginationFileExplorer = () => {
   );
 };
 
+const RootPaginationFileExplorer = () => {
+  const [loadedCount, setLoadedCount] = React.useState(100);
+  const items = React.useMemo(
+    () => ofArray(Array.from({ length: loadedCount }, (_, index) => {
+      const name = `file-${String(index).padStart(3, "0")}.txt`;
+      return createStableFile(name, name, name);
+    })),
+    [loadedCount],
+  );
+
+  return (
+    <div className="swt:p-4">
+      <p>Loaded {loadedCount} of 250 root files.</p>
+      <FileExplorer
+        initialItems={items}
+        hasMoreRootItems={loadedCount < 250}
+        onLoadMoreRootItems={() => setLoadedCount((count) => Math.min(250, count + 100))}
+      />
+    </div>
+  );
+};
+
 const InMemoryCreateFileExplorer = () => {
   const [pendingPath, setPendingPath] = React.useState<string | null>(null);
   const [savedPaths, setSavedPaths] = React.useState<string[]>([]);
@@ -550,6 +572,10 @@ const meta: Meta<typeof FileExplorerExample> = {
 
 export default meta;
 type Story = StoryObj<typeof FileExplorerExample>;
+
+export const RootPagination: StoryObj<typeof RootPaginationFileExplorer> = {
+  render: () => <RootPaginationFileExplorer />,
+};
 
 export const ManualPagination: StoryObj<typeof ManualPaginationFileExplorer> = {
   render: () => <ManualPaginationFileExplorer />,

@@ -675,7 +675,12 @@ type FileTree =
                                     )
                                     |> Option.defaultValue false
                                 ),
-                            onLoadMoreChildren = loadNextDirectoryPage
+                            onLoadMoreChildren = loadNextDirectoryPage,
+                            hasMoreRootItems =
+                                (fileStateCtx.state.FileTreeDirectoryHasMore
+                                 |> Map.tryFind ""
+                                 |> Option.defaultValue false),
+                            onLoadMoreRootItems = (fun () -> loadNextDirectoryPage { rootItem with Path = Some "" })
                         )
                     ]
                 ]
