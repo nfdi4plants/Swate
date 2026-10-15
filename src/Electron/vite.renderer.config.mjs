@@ -10,6 +10,9 @@ export default defineConfig({
         }),
         tailwindcss()
     ],
+    optimizeDeps: {
+        include: ['elkjs/lib/elk.bundled.js'],
+    },
     server: {
         watch: {
             // Ignore raw F# source and non-renderer generated outputs to avoid unnecessary full reloads.

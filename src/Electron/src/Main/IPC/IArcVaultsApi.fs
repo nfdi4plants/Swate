@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
 open Swate.Components.Shared
+open Swate.Components.Shared.ProvenanceGraph.BuildIndex
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -726,6 +727,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         (fun vault -> promise {
                             return Ok(Main.Provenance.ProvenanceGroupingReader.loadTable selection vault.arc.Value)
                         })
+            with e ->
+                return Error e
+        }
+    loadProvenanceGraph =
+        fun () -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise { return Ok(ProvenanceGraphData.ofInvestigation vault.arc.Value) })
             with e ->
                 return Error e
         }

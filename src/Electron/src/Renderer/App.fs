@@ -159,6 +159,18 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
         else
             pageStateCtx.setState (Some PageState.ValidationPackageBrowser)
 
+    let provenanceGraphActive =
+        match pageStateCtx.state with
+        | Some(PageState.ProvenanceGraphPage _) -> true
+        | _ -> false
+
+    // Every open gets a new request id, so the page mounts new and loads its data again.
+    let toggleProvenanceGraph () =
+        if provenanceGraphActive then
+            pageStateCtx.setState None
+        else
+            pageStateCtx.setState (Some(PageState.ProvenanceGraphPage(System.Guid.NewGuid().ToString())))
+
     React.Fragment [
         Layout.LayoutBtn(
             iconClassName = "swt:fluent--home-24-regular",
@@ -183,6 +195,13 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
             tooltip = "Validation packages",
             isActive = validationBrowserActive,
             onClick = fun () -> toggleValidationBrowser ()
+        )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--flowchart-24-regular",
+            tooltip = "Provenance Graph",
+            isActive = provenanceGraphActive,
+            indicator = "new",
+            onClick = fun () -> toggleProvenanceGraph ()
         )
     ]
 

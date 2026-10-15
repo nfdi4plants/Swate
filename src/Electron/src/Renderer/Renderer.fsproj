@@ -69,6 +69,8 @@
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
     <Compile Include="Components\MainContent\ProvenanceGroupingTarget.fs" />
+    <Compile Include="Components\MainContent\ProvenanceGraphArea.fs" />
+    <Compile Include="Components\MainContent\ProvenanceGraphTarget.fs" />
     <Compile Include="Components\MainContent\ValidationPackageBrowserTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
