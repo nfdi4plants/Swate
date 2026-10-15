@@ -139,10 +139,16 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ LazyComponents.ProvenanceGroupingTarget() ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
-                    | Some _, Some PageState.ProvenanceGraphPage ->
-                        React.Suspense(
-                            [ LazyComponents.ProvenanceGraphTarget() ],
-                            fallback = LazyComponents.FullPageLoadingSpinner("Loading provenance graph...")
+                    | Some _, Some(PageState.ProvenanceGraphPage requestId) ->
+                        // A new request id mounts the page again, so every open of the page starts from scratch.
+                        React.KeyedFragment(
+                            requestId,
+                            [
+                                React.Suspense(
+                                    [ LazyComponents.ProvenanceGraphTarget() ],
+                                    fallback = LazyComponents.FullPageLoadingSpinner("Loading provenance graph...")
+                                )
+                            ]
                         )
                     | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
