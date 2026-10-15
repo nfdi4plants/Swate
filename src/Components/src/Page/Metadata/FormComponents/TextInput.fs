@@ -21,7 +21,8 @@ type TextInput =
             ?classes: string,
             ?isJoin: bool,
             ?rmv: MouseEvent -> unit,
-            ?validator: string -> Result<unit, string>
+            ?validator: string -> Result<unit, string>,
+            ?trailingAction: string -> ReactElement
         ) =
         let isArea = defaultArg isArea false
         let disabled = defaultArg disabled false
@@ -60,6 +61,8 @@ type TextInput =
             if isJoin then
                 "swt:join-item"
             "swt:input swt:input-bordered swt:w-full"
+            if trailingAction.IsSome then
+                "swt:min-w-0"
             if validationError.IsSome then
                 "swt:input-error"
             if classes.IsSome then
@@ -106,6 +109,8 @@ type TextInput =
                                 if placeholder.IsSome then
                                     prop.placeholder placeholder.Value
                             ]
+                            if trailingAction.IsSome then
+                                trailingAction.Value tempValue
                             if rmv.IsSome then
                                 Helpers.deleteButton rmv.Value
                         ]

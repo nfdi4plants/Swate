@@ -293,7 +293,12 @@
     <Compile Include="Page\Metadata\FormComponents\DateTimeInput.fs" />
     <Compile Include="Page\Metadata\FormComponents\CommentsInput.fs" />
     <Compile Include="Page\Metadata\FormComponents\PersonsInput.fs" />
-    <Compile Include="Page\Metadata\FormComponents\PublicationsInput.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Types.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Lookup.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Lookup.test.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\PublicationSearchDialog.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\PublicationsInput.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\PublicationsInput.test.rtl.fs" />
     <Compile Include="Page\Metadata\FormComponents\OntologySourceReferencesInput.fs" />
     <Compile Include="Page\Metadata\TemplateMetadata.fs" />
     <Compile Include="Page\Metadata\AssayMetadata.fs" />
