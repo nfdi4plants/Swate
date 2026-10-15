@@ -178,12 +178,23 @@ type DataHubBrowser =
                         (not isAuthenticated)
                         && (mode = ExploreTab.YourRepos || mode = ExploreTab.YourOrganisations)
 
-                    Html.div [
-                        prop.className (
+                    // daisyUI styles a tab only when it is a direct child of the tabs container,
+                    // so the tooltip classes go on the tab itself.
+                    Html.a [
+                        prop.testId ("GitLabExploreTab-" + tid)
+                        prop.tabIndex 0
+                        prop.custom ("aria-disabled", if isRestricted then "true" else "false")
+                        prop.className [
+                            "swt:tab"
+                            if tab = mode then
+                                "swt:tab-active"
                             if isRestricted then
-                                "swt:tooltip swt:tooltip-bottom"
-                            else
-                                ""
+                                // Opacity would fade the tooltip inside as well, so only the text color fades.
+                                "swt:tooltip swt:tooltip-bottom swt:text-base-content/50 swt:cursor-not-allowed"
+                        ]
+                        prop.onClick (fun _ ->
+                            if not isRestricted then
+                                setTab mode
                         )
                         prop.children [
                             if isRestricted then
@@ -191,23 +202,7 @@ type DataHubBrowser =
                                     prop.className "swt:tooltip-content"
                                     prop.text "Log in to access this tab"
                                 ]
-                            Html.a [
-                                prop.testId ("GitLabExploreTab-" + tid)
-                                prop.tabIndex 0
-                                prop.custom ("aria-disabled", if isRestricted then "true" else "false")
-                                prop.className [
-                                    "swt:tab"
-                                    if tab = mode then
-                                        "swt:tab-active"
-                                    if isRestricted then
-                                        "swt:opacity-50 swt:cursor-not-allowed"
-                                ]
-                                prop.onClick (fun _ ->
-                                    if not isRestricted then
-                                        setTab mode
-                                )
-                                prop.text label
-                            ]
+                            Html.text label
                         ]
                     ]
             ]
