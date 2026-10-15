@@ -503,7 +503,11 @@ Vitest.describe (
                 ]
 
                 Vitest
-                    .expect(createFileItem "overview.md" (Some "studies/overview.md") |> labelsFor |> Array.ofList)
+                    .expect(
+                        createFileItem "overview.md" (Some "studies/overview.md")
+                        |> labelsFor
+                        |> Array.ofList
+                    )
                     .toEqual ([| "Rename"; "Delete" |])
 
                 Vitest
