@@ -173,12 +173,6 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
             onClick = fun () -> toggleTarget LeftSidebarPage.Git
         )
         Layout.LayoutBtn(
-            iconClassName = "swt:fluent--cloud-beaker-24-regular",
-            tooltip = "Download ARC from DataHUB",
-            isActive = false,
-            onClick = fun () -> pageStateCtx.setState (Some PageState.DataHubBrowser)
-        )
-        Layout.LayoutBtn(
             iconClassName = "swt:fluent--clipboard-checkmark-24-regular",
             tooltip = "Validation packages",
             isActive = validationBrowserActive,
