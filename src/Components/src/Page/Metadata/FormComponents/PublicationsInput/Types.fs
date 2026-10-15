@@ -23,7 +23,7 @@ type CrossrefAuthor =
     abstract name: string option
 
 type CrossrefDate =
-    abstract ``date-parts``: int[][] option
+    abstract ``date-parts``: int option[][] option
 
 type CrossrefWork =
     abstract DOI: string option

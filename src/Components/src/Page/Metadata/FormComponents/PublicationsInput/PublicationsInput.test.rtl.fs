@@ -379,6 +379,28 @@ Vitest.test (
 )
 
 Vitest.test (
+    "an unknown DOI shows no results and other HTTP errors show the provider message",
+    fun () -> promise {
+        let mutable status = 404
+
+        Helpers.stubFetch (fun (_: string) -> promise { return Helpers.response (box {| status = "error" |}) status })
+
+        render [ Publication() ] ignore
+        Helpers.openSearch ()
+        Helpers.searchDoi "10.1234/unknown"
+        let! _ = RTL.screen.findByText "No publications found."
+        Vitest.expect(RTL.screen.queryByRole("alert").IsNone).toBe true
+        status <- 500
+        Helpers.click "Search"
+        let! alert = RTL.screen.findByRole "alert"
+
+        Vitest
+            .expect(alert.textContent)
+            .toBe "Publication search failed: Crossref could not load this publication (HTTP 500). Please try again."
+    }
+)
+
+Vitest.test (
     "changing the query invalidates an older response and searching remains explicit",
     fun () -> promise {
         let pending = Helpers.deferred ()

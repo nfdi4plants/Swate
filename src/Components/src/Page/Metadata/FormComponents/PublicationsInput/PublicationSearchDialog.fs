@@ -121,7 +121,7 @@ type PublicationSearchDialog =
                             setLoading false
                     with ex ->
                         if requestVersion.current = version then
-                            setError (Some $"Publication search failed: {ex.Message} Try searching again.")
+                            setError (Some $"Publication search failed: {ex.Message}")
                             setLoading false
                 }
                 |> ignore

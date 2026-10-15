@@ -5,18 +5,8 @@ open System.Text.RegularExpressions
 open ARCtrl
 open Fable.Core
 open Fetch
+open Swate.Components.Page.Metadata.FormComponents.Helpers
 open Swate.Components.Page.Metadata.FormComponents.PublicationsInput.Types
-
-let private nonblank (value: string option) =
-    value
-    |> Option.bind (fun text ->
-        if String.IsNullOrWhiteSpace text then
-            None
-        else
-            Some(text.Trim())
-    )
-
-let private optionalArray (values: 'T[] option) = values |> Option.defaultValue [||]
 
 let normalizeDoi (query: string) : Result<string, string> =
     let value = if isNull query then "" else query.Trim()
@@ -47,9 +37,9 @@ let normalizeDoi (query: string) : Result<string, string> =
     with _ ->
         Error "This DOI link contains an invalid encoded character."
 
-let crossrefUrl query =
-    normalizeDoi query
-    |> Result.map (fun doi -> "https://api.crossref.org/works/" + JS.encodeURIComponent doi)
+/// Expects a DOI that normalizeDoi already accepted.
+let crossrefUrl (doi: string) =
+    "https://api.crossref.org/works/" + JS.encodeURIComponent doi
 
 /// Preserve free-text search syntax, but make recognizable identifiers exact searches.
 let europePmcQuery (query: string) =
@@ -86,17 +76,66 @@ let formatCrossrefAuthor (author: CrossrefAuthor) =
     personalName |> Option.orElse (nonblank author.name)
 
 let private firstText values =
-    values |> optionalArray |> Array.tryPick (Some >> nonblank)
+    values |> Option.defaultValue [||] |> Array.tryPick (Some >> nonblank)
+
+[<Emit("String.fromCodePoint($0)")>]
+let private fromCodePoint (_codePoint: int) : string = jsNative
+
+let private namedEntities =
+    Map.ofList [
+        "amp", "&"
+        "lt", "<"
+        "gt", ">"
+        "quot", "\""
+        "apos", "'"
+        "nbsp", " "
+    ]
+
+let private decodeEntity (entity: Match) =
+    let hex = entity.Groups.[1].Value
+    let dec = entity.Groups.[2].Value
+
+    let codePoint =
+        try
+            if hex <> "" then Some(Convert.ToInt32(hex, 16))
+            elif dec <> "" then Some(int dec)
+            else None
+        with _ ->
+            None
+
+    match codePoint with
+    | Some value when value > 0 && value <= 0x10FFFF && (value < 0xD800 || value > 0xDFFF) -> fromCodePoint value
+    | Some _ -> entity.Value
+    | None -> Map.tryFind entity.Groups.[3].Value namedEntities |> Option.defaultValue entity.Value
+
+/// Crossref titles carry JATS markup and Europe PMC titles carry HTML, but ARC titles are plain text.
+/// It strips tags before it decodes entities, so an escaped "&lt;i&gt;" stays visible as text.
+/// It keeps a "<" that no letter follows, as in "p < 0.05".
+let cleanTitle (value: string) =
+    if isNull value then
+        ""
+    else
+        let withoutTags = Regex.Replace(value, @"<\/?[A-Za-z][\w:.-]*(?:\s+[^<>]*)?\/?>", "")
+
+        let decoded =
+            Regex.Replace(
+                withoutTags,
+                @"&(?:#[xX]([0-9A-Fa-f]{1,6})|#([0-9]{1,7})|([A-Za-z][A-Za-z0-9]{1,31}));",
+                MatchEvaluator decodeEntity
+            )
+
+        Regex.Replace(decoded, @"[\s ]+", " ").Trim()
 
 let private crossrefYear (date: CrossrefDate option) =
     date
     |> Option.bind (fun value -> value.``date-parts``)
-    |> optionalArray
+    |> Option.defaultValue [||]
     |> Array.tryPick (fun parts ->
         if isNull parts || parts.Length = 0 then
             None
         else
-            Some(string parts.[0])
+            // Crossref sends [[null]] for works without a known date.
+            parts.[0] |> Option.map string
     )
 
 let mapCrossrefWork (work: CrossrefWork) : SearchResult =
@@ -104,10 +143,10 @@ let mapCrossrefWork (work: CrossrefWork) : SearchResult =
 
     {
         key = "crossref:" + (doi |> Option.defaultValue "publication")
-        title = firstText work.title
+        title = firstText work.title |> Option.map cleanTitle |> nonblank
         authors =
             work.author
-            |> optionalArray
+            |> Option.defaultValue [||]
             |> Array.choose formatCrossrefAuthor
             |> String.concat "; "
             |> Some
@@ -144,7 +183,7 @@ let mapEuropePmcResult (result: EuropePmcResult) : SearchResult =
             (source |> Option.defaultValue "europepmc")
             + ":"
             + (id |> Option.defaultValue "publication")
-        title = nonblank result.title
+        title = result.title |> Option.map cleanTitle |> nonblank
         authors = nonblank result.authorString
         doi = nonblank result.doi
         pubMedId = pmid
@@ -159,7 +198,7 @@ let mapEuropePmcPage cursor (response: EuropePmcResponse) : SearchPage =
     let results =
         response.resultList
         |> Option.bind (fun value -> value.result)
-        |> optionalArray
+        |> Option.defaultValue [||]
         |> Array.map mapEuropePmcResult
 
     let nextCursor =
@@ -172,45 +211,42 @@ let mapEuropePmcPage cursor (response: EuropePmcResponse) : SearchPage =
         nextCursor = nextCursor
     }
 
-let searchDoi query : JS.Promise<SearchPage> = promise {
-    match crossrefUrl query with
-    | Error error -> return failwith error
-    | Ok url ->
-        let! response =
-            fetch url [
-                requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-            ]
+/// Expects a DOI that normalizeDoi already accepted.
+let searchDoi doi : JS.Promise<SearchPage> = promise {
+    // fetchUnsafe keeps non-2xx responses, so a 404 for an unknown DOI becomes an empty result.
+    let! response =
+        fetchUnsafe (crossrefUrl doi) [
+            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
+        ]
 
-        if response.Status = 404 then
-            return { results = [||]; nextCursor = None }
-        elif not response.Ok then
-            return failwith $"Crossref could not load this publication (HTTP {response.Status}). Please try again."
-        else
-            let! payload = response.json<CrossrefResponse> ()
+    if response.Status = 404 then
+        return { results = [||]; nextCursor = None }
+    elif not response.Ok then
+        return failwith $"Crossref could not load this publication (HTTP {response.Status}). Please try again."
+    else
+        let! payload = response.json<CrossrefResponse> ()
 
-            return {
-                results =
-                    payload.message
-                    |> Option.map (mapCrossrefWork >> Array.singleton)
-                    |> Option.defaultValue [||]
-                nextCursor = None
-            }
+        return {
+            results =
+                payload.message
+                |> Option.map (mapCrossrefWork >> Array.singleton)
+                |> Option.defaultValue [||]
+            nextCursor = None
+        }
 }
 
+/// Expects a non-blank query.
 let searchEuropePmc query cursor : JS.Promise<SearchPage> = promise {
-    if String.IsNullOrWhiteSpace query then
-        return failwith "Enter a title, author, PubMed ID, or PMC ID."
-    else
-        let! response =
-            fetch (europePmcUrl query cursor) [
-                requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-            ]
+    let! response =
+        fetchUnsafe (europePmcUrl query cursor) [
+            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
+        ]
 
-        if not response.Ok then
-            return failwith $"Europe PMC could not search publications (HTTP {response.Status}). Please try again."
-        else
-            let! payload = response.json<EuropePmcResponse> ()
-            return mapEuropePmcPage cursor payload
+    if not response.Ok then
+        return failwith $"Europe PMC could not search publications (HTTP {response.Status}). Please try again."
+    else
+        let! payload = response.json<EuropePmcResponse> ()
+        return mapEuropePmcPage cursor payload
 }
 
 /// Apply only returned metadata to a copy, retaining manual metadata and annotations.

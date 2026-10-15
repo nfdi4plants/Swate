@@ -48,8 +48,8 @@ Vitest.describe (
             "encodes DOI and Europe PMC query and cursor values",
             fun () ->
                 Vitest
-                    .expect(crossrefUrl "doi:10.1000/a&b")
-                    .toEqual (Ok "https://api.crossref.org/works/10.1000%2Fa%26b")
+                    .expect(crossrefUrl "10.1000/a&b")
+                    .toBe "https://api.crossref.org/works/10.1000%2Fa%26b"
 
                 Vitest
                     .expect(europePmcUrl "plant & cell" (Some "next+=/"))
@@ -100,6 +100,47 @@ Vitest.describe (
                     |> mapCrossrefWork
 
                 Vitest.expect(fallback.year).toEqual (Some "2023")
+
+                let undated =
+                    json<CrossrefWork> """{"issued":{"date-parts":[[null]]}}""" |> mapCrossrefWork
+
+                Vitest.expect(undated.year.IsNone).toBe true
+
+                let nullFallback =
+                    json<CrossrefWork>
+                        """{"published":{"date-parts":[[null]]},"issued":{"date-parts":[[2022]]}}"""
+                    |> mapCrossrefWork
+
+                Vitest.expect(nullFallback.year).toEqual (Some "2022")
+        )
+
+        Vitest.test (
+            "removes title markup and decodes entities without touching comparison signs",
+            fun () ->
+                for input, expected in
+                    [
+                        "Virulence Factors of Uropathogenic <i>Escherichia coli</i>",
+                        "Virulence Factors of Uropathogenic Escherichia coli"
+                        "<jats:title>Growth of <jats:italic toggle=\"yes\">Arabidopsis</jats:italic></jats:title>",
+                        "Growth of Arabidopsis"
+                        "H<sub>2</sub>O<sub>2</sub> signalling &amp; CO<sub>2</sub> uptake",
+                        "H2O2 signalling & CO2 uptake"
+                        "Effect of&#160;TNF-&#x3b1; on cells&#8217; survival", "Effect of TNF-α on cells’ survival"
+                        "  Significance\twhen p < 0.05 and n>3 ", "Significance when p < 0.05 and n>3"
+                        "Study &lt;in vivo&gt; of &unknown; markers <br/>", "Study <in vivo> of &unknown; markers"
+                    ] do
+                    Vitest.expect(cleanTitle input).toBe expected
+
+                let crossref =
+                    json<CrossrefWork> """{"title":["<i>E. coli</i> growth"]}""" |> mapCrossrefWork
+
+                Vitest.expect(crossref.title).toEqual (Some "E. coli growth")
+
+                let europe =
+                    json<EuropePmcResult> """{"title":"Motility in <i>E. coli</i>."}"""
+                    |> mapEuropePmcResult
+
+                Vitest.expect(europe.title).toEqual (Some "Motility in E. coli.")
         )
 
         Vitest.test (
