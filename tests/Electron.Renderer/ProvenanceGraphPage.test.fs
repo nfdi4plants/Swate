@@ -208,7 +208,7 @@ let private Reopen () =
             prop.testId "reopen"
             prop.onClick (fun _ -> setRequestId "2")
         ]
-        Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphArea
+        Renderer.Components.MainContent.ProvenanceGraphArea.ProvenanceGraphArea
             requestId
             (Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphTarget())
     ]
@@ -408,7 +408,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphArea "1" (Throws())
+                        Renderer.Components.MainContent.ProvenanceGraphArea.ProvenanceGraphArea "1" (Throws())
                     )
 
                 try

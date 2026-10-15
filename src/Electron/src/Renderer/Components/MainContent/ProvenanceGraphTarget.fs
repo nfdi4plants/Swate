@@ -2,7 +2,6 @@ module Renderer.Components.MainContent.ProvenanceGraphTarget
 
 open Feliz
 open Swate.Components.Primitive
-open Swate.Components.Primitive.ErrorBoundary
 open Swate.Components.Shared.ProvenanceGraph.Types
 open Swate.Components.Shared.ProvenanceGraph.BuildIndex
 
@@ -13,33 +12,6 @@ type private LoadState =
     | Loading
     | Failed of string
     | Loaded of ProvenanceIndex
-
-/// An alert with an icon, what failed and a hint. A page open shows the ARC as it was at that time, so the hint
-/// sends the user to close the graph and open it again after a fix.
-[<ReactComponent>]
-let private ErrorAlert (message: string) =
-    Html.div [
-        prop.className "swt:w-full swt:min-w-0 swt:p-3"
-        prop.testId "provenance-graph-error"
-        prop.children [
-            Html.div [
-                prop.className "swt:alert swt:alert-error"
-                prop.role.alert
-                prop.children [
-                    Html.i [
-                        prop.className "swt:iconify swt:fluent--error-circle-24-regular swt:size-5"
-                    ]
-                    Html.div [
-                        Html.p [ prop.className "swt:m-0"; prop.text message ]
-                        Html.p [
-                            prop.className "swt:m-0 swt:text-xs"
-                            prop.text "After you fix the ARC, close and open the graph again."
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
 
 /// Loads the provenance data once per page open and shows the graph. A load error shows its message in the page.
 /// The page catches the errors of its views itself. The app around the page keeps working.
@@ -84,7 +56,7 @@ let ProvenanceGraphTarget () =
                     )
                 ]
             ]
-        | LoadState.Failed message -> ErrorAlert message
+        | LoadState.Failed message -> ProvenanceGraphArea.ErrorAlert message
         | LoadState.Loaded index -> Swate.Components.Page.ProvenanceGraph.ProvenanceGraph.ProvenanceGraph(index)
 
     Html.div [
@@ -92,17 +64,3 @@ let ProvenanceGraphTarget () =
         prop.testId "provenance-graph-page"
         prop.children [ content ]
     ]
-
-/// The main content area of the provenance graph page. The request id changes with every open of the page, and a
-/// new id mounts everything inside again, so every open starts from scratch. The boundary catches what the
-/// target cannot catch itself, such as a chunk of the lazy target that fails to load, and shows what failed.
-let ProvenanceGraphArea (requestId: string) (content: ReactElement) : ReactElement =
-    React.KeyedFragment(
-        requestId,
-        [
-            ErrorBoundary.ErrorBoundary(
-                content,
-                (fun error -> ErrorAlert $"The provenance graph could not be shown: {error.Message}")
-            )
-        ]
-    )

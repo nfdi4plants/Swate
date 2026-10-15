@@ -140,8 +140,9 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
                     | Some _, Some(PageState.ProvenanceGraphPage requestId) ->
-                        // The boundary also covers the lazy import, which fails outside of the target.
-                        ProvenanceGraphTarget.ProvenanceGraphArea
+                        // The area keys the content by the request id and shows what failed when the lazy import
+                        // or the target throws. It sits in its own module, so Main imports the target only lazily.
+                        ProvenanceGraphArea.ProvenanceGraphArea
                             requestId
                             (React.Suspense(
                                 [ LazyComponents.ProvenanceGraphTarget() ],
