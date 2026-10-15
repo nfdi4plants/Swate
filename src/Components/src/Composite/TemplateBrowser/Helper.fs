@@ -73,6 +73,16 @@ let private getDeselectedTableColumnIndices (deselectedColumns: Set<int * int>) 
     )
     |> List.ofSeq
 
+// https://github.com/nfdi4plants/ARCtrl/issues/647
+// If this issue is fixed, we will no longer need to manually add empty columns for header-only imports.
+let private joinTemplateTable (target: ArcTable) (source: ArcTable) (importType: TableJoinOptions) =
+    match importType with
+    | TableJoinOptions.Headers ->
+        // ARCtrl beta.12's Headers join omits backing column entries, which breaks later reads and saves.
+        // Add empty columns through the normal API to preserve header-only import semantics and stored refs.
+        target.AddColumns(source.Headers |> Seq.map (fun header -> CompositeColumn.create header))
+    | _ -> target.Join(source, joinOptions = importType)
+
 let createUpdatedTables
     (arcTables: ResizeArray<ArcTable>)
     (state: SelectiveImportConfig)
@@ -93,7 +103,7 @@ let createUpdatedTables
                 let finalTable =
                     Table.selectiveTablePrepare appliedTable sourceTable deselectedColumnIndices
 
-                appliedTable.Join(finalTable, joinOptions = state.ImportType)
+                joinTemplateTable appliedTable finalTable state.ImportType
                 appliedTable
     ]
     |> ResizeArray
@@ -153,7 +163,7 @@ let updateTables
                 if tempTable.ColumnCount = 0 then
                     tempTable.AddColumns(preparedTemplate.Columns)
                 else
-                    tempTable.Join(preparedTemplate, joinOptions = importConfig.ImportType)
+                    joinTemplateTable tempTable preparedTemplate importConfig.ImportType
 
             existingTables.[tableIndex] <- tempTable
         | _ -> ()
@@ -166,7 +176,7 @@ let updateTables
         selectedColumnTables
         |> Seq.map (fun table ->
             let nextTable = ArcTable.init table.Name
-            nextTable.Join(table, joinOptions = importConfig.ImportType)
+            joinTemplateTable nextTable table importConfig.ImportType
             nextTable
         )
         |> Seq.rev
