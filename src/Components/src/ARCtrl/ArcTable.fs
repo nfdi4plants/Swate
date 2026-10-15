@@ -1,51 +1,5 @@
 module ARCtrl.Table
 
-/// Read stored references directly so diagnostics also work when table.Columns would throw.
-let internal logTableState (sourceFile: string) (stage: string) (table: ArcTable) =
-    try
-        let values = table.Values
-
-        let missingColumns = [|
-            for index in 0 .. table.ColumnCount - 1 do
-                if not (values.Columns.ContainsKey index) then
-                    yield index
-        |]
-
-        let columnRefs =
-            values.Columns
-            |> Seq.map (fun column ->
-                let hashes, rowKeys, kind =
-                    match column.Value with
-                    | ArcTableAux.ColumnValueRefs.Constant hash -> Seq.singleton hash, [||], "constant"
-                    | ArcTableAux.ColumnValueRefs.Sparse refs ->
-                        refs.Values :> seq<int>, (refs.Keys |> Seq.truncate 20 |> Seq.toArray), "sparse"
-
-                {|
-                    column = column.Key
-                    kind = kind
-                    rowKeys = rowKeys
-                    missingValueHashes =
-                        hashes
-                        |> Seq.filter (fun hash -> not (values.ValueMap.ContainsKey hash))
-                        |> Seq.distinct
-                        |> Seq.truncate 20
-                        |> Seq.toArray
-                |}
-            )
-            |> Seq.toArray
-
-        Browser.Dom.console.log (
-            $"[{sourceFile}] {stage}: table={table.Name}, rows={table.RowCount}, columns={table.ColumnCount}, storedColumns={values.Columns.Count}, storedValues={values.ValueMap.Count}",
-            {|
-                headers = table.Headers |> Seq.map string |> Seq.toArray
-                columnKeys = values.Columns.Keys |> Seq.toArray
-                missingColumns = missingColumns
-                columnRefs = columnRefs
-            |}
-        )
-    with error ->
-        Browser.Dom.console.warn ($"[{sourceFile}] {stage}: table diagnostic snapshot failed.", error)
-
 /// <summary>
 /// This functions returns a **copy** of `toJoinTable` without any column already in `activeTable`.
 /// </summary>
