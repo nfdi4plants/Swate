@@ -158,9 +158,9 @@ type GitState = {
     PendingConfirmation: GitSidebarConfirmationDialog option
     PendingRemoteAction: GitPendingRemoteAction
     PendingPublishRename: GitPublishRenamePrompt option
-    /// The owners loaded for the first publish of the current ARC. None until they are loaded.
+    /// The owners of the open upload dialog. None when no dialog asked for an owner.
     PublishOwners: GitPublishOwner[] option
-    /// The owner the user picked for the first publish. None until picked.
+    /// The owner the next project creation uses, set when the upload dialog is submitted.
     PublishOwnerChoice: GitPublishOwner option
     /// A primary save that still has to publish once the update or merge is done.
     PendingPostMergePush: bool
@@ -1019,6 +1019,26 @@ let publishOwnersOf (dto: PublishOwnersDto) : GitPublishOwner[] =
 let private hasEnabledGroup (owners: GitPublishOwner[]) =
     owners
     |> Array.exists (fun owner -> owner.NamespaceId.IsSome && owner.DisabledReason.IsNone)
+
+/// The owner the upload goes to when the dialog offered no owners.
+let private personalPublishOwner: GitPublishOwner = {
+    NamespaceId = None
+    Label = "personal"
+    DisabledReason = None
+}
+
+/// True when renaming the ARC folder to the given name leaves its path unchanged. The main
+/// process refuses such a rename, so the check joins the parent of the current path with the
+/// name and compares both with PathHelpers.normalizePathForFsComparison, as ArcVaultHelper does.
+let private keepsArcFolderName (currentArcPath: string) (name: string) =
+    let comparable = Swate.Components.Shared.PathHelpers.normalizePathForFsComparison
+
+    let target =
+        match Swate.Components.Shared.PathHelpers.tryGetParentPath currentArcPath with
+        | Some parent -> $"{parent}/{name}"
+        | None -> name
+
+    comparable target = comparable currentArcPath
 
 let private refreshFailure (refreshResult: GitRefreshResult) : OperationFailureDto option =
     match refreshResult.Session, refreshResult.Status, refreshResult.Refs, refreshResult.LfsSettings with
@@ -3621,8 +3641,8 @@ type private PublishFailure =
     | ProjectNameRefused of string
     /// The signed-in user can create the repository in a group, so the dialog asks for the owner first.
     | OwnerChoiceRequired of GitPublishOwner[]
-    /// DataHUB refused the chosen owner.
-    | OwnerNotAllowed of message: string
+    /// DataHUB refused the owner with this namespace id (None is the personal namespace).
+    | OwnerNotAllowed of namespaceId: int option * message: string
     | ProvisioningIncomplete of GitProvisionedRemote * string
     | NoUsableAccount
 
@@ -3707,18 +3727,17 @@ let private runPublishAsync
                     | Error(CreateProjectError.NameRefused _) ->
                         return Error(PublishFailure.ProjectNameRefused projectNameRefusedMessage)
                     | Error(CreateProjectError.NotAllowed details) ->
-                        let refusal =
-                            match owner with
-                            | Some { NamespaceId = Some _; Label = label } ->
-                                $"DataHUB did not allow a new repository in {label}. Choose a different owner."
-                            | _ -> "DataHUB did not allow a new repository in your personal namespace."
-
+                        // GitLab's text for a group only says the namespace is not valid. Its text for the
+                        // personal namespace can name a project limit, which the user can act on.
                         let message =
-                            match details with
-                            | Some text -> $"{refusal} ({text})"
-                            | None -> refusal
+                            match owner, details with
+                            | Some { NamespaceId = Some _; Label = label }, _ ->
+                                $"DataHUB did not allow a new repository in {label}."
+                            | _, Some text ->
+                                $"DataHUB did not allow a new repository in your personal namespace. {text}"
+                            | _, None -> "DataHUB did not allow a new repository in your personal namespace."
 
-                        return Error(PublishFailure.OwnerNotAllowed message)
+                        return Error(PublishFailure.OwnerNotAllowed(owner |> Option.bind _.NamespaceId, message))
                     | Error(CreateProjectError.Failed error) ->
                         return Error(PublishFailure.Routed(RoutedFailure.Error error.GitLabErrorToString))
                     | Ok project ->
@@ -3741,7 +3760,7 @@ let private runPublishAsync
                             Error(
                                 PublishFailure.Routed(
                                     RoutedFailure.Error
-                                        $"Could not load your DataHUB groups: {error.GitLabErrorToString}"
+                                        $"Could not load your DataHUB groups, so nothing was uploaded. Try the upload again. ({error.GitLabErrorToString})"
                                 )
                             )
                     | Ok dto ->
@@ -3774,8 +3793,26 @@ let private runPublishAsync
                 | routed -> return Error(PublishFailure.Routed routed)
     }
 
-/// publishOwners is the owner list the model stores. A refused owner reopens the dialog only
-/// when that list offers another group, otherwise the refusal is an error like any other.
+/// The stored owner list with the refused owner disabled. None when the list is missing or has
+/// no enabled owner left, so the dialog has nothing to offer.
+let private ownersAfterRefusal (namespaceId: int option) (publishOwners: GitPublishOwner[] option) =
+    publishOwners
+    |> Option.map (
+        Array.map (fun owner ->
+            if owner.NamespaceId = namespaceId then
+                {
+                    owner with
+                        DisabledReason = Some "DataHUB refused a new repository here."
+                }
+            else
+                owner
+        )
+    )
+    |> Option.filter (Array.exists (fun owner -> owner.DisabledReason.IsNone))
+
+/// publishOwners is the owner list the model stores. A refused owner reopens the dialog when
+/// an enabled owner is left after the refused one is marked disabled (the personal namespace
+/// counts). Otherwise the refusal is an error like any other.
 let private publishFailureToOutcome
     (onRouted: RoutedFailure -> JS.Promise<Result<WriteAttemptOutcome, string>>)
     (publishOwners: GitPublishOwner[] option)
@@ -3797,9 +3834,11 @@ let private publishFailureToOutcome
                         false
                     )
                 )
-        | PublishFailure.OwnerNotAllowed message when publishOwners |> Option.exists hasEnabledGroup ->
-            return Ok(RequiresRemoteProjectRename(message, None, true))
-        | PublishFailure.OwnerNotAllowed message -> return! onRouted (RoutedFailure.Error message)
+        | PublishFailure.OwnerNotAllowed(namespaceId, message) ->
+            match ownersAfterRefusal namespaceId publishOwners with
+            | Some owners ->
+                return Ok(RequiresRemoteProjectRename($"{message} Choose a different owner.", Some owners, true))
+            | None -> return! onRouted (RoutedFailure.Error message)
         | PublishFailure.ProvisioningIncomplete(provisioned, message) ->
             return Ok(ProvisioningIncomplete(provisioned, message))
     }
@@ -3900,9 +3939,10 @@ let private runPrimarySaveAttemptAsync
                     | Error(PublishFailure.OwnerChoiceRequired _)
                     | Error(PublishFailure.ProvisioningIncomplete _)
                     | Error PublishFailure.NoUsableAccount -> false
-                    // Without another group to offer, the refusal ends in the refresh of the saved-locally outcome.
-                    | Error(PublishFailure.OwnerNotAllowed _) ->
-                        not (refreshedState.PublishOwners |> Option.exists hasEnabledGroup)
+                    // The dialog reopens when an enabled owner is left after the refused one is disabled.
+                    // Otherwise the refusal ends in the refresh of the saved-locally outcome.
+                    | Error(PublishFailure.OwnerNotAllowed(namespaceId, _)) ->
+                        (ownersAfterRefusal namespaceId refreshedState.PublishOwners).IsNone
 
                 if followsRefresh then
                     reportPhase GitBusyOperation.Refreshing
@@ -5396,54 +5436,68 @@ let private updateCore
                 PendingRefreshWarningNotice = Some pendingPrimarySaveWarning
         },
         Cmd.ofMsg RefreshRequested
-    | SubmitPublishRenameRequested _ when model.PendingPublishRename.IsNone -> model, Cmd.none
     | SubmitPublishRenameRequested submit ->
-        let normalizedName =
-            submit.Name
-            |> Option.ofObj
-            |> Option.map _.Trim()
-            |> Option.defaultValue String.Empty
+        match model.PendingPublishRename with
+        | None -> model, Cmd.none
+        | Some prompt ->
+            let normalizedName =
+                submit.Name
+                |> Option.ofObj
+                |> Option.map _.Trim()
+                |> Option.defaultValue String.Empty
 
-        if String.IsNullOrWhiteSpace normalizedName then
-            {
-                model with
-                    ErrorNotice = Some "ARC folder name must not be empty."
-            },
-            reportErrorCmd deps "Could not rename ARC" "ARC folder name must not be empty."
-        else
-            let choice =
-                model.PublishOwners
-                |> Option.bind (Array.tryFind (fun owner -> owner.NamespaceId = submit.NamespaceId))
-                |> Option.defaultValue {
-                    NamespaceId = submit.NamespaceId
-                    Label =
-                        match submit.NamespaceId with
-                        | None -> "personal"
-                        | Some id -> string id
-                    DisabledReason = None
-                }
-
-            let selection = {
-                Owners = model.PublishOwners
-                Choice = Some choice
-            }
-
-            let nextModel =
+            if String.IsNullOrWhiteSpace normalizedName then
                 {
                     model with
-                        PublishOwnerChoice = Some choice
+                        ErrorNotice = Some "ARC folder name must not be empty."
+                },
+                reportErrorCmd deps "Could not rename ARC" "ARC folder name must not be empty."
+            else
+                // The prompt is the list the user saw, so the choice is looked up there.
+                let choice =
+                    prompt.Owners
+                    |> Array.tryFind (fun owner -> owner.NamespaceId = submit.NamespaceId)
+                    |> Option.defaultValue personalPublishOwner
+
+                let selection = {
+                    Owners =
+                        if prompt.Owners.Length = 0 then
+                            None
+                        else
+                            Some prompt.Owners
+                    Choice = Some choice
                 }
-                |> withBusyOperation (Some GitBusyOperation.RenamingRepository)
-                |> fun state -> { state with ErrorNotice = None }
 
-            let cmd =
-                Cmd.OfPromise.either
-                    deps.renameOpenArcRoot
-                    normalizedName
-                    (fun result -> PublishRenameCompleted(model.ArcSessionId, result, selection))
-                    (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err), selection))
+                let keepsName =
+                    model.CurrentArcPath
+                    |> Option.exists (fun currentPath -> keepsArcFolderName currentPath normalizedName)
 
-            nextModel, cmd
+                if keepsName then
+                    {
+                        model with
+                            PendingPublishRename = None
+                            PublishOwners = selection.Owners
+                            PublishOwnerChoice = selection.Choice
+                            ErrorNotice = None
+                    },
+                    Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
+                else
+                    let nextModel =
+                        {
+                            model with
+                                PublishOwnerChoice = Some choice
+                        }
+                        |> withBusyOperation (Some GitBusyOperation.RenamingRepository)
+                        |> fun state -> { state with ErrorNotice = None }
+
+                    let cmd =
+                        Cmd.OfPromise.either
+                            deps.renameOpenArcRoot
+                            normalizedName
+                            (fun result -> PublishRenameCompleted(model.ArcSessionId, result, selection))
+                            (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err), selection))
+
+                    nextModel, cmd
     | PublishRenameCompleted(sessionId, Ok renamedPath, selection) when
         sessionId = model.ArcSessionId
         && not (
@@ -6031,6 +6085,21 @@ let update
     (model: GitState)
     : GitState * Cmd<Msg> =
     let next, cmd = updateCore deps setPageState msg model
+
+    // A publish consumes the owner choice. Only the reprompt keeps the owners for the next try.
+    // A completion of an outdated write is dropped by updateCore and leaves the owners alone.
+    let next =
+        match msg with
+        | WriteCompleted(_, _, _, Ok(RequiresRemoteProjectRename _)) -> next
+        | WriteCompleted(sessionId, writeRequestId, _, _) when
+            sessionId = model.ArcSessionId && writeRequestId = model.WriteRequestId
+              ->
+              {
+                  next with
+                      PublishOwners = None
+                      PublishOwnerChoice = None
+              }
+        | _ -> next
 
     // Every way of leaving a diff page ends here: another selection, another page, a closed
     // page or a reset for another ARC.

@@ -747,14 +747,18 @@ module private Internals =
 
         loadFrom None []
 
-/// Reads the `message` field of a GitLab error body through typed bindings.
+/// Reads the `message` and `error` fields of a GitLab error body through typed bindings.
 module private ErrorBody =
 
     [<AllowNullLiteral>]
     type IErrorBody =
         abstract message: obj
+        abstract error: obj
 
-    /// GitLab sends either a text or an object that maps field names to arrays of texts.
+    /// GitLab sends the text of a failure as a string or an array of strings, in `message` or in `error`.
+    /// The text sits in `error` only when `message` is absent, for example the 403 limit reply
+    /// {"error":["Your project limit is 5 projects! ..."]}. Validation failures put an object
+    /// in `message` that maps field names to arrays of texts.
     [<RequireQualifiedAccess>]
     type Message =
         | Text of string
@@ -771,6 +775,17 @@ module private ErrorBody =
         else
             []
 
+    let private isPlainObject (value: obj) =
+        not (isNull value)
+        && jsTypeof value = "object"
+        && not (JS.Constructors.Array.isArray value)
+
+    let private tryText (value: obj) : Message option =
+        if JS.Constructors.Array.isArray value || jsTypeof value = "string" then
+            Some(Message.Text(String.concat "; " (toTexts value)))
+        else
+            None
+
     let tryParse (bodyText: string) : Message option =
         try
             let parsed = JS.JSON.parse bodyText
@@ -778,26 +793,22 @@ module private ErrorBody =
             if isNull parsed || jsTypeof parsed <> "object" then
                 None
             else
-                let message = (unbox<IErrorBody> parsed).message
+                let body = unbox<IErrorBody> parsed
 
-                if jsTypeof message = "string" then
-                    Some(Message.Text(unbox<string> message))
-                elif
-                    not (isNull message)
-                    && jsTypeof message = "object"
-                    && not (JS.Constructors.Array.isArray message)
-                then
+                if isPlainObject body.message then
                     Some(
                         Message.Fields [
-                            for key, value in JS.Constructors.Object.entries message -> key, toTexts value
+                            for key, value in JS.Constructors.Object.entries body.message -> key, toTexts value
                         ]
                     )
                 else
-                    None
+                    match tryText body.message with
+                    | Some text -> Some text
+                    | None -> tryText body.error
         with _ ->
             None
 
-/// Sorts the failure of POST /api/v4/projects into a refused name, a missing permission or any other failure.
+/// Tells a refused name and a missing permission apart from other failures of POST /api/v4/projects.
 let classifyCreateProjectFailure (status: int) (bodyText: string) : CreateProjectError =
     let message = ErrorBody.tryParse bodyText
 

@@ -808,6 +808,9 @@ export const PublishOwnerPrompt: Story = {
 
     await expect(await modal.findByTestId("GitSidebarPublishOwner-12")).toBeDisabled();
     await expect(modal.getByTestId("GitSidebarPublishOwnerReason-12")).toBeInTheDocument();
+    await expect(modal.getByTestId("GitSidebarPublishOwner-12")).toHaveAccessibleDescription(
+      "You may not create projects in this group.",
+    );
     await expect(modal.getByTestId("GitSidebarPublishOwner-11")).toBeEnabled();
     await expect(modal.queryByTestId("GitSidebarPublishOwnerReason-11")).not.toBeInTheDocument();
 
@@ -822,6 +825,35 @@ export const PublishOwnerPrompt: Story = {
     await userEvent.click(modal.getByTestId("GitSidebarPublishRenameSubmit"));
     await waitFor(() => expect(submitPublishRenameSpy).toHaveBeenCalledTimes(2));
     await expect(submitPublishRenameSpy.mock.calls[1][0].NamespaceId).toBe(11);
+  },
+};
+
+export const PublishOwnerPromptWithoutPersonalOwner: Story = {
+  args: {
+    ...PublishOwnerPrompt.args,
+    publishRenamePrompt: {
+      CurrentName: "My ARC",
+      Message: "Choose where to create the DataHUB repository.",
+      Owners: [
+        {
+          NamespaceId: undefined,
+          Label: "carol (personal)",
+          DisabledReason: "DataHUB refused a new repository here.",
+        },
+        ...publishOwners.slice(1),
+      ],
+      SelectedNamespaceId: undefined,
+    },
+  },
+  play: async () => {
+    submitPublishRenameSpy.mockClear();
+    const modal = within(document.body);
+
+    await expect(await modal.findByTestId("GitSidebarPublishOwner-personal")).toBeDisabled();
+    await expect(modal.getByTestId("GitSidebarPublishOwner-11")).toBeChecked();
+    await userEvent.click(modal.getByTestId("GitSidebarPublishRenameSubmit"));
+    await waitFor(() => expect(submitPublishRenameSpy).toHaveBeenCalledTimes(1));
+    await expect(submitPublishRenameSpy.mock.calls[0][0].NamespaceId).toBe(11);
   },
 };
 

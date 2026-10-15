@@ -1999,10 +1999,11 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Submitting the dialog with a group creates the repository there without loading the owners again",
+            "Submitting the dialog with the current folder name and a group publishes there without renaming",
             fun () -> promise {
                 let createRequests = ResizeArray<CreateProjectRequest>()
                 let loadCalls = ResizeArray<string>()
+                let renameCalls = ResizeArray<string>()
 
                 let deps = {
                     firstPublishDeps
@@ -2014,26 +2015,30 @@ Vitest.describe (
                             createRequests.Add request
                             promise { return Ok remoteProject }
                         ) with
-                        renameOpenArcRoot = fun _ -> promise { return Ok "C:/arc" }
+                        renameOpenArcRoot =
+                            fun name ->
+                                renameCalls.Add name
+                                unexpectedPromise "renameOpenArcRoot"
                 }
 
                 let! prompted = runPush deps runningState
 
-                let! submitted, renameMessages =
-                    step deps prompted (SubmitPublishRenameRequested { Name = "arc"; NamespaceId = Some 7 })
+                let! submitted, publishMessages =
+                    step deps prompted (SubmitPublishRenameRequested { Name = " ARC "; NamespaceId = Some 7 })
 
-                let! renamed, retryMessages = step deps submitted renameMessages[0]
+                Vitest.expect(submitted.PendingPublishRename).toEqual (None)
 
                 Vitest
-                    .expect(retryMessages)
+                    .expect(publishMessages)
                     .toEqual (
                         [|
                             WriteRequested(Push GitUpdateAcceptance.RequirePreview)
                         |]
                     )
 
-                let! _ = runPush deps renamed
+                let! _ = runPush deps submitted
 
+                Vitest.expect(renameCalls.Count).toBe (0)
                 Vitest.expect(loadCalls.Count).toBe (1)
                 Vitest.expect(createRequests |> Seq.map _.NamespaceId |> Seq.toArray).toEqual ([| Some 7 |])
             }
@@ -2123,7 +2128,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A refusal for the chosen group reopens the dialog with the owners and no owner selected",
+            "A refusal for the chosen group reopens the dialog with that group disabled and no owner selected",
             fun () -> promise {
                 let owners =
                     publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
@@ -2143,10 +2148,144 @@ Vitest.describe (
                 let prompt = next.PendingPublishRename.Value
 
                 Vitest.expect(prompt.Owners.Length).toBe (2)
+                Vitest.expect(prompt.Owners[0].DisabledReason).toEqual (None)
+                Vitest.expect(prompt.Owners[1].DisabledReason.IsSome).toBe (true)
                 Vitest.expect(prompt.SelectedNamespaceId).toEqual (None)
                 Vitest.expect(prompt.Message).toContain ("lab/team")
+                Vitest.expect(prompt.Message).not.toContain ("limit reached")
+                Vitest.expect(next.PublishOwners).toEqual (Some prompt.Owners)
                 Vitest.expect(next.PublishOwnerChoice).toEqual (None)
                 Vitest.expect(next.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A refusal for the personal namespace reopens the dialog with it disabled when a group is left",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return failwith "loadPublishOwners" })
+                        (fun _ -> promise { return Error(CreateProjectError.NotAllowed(Some "limit reached")) })
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[0]
+                }
+
+                let! next = runPush deps state
+                let prompt = next.PendingPublishRename.Value
+
+                Vitest.expect(prompt.Owners[0].DisabledReason.IsSome).toBe (true)
+                Vitest.expect(prompt.Owners[1].DisabledReason).toEqual (None)
+                Vitest.expect(prompt.Message).toContain ("limit reached")
+                Vitest.expect(prompt.SelectedNamespaceId).toEqual (None)
+                Vitest.expect(next.PublishOwnerChoice).toEqual (None)
+                Vitest.expect(next.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A name refused inside the chosen group keeps the owners and the group in the dialog",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return failwith "loadPublishOwners" })
+                        (fun _ -> promise { return Error(CreateProjectError.NameRefused None) })
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[1]
+                }
+
+                let! next = runPush deps state
+                let prompt = next.PendingPublishRename.Value
+
+                Vitest.expect(prompt.Owners).toEqual (owners)
+                Vitest.expect(prompt.SelectedNamespaceId).toEqual (Some 7)
+                Vitest.expect(next.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A primary save with a group that accepts projects asks for the owner and creates nothing",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+
+                let deps = {
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) })
+                        (fun request ->
+                            createRequests.Add request
+                            unexpectedGitLab "createRemoteProject"
+                        ) with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let! requested, requestMessages = step deps state (PrimarySaveAllRequested "Publish")
+                let writing, writeCmd = update deps ignore requestMessages[0] requested
+                let! completionMessages = collectWriteMessages writeCmd
+
+                match completionMessages with
+                | [| WriteCompleted(_, _, PrimarySave _, Ok(RequiresRemoteProjectRename _)) |] -> ()
+                | _ -> failwith "Expected the primary save to ask for the owner."
+
+                let finished, _ = update deps ignore completionMessages[0] writing
+
+                Vitest.expect(createRequests.Count).toBe (0)
+
+                Vitest
+                    .expect(
+                        finished.PendingPublishRename
+                        |> Option.map (fun prompt -> prompt.Owners |> Array.map _.NamespaceId)
+                    )
+                    .toEqual (Some [| None; Some 7 |])
+            }
+        )
+
+        Vitest.test (
+            "A completed write other than the owner prompt clears the owners and the owner choice",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[1]
+                }
+
+                let publishWith createResult = promise {
+                    let deps =
+                        firstPublishDeps
+                            (fun () -> promise { return failwith "loadPublishOwners" })
+                            (fun _ -> createResult)
+
+                    return! runPush deps state
+                }
+
+                let! published = publishWith (promise { return Ok remoteProject })
+
+                let! failed = publishWith (promise { return Error(CreateProjectError.Failed GitLabError.Forbidden) })
+
+                for finished in [| published; failed |] do
+                    Vitest.expect(finished.PendingPublishRename).toEqual (None)
+                    Vitest.expect(finished.PublishOwners).toEqual (None)
+                    Vitest.expect(finished.PublishOwnerChoice).toEqual (None)
+
+                Vitest.expect(failed.ErrorNotice.IsSome).toBe (true)
             }
         )
 

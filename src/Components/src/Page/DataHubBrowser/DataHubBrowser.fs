@@ -183,6 +183,8 @@ type DataHubBrowser =
                     Html.a [
                         prop.testId ("GitLabExploreTab-" + tid)
                         prop.tabIndex 0
+                        // The label keeps the tooltip text out of the accessible name of the tab.
+                        prop.ariaLabel label
                         prop.custom ("aria-disabled", if isRestricted then "true" else "false")
                         prop.className [
                             "swt:tab"

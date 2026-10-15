@@ -119,18 +119,23 @@ module private GitSidebarInternal =
     let formatThresholdInput (thresholdMb: int) = string thresholdMb
 
     /// The owner a new publish prompt starts with: the requested one if it is offered and enabled,
-    /// otherwise the personal namespace.
+    /// otherwise the personal namespace if it is enabled, otherwise the first enabled owner.
+    /// None when no owner is enabled or the prompt offers no owners.
     let initialPublishNamespaceId (prompt: GitSidebarPublishRenamePrompt option) : int option =
         match prompt with
-        | Some prompt when
-            prompt.SelectedNamespaceId.IsSome
-            && prompt.Owners
-               |> Array.exists (fun owner ->
-                   owner.NamespaceId = prompt.SelectedNamespaceId && owner.DisabledReason.IsNone
-               )
-            ->
-            prompt.SelectedNamespaceId
-        | _ -> None
+        | None -> None
+        | Some prompt ->
+            let enabled =
+                prompt.Owners |> Array.filter (fun owner -> owner.DisabledReason.IsNone)
+
+            enabled
+            |> Array.tryFind (fun owner ->
+                prompt.SelectedNamespaceId.IsSome
+                && owner.NamespaceId = prompt.SelectedNamespaceId
+            )
+            |> Option.orElse (enabled |> Array.tryFind (fun owner -> owner.NamespaceId.IsNone))
+            |> Option.orElse (Array.tryHead enabled)
+            |> Option.bind _.NamespaceId
 
     /// Test id suffix of an owner choice.
     let publishOwnerKey (owner: GitSidebarPublishOwner) : string =
@@ -1694,6 +1699,10 @@ type GitSidebar =
         let owners = prompt |> Option.map _.Owners |> Option.defaultValue [||]
         let hasOwners = owners.Length > 0
 
+        let selectedOwnerIsEnabled =
+            owners
+            |> Array.exists (fun owner -> owner.NamespaceId = props.SelectedNamespaceId && owner.DisabledReason.IsNone)
+
         let keepsName =
             match prompt with
             | Some prompt -> normalizedInput = prompt.CurrentName
@@ -1740,12 +1749,18 @@ type GitSidebar =
                             ]
                         ]
                         if hasOwners then
+                            Html.p [
+                                prop.className "swt:text-xs swt:text-base-content/60"
+                                prop.text "Changing the name also renames the ARC folder."
+                            ]
+                        if hasOwners then
                             Html.fieldSet [
                                 prop.className "swt:fieldset"
                                 prop.children [
                                     Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Owner" ]
                                     for owner in owners do
                                         let ownerKey = GitSidebarInternal.publishOwnerKey owner
+                                        let reasonId = $"{ownerGroupName}-reason-{ownerKey}"
 
                                         Html.div [
                                             prop.key ownerKey
@@ -1764,8 +1779,11 @@ type GitSidebar =
                                                             prop.testId $"GitSidebarPublishOwner-{ownerKey}"
                                                             prop.type'.radio
                                                             prop.name ownerGroupName
-                                                            prop.className "swt:radio swt:radio-sm"
+                                                            prop.className
+                                                                "swt:radio swt:radio-sm swt:disabled:opacity-60 swt:disabled:border-base-content/40"
                                                             prop.disabled (props.IsBusy || owner.DisabledReason.IsSome)
+                                                            if owner.DisabledReason.IsSome then
+                                                                prop.ariaDescribedBy reasonId
                                                             prop.isChecked (
                                                                 owner.NamespaceId = props.SelectedNamespaceId
                                                             )
@@ -1779,6 +1797,7 @@ type GitSidebar =
                                                 match owner.DisabledReason with
                                                 | Some reason ->
                                                     Html.span [
+                                                        prop.id reasonId
                                                         prop.testId $"GitSidebarPublishOwnerReason-{ownerKey}"
                                                         prop.className "swt:text-xs swt:text-base-content/60"
                                                         prop.text reason
@@ -1801,7 +1820,11 @@ type GitSidebar =
                     Html.button [
                         prop.testId "GitSidebarPublishRenameSubmit"
                         prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                        prop.disabled (props.IsBusy || String.IsNullOrWhiteSpace normalizedInput)
+                        prop.disabled (
+                            props.IsBusy
+                            || String.IsNullOrWhiteSpace normalizedInput
+                            || (hasOwners && not selectedOwnerIsEnabled)
+                        )
                         prop.text (
                             if hasOwners && keepsName then
                                 "Upload"
