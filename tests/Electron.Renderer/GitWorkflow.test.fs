@@ -296,7 +296,7 @@ let private buildSingleConflictDocument currentLines incomingLines =
     |> String.concat "\n"
 
 let private unexpectedPromise<'T> name : JS.Promise<Result<'T, string>> = promise { return failwith name }
-let private unexpectedGitLab<'T> name : JS.Promise<Result<'T, GitLabError>> = promise { return failwith name }
+let private unexpectedGitLab<'T> name : JS.Promise<Result<'T, CreateProjectError>> = promise { return failwith name }
 
 let private conflictPage path =
     PageState.GitMergeConflictPage {
@@ -321,6 +321,7 @@ let private defaultDependencies: GitDependencies = {
     initializeWorkspace = fun _ -> unexpectedPromise "initializeWorkspace"
     bindWorkspace = fun _ -> unexpectedPromise "bindWorkspace"
     createRemoteProject = fun _ -> unexpectedGitLab "createRemoteProject"
+    loadPublishOwners = fun () -> promise { return failwith "loadPublishOwners" }
     renameOpenArcRoot = fun _ -> unexpectedPromise "renameOpenArcRoot"
     checkDependencies = fun _ -> unexpectedPromise "checkDependencies"
     installDependency = fun _ -> unexpectedPromise "installDependency"
@@ -976,10 +977,18 @@ Vitest.describe (
                 )
 
                 try
-                    let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", " My ARC Project ")
+                    let! result =
+                        GitLabApi.CreateProject(
+                            "https://gitlab.example/",
+                            "token-123",
+                            {
+                                Name = " My ARC Project "
+                                NamespaceId = None
+                            }
+                        )
 
                     match result with
-                    | Error err -> failwith err.GitLabErrorToString
+                    | Error _ -> failwith "Expected the project to be created."
                     | Ok project ->
                         Vitest.expect(project.name).toBe ("My ARC Project")
                         Vitest.expect(project.path_with_namespace).toBe ("carol/my-arc-project")
@@ -995,7 +1004,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitLabApi.CreateProject includes GitLab's duplicate-name response in the error",
+            "GitLabApi.CreateProject reports GitLab's duplicate-name response as a refused name",
             fun () -> promise {
                 let duplicateNameError =
                     createObj [
@@ -1021,14 +1030,21 @@ Vitest.describe (
                 )
 
                 try
-                    let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", "Existing ARC")
+                    let! result =
+                        GitLabApi.CreateProject(
+                            "https://gitlab.example/",
+                            "token-123",
+                            {
+                                Name = "Existing ARC"
+                                NamespaceId = None
+                            }
+                        )
 
                     match result with
                     | Ok _ -> failwith "Expected duplicate project creation to fail."
-                    | Error error ->
-                        let message = error.GitLabErrorToString
-                        Vitest.expect(message).toContain ("HTTP 400")
-                        Vitest.expect(message).toContain ("has already been taken")
+                    | Error(CreateProjectError.NameRefused details) ->
+                        Vitest.expect(details |> Option.defaultValue "").toContain ("has already been taken")
+                    | Error _ -> failwith "Expected NameRefused."
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
             }
@@ -1815,7 +1831,7 @@ Vitest.describe (
                                     }
                                 else
                                     unexpectedPromise "unexpected pull"
-                        createRemoteProject = fun _ -> promise { return Error(GitLabError.HttpError 400) }
+                        createRemoteProject = fun _ -> promise { return Error(CreateProjectError.NameRefused None) }
                 }
 
                 let model, command =
@@ -10040,8 +10056,10 @@ Vitest.describe (
                             publishRenamePrompt = {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
+                                Owners = [||]
+                                SelectedNamespaceId = None
                             },
-                            onSubmitPublishRename = (fun name -> submittedName <- Some name),
+                            onSubmitPublishRename = (fun submit -> submittedName <- Some submit.Name),
                             onCancelPublishRename = (fun () -> cancelCalls <- cancelCalls + 1)
                         )
                     )

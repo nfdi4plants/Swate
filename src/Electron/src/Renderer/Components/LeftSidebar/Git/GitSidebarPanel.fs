@@ -186,6 +186,8 @@ let Main () =
                  |> Option.map (fun prompt -> {
                      CurrentName = prompt.CurrentName
                      Message = prompt.Message
+                     Owners = [||]
+                     SelectedNamespaceId = None
                  })),
             callbacks = {
                 OnRefresh = gitStateCtx.refresh
@@ -227,7 +229,7 @@ let Main () =
             remoteActionsEnabled = remoteActionsEnabled,
             canCancelOperation = canCancelOperation,
             canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,
-            onSubmitPublishRename = gitStateCtx.submitPublishRename,
+            onSubmitPublishRename = (fun submit -> gitStateCtx.submitPublishRename submit.Name),
             onCancelPublishRename = gitStateCtx.cancelPublishRename,
             onOpenRemoteRepository =
                 (fun () ->

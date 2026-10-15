@@ -74,6 +74,7 @@ module private Helper =
             initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
             bindWorkspace = Renderer.VersionControlApiClient.bindWorkspace
             createRemoteProject = Api.ipcGitLabApi.createProject
+            loadPublishOwners = Api.ipcGitLabApi.loadPublishOwners
             renameOpenArcRoot =
                 fun newName -> promise {
                     let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName

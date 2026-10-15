@@ -647,7 +647,8 @@ type GitDependencies = {
     updatePageState: (PageState option -> PageState option) -> unit
     initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
-    createRemoteProject: string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
+    createRemoteProject: CreateProjectRequest -> JS.Promise<Result<ExploreProjectDto, CreateProjectError>>
+    loadPublishOwners: unit -> JS.Promise<Result<PublishOwnersDto, GitLabError>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, string>>
     checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto[]>, string>>
     installDependency:
@@ -3547,15 +3548,6 @@ let private pendingPrimarySaveRemoteFailureAsync (deps: GitDependencies) (messag
     | Error failure -> return Error(failureMessage failure)
 }
 
-/// A duplicate or otherwise refused project name comes back as a rename prompt. Every
-/// other GitLab failure is an error of its own.
-let private isProjectNameRefused (error: GitLabError) =
-    match error with
-    | GitLabError.HttpError 400
-    | GitLabError.HttpError 409
-    | GitLabError.InvalidRequest _ -> true
-    | _ -> false
-
 [<RequireQualifiedAccess>]
 type private PublishFailure =
     | Routed of RoutedFailure
@@ -3634,12 +3626,21 @@ let private runPublishAsync
             match model.ProvisionedRemote with
             | Some provisioned -> return! bindAndPublish acceptance provisioned
             | None ->
-                let! created = deps.createRemoteProject projectName
+                let! created =
+                    deps.createRemoteProject {
+                        Name = projectName
+                        NamespaceId = None
+                    }
 
                 match created with
-                | Error error when isProjectNameRefused error ->
+                | Error(CreateProjectError.NameRefused _) ->
                     return Error(PublishFailure.ProjectNameRefused projectNameRefusedMessage)
-                | Error error -> return Error(PublishFailure.Routed(RoutedFailure.Error error.GitLabErrorToString))
+                | Error(CreateProjectError.NotAllowed details) ->
+                    let text = details |> Option.defaultValue GitLabError.Forbidden.GitLabErrorToString
+
+                    return Error(PublishFailure.Routed(RoutedFailure.Error text))
+                | Error(CreateProjectError.Failed error) ->
+                    return Error(PublishFailure.Routed(RoutedFailure.Error error.GitLabErrorToString))
                 | Ok project ->
                     return!
                         bindAndPublish acceptance {

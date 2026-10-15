@@ -118,6 +118,26 @@ module private GitSidebarInternal =
 
     let formatThresholdInput (thresholdMb: int) = string thresholdMb
 
+    /// The owner a new publish prompt starts with: the requested one if it is offered and enabled,
+    /// otherwise the personal namespace.
+    let initialPublishNamespaceId (prompt: GitSidebarPublishRenamePrompt option) : int option =
+        match prompt with
+        | Some prompt when
+            prompt.SelectedNamespaceId.IsSome
+            && prompt.Owners
+               |> Array.exists (fun owner ->
+                   owner.NamespaceId = prompt.SelectedNamespaceId && owner.DisabledReason.IsNone
+               )
+            ->
+            prompt.SelectedNamespaceId
+        | _ -> None
+
+    /// Test id suffix of an owner choice.
+    let publishOwnerKey (owner: GitSidebarPublishOwner) : string =
+        match owner.NamespaceId with
+        | Some id -> string id
+        | None -> "personal"
+
     /// The range of the background indexing limit in MB, the same as the main process allows. A value
     /// below 64 is the memory budget of a diff held in memory.
     [<Literal>]
@@ -257,6 +277,8 @@ type private PublishRenameDialogProps = {
     Prompt: GitSidebarPublishRenamePrompt option
     InputValue: string
     SetInputValue: string -> unit
+    SelectedNamespaceId: int option
+    SetSelectedNamespaceId: int option -> unit
     IsBusy: bool
     Submit: unit -> unit
     Cancel: unit -> unit
@@ -1668,6 +1690,14 @@ type GitSidebar =
     static member private PublishRenameDialog(props: PublishRenameDialogProps) =
         let prompt = props.Prompt
         let normalizedInput = props.InputValue.Trim()
+        let ownerGroupName = React.useId ()
+        let owners = prompt |> Option.map _.Owners |> Option.defaultValue [||]
+        let hasOwners = owners.Length > 0
+
+        let keepsName =
+            match prompt with
+            | Some prompt -> normalizedInput = prompt.CurrentName
+            | None -> false
 
         BaseModal.Modal(
             isOpen = prompt.IsSome,
@@ -1676,7 +1706,13 @@ type GitSidebar =
                     if not isOpen then
                         props.Cancel()
                 ),
-            header = Html.text "Rename Repository",
+            header =
+                Html.text (
+                    if hasOwners then
+                        "Upload to DataHUB"
+                    else
+                        "Rename Repository"
+                ),
             description =
                 Html.text (
                     prompt
@@ -1703,6 +1739,55 @@ type GitSidebar =
                                 ]
                             ]
                         ]
+                        if hasOwners then
+                            Html.fieldSet [
+                                prop.className "swt:fieldset"
+                                prop.children [
+                                    Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Owner" ]
+                                    for owner in owners do
+                                        let ownerKey = GitSidebarInternal.publishOwnerKey owner
+
+                                        Html.div [
+                                            prop.key ownerKey
+                                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-x-2"
+                                            prop.children [
+                                                Html.label [
+                                                    prop.className (
+                                                        "swt:label swt:gap-2 "
+                                                        + (if owner.DisabledReason.IsSome then
+                                                               "swt:text-base-content/50 swt:cursor-not-allowed"
+                                                           else
+                                                               "swt:text-base-content")
+                                                    )
+                                                    prop.children [
+                                                        Html.input [
+                                                            prop.testId $"GitSidebarPublishOwner-{ownerKey}"
+                                                            prop.type'.radio
+                                                            prop.name ownerGroupName
+                                                            prop.className "swt:radio swt:radio-sm"
+                                                            prop.disabled (props.IsBusy || owner.DisabledReason.IsSome)
+                                                            prop.isChecked (
+                                                                owner.NamespaceId = props.SelectedNamespaceId
+                                                            )
+                                                            prop.onChange (fun (_: bool) ->
+                                                                props.SetSelectedNamespaceId owner.NamespaceId
+                                                            )
+                                                        ]
+                                                        Html.span [ prop.text owner.Label ]
+                                                    ]
+                                                ]
+                                                match owner.DisabledReason with
+                                                | Some reason ->
+                                                    Html.span [
+                                                        prop.testId $"GitSidebarPublishOwnerReason-{ownerKey}"
+                                                        prop.className "swt:text-xs swt:text-base-content/60"
+                                                        prop.text reason
+                                                    ]
+                                                | None -> ()
+                                            ]
+                                        ]
+                                ]
+                            ]
                     ]
                 ],
             footer =
@@ -1717,7 +1802,12 @@ type GitSidebar =
                         prop.testId "GitSidebarPublishRenameSubmit"
                         prop.className "swt:btn swt:btn-primary swt:ml-auto"
                         prop.disabled (props.IsBusy || String.IsNullOrWhiteSpace normalizedInput)
-                        prop.text "Rename and Upload"
+                        prop.text (
+                            if hasOwners && keepsName then
+                                "Upload"
+                            else
+                                "Rename and Upload"
+                        )
                         prop.onClick (fun _ -> props.Submit())
                     ]
                 ],
@@ -1746,7 +1836,7 @@ type GitSidebar =
             ?canOpenRemoteRepository: bool,
             ?canCancelOperation: bool,
             ?onOpenRemoteRepository: unit -> unit,
-            ?onSubmitPublishRename: string -> unit,
+            ?onSubmitPublishRename: GitSidebarPublishSubmit -> unit,
             ?onCancelPublishRename: unit -> unit
         ) =
 
@@ -1791,6 +1881,9 @@ type GitSidebar =
 
         let publishRenameInput, setPublishRenameInput =
             React.useState (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
+
+        let publishNamespaceId, setPublishNamespaceId =
+            React.useState (GitSidebarInternal.initialPublishNamespaceId publishRenamePrompt)
 
         let downloadLargeFilesInput, setDownloadLargeFilesInput =
             React.useState downloadLargeFiles
@@ -1874,6 +1967,7 @@ type GitSidebar =
         React.useEffect (
             (fun () ->
                 setPublishRenameInput (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
+                setPublishNamespaceId (GitSidebarInternal.initialPublishNamespaceId publishRenamePrompt)
             ),
             [| box publishRenamePrompt |]
         )
@@ -2094,7 +2188,11 @@ type GitSidebar =
                 setLocalError (Some "Repository name must not be empty.")
             else
                 setLocalError None
-                onSubmitPublishRename normalizedName
+
+                onSubmitPublishRename {
+                    Name = normalizedName
+                    NamespaceId = publishNamespaceId
+                }
 
         let submitPruneLfsCache () =
             setLocalError None
@@ -2307,6 +2405,8 @@ type GitSidebar =
                         Prompt = publishRenamePrompt
                         InputValue = publishRenameInput
                         SetInputValue = setPublishRenameInput
+                        SelectedNamespaceId = publishNamespaceId
+                        SetSelectedNamespaceId = setPublishNamespaceId
                         IsBusy = isBusy
                         Submit = submitPublishRename
                         Cancel = onCancelPublishRename

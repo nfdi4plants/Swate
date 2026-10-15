@@ -772,6 +772,59 @@ export const SwitchBranchModal: Story = {
   },
 };
 
+const submitPublishRenameSpy = fn();
+
+const publishOwners = [
+  { NamespaceId: undefined, Label: "carol (personal)", DisabledReason: undefined },
+  { NamespaceId: 11, Label: "nfdi4plants/team-a", DisabledReason: undefined },
+  {
+    NamespaceId: 12,
+    Label: "nfdi4plants/archive",
+    DisabledReason: "You may not create projects in this group.",
+  },
+];
+
+export const PublishOwnerPrompt: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
+    hasRemote: false,
+    publishRenamePrompt: {
+      CurrentName: "My ARC",
+      Message: "Choose where to create the DataHUB repository.",
+      Owners: publishOwners,
+      SelectedNamespaceId: undefined,
+    },
+    onSubmitPublishRename: submitPublishRenameSpy,
+  },
+  play: async () => {
+    submitPublishRenameSpy.mockClear();
+    const modal = within(document.body);
+
+    await expect(await modal.findByTestId("GitSidebarPublishOwner-12")).toBeDisabled();
+    await expect(modal.getByTestId("GitSidebarPublishOwnerReason-12")).toBeInTheDocument();
+    await expect(modal.getByTestId("GitSidebarPublishOwner-11")).toBeEnabled();
+    await expect(modal.queryByTestId("GitSidebarPublishOwnerReason-11")).not.toBeInTheDocument();
+
+    await expect(modal.getByTestId("GitSidebarPublishOwner-personal")).toBeChecked();
+    await userEvent.click(modal.getByTestId("GitSidebarPublishRenameSubmit"));
+    await waitFor(() => expect(submitPublishRenameSpy).toHaveBeenCalledTimes(1));
+    await expect(submitPublishRenameSpy.mock.calls[0][0].Name).toBe("My ARC");
+    await expect(submitPublishRenameSpy.mock.calls[0][0].NamespaceId).toBeUndefined();
+
+    await userEvent.click(modal.getByTestId("GitSidebarPublishOwner-11"));
+    await expect(modal.getByTestId("GitSidebarPublishOwner-11")).toBeChecked();
+    await userEvent.click(modal.getByTestId("GitSidebarPublishRenameSubmit"));
+    await waitFor(() => expect(submitPublishRenameSpy).toHaveBeenCalledTimes(2));
+    await expect(submitPublishRenameSpy.mock.calls[1][0].NamespaceId).toBe(11);
+  },
+};
+
 export const CommitComposer: Story = {
   args: {
     status: baseStatus,
