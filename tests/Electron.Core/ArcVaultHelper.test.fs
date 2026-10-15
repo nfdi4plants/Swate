@@ -547,14 +547,14 @@ let private createTestWindow options =
         if preventedCloseCount = preventedBeforeAttempt then
             triggerClosed ()
 
-    let onEvent (eventName: string) (handler: obj) =
+    let onEvent (eventName: string, handler: obj) =
         if eventName = "close" then
             closeHandler <- Some(unbox handler)
         elif eventName = "closed" then
             closedHandler <- Some(unbox handler)
 
     let onEventJs: obj =
-        emitJsExpr onEvent "((eventName, handler) => $0(eventName, handler))"
+        emitJsExpr onEvent "((eventName, handler) => $0([eventName, handler]))"
 
     let send: obj =
         emitJsExpr

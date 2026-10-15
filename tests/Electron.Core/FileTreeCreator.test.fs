@@ -260,6 +260,19 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "LFS metadata matches separator variants",
+            fun () ->
+                let largeObject = createObjectState "dataset/data.csv"
+
+                let entries =
+                    enrichFileEntries [ "dataset/data.csv", largeObject ] [|
+                        createFileEntry "data.csv" "/repo/dataset\\data.csv"
+                    |]
+
+                Vitest.expect(entries.[0].largeObject).toEqual (Some largeObject)
+        )
+
+        Vitest.test (
             "case-only disk path difference finds LFS metadata",
             fun () ->
                 let largeObject = createObjectState "data.csv"

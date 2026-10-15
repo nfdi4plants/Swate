@@ -408,12 +408,7 @@ module ArcVaultExtensions =
                             | _ -> None
                         )
 
-                    // TEMPORARILY DISABLED due to LFS problems:
-                    // FileTree LFS enrichment performs a repository-wide ListObjects operation.
-                    // Re-enable only when VersionControlService offers bounded object-state lookup
-                    // for the explicit changed paths.
-                    // let! enrichedChangedFiles = getFileEntriesWithLfsMetadata arcPath changedFiles
-                    let enrichedChangedFiles = changedFiles
+                    let! enrichedChangedFiles = getFileEntriesWithLfsMetadata arcPath changedFiles
                     let mutable enrichedChangedFileIndex = 0
 
                     for event, readEntry in Array.zip (normalizedEvents |> List.toArray) readEntries do
@@ -1282,6 +1277,7 @@ module ArcVaultExtensions =
 
                             try
                                 let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
+                                let! entries = getFileEntriesWithLfsMetadata arcPath page.Entries
 
                                 if
                                     capturedWatcherEpoch <> this.WatcherEpoch
@@ -1290,7 +1286,7 @@ module ArcVaultExtensions =
                                     do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
                                     return raise (ArcLoadCancelledException this.window.id)
 
-                                let nextTree = mergeFileTreeDirectoryPage page.Entries this.fileTree
+                                let nextTree = mergeFileTreeDirectoryPage entries this.fileTree
                                 this.fileTreeDirectoryHasMore.[normalizedRelativePath] <- page.HasMore
                                 this.SetFileTree nextTree
 
@@ -1440,12 +1436,13 @@ module ArcVaultExtensions =
 
                 try
                     let! page = readFileTreeDirectoryCursorPage directoryPath cursor 100
+                    let! entries = getFileEntriesWithLfsMetadata normalizedArcPath page.Entries
 
                     if not page.HasMore then
                         do! this.CloseFileTreeDirectoryCursor ""
 
                     return {
-                        Entries = createFileEntryTree (Array.append [| rootEntry |] page.Entries)
+                        Entries = createFileEntryTree (Array.append [| rootEntry |] entries)
                         HasMore = page.HasMore
                     }
                 with error ->

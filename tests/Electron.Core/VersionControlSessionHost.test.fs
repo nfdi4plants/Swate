@@ -843,6 +843,120 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "File Explorer enriches every page and shares fresh object metadata across a watcher batch",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-file-tree-objects-"
+                let workspace = join [| root; "workspace" |]
+                let nested = join [| workspace; "nested" |]
+                Main.Bindings.Filesystem.mkdirSync nested (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                let names = Array.init 110 (fun index -> $"file-{index}.dat")
+
+                for name in Array.append names [| "nested/object.dat"; "ordinary.txt" |] do
+                    writeText (join [| workspace; name |]) "content"
+
+                let mutable objects =
+                    Array.append names [| "nested/object.dat" |]
+                    |> Array.map (fun name -> {
+                        Path = RepositoryPath.tryCreate name |> Result.defaultWith failwith
+                        IsMaterialized = false
+                        IsLocallyAvailable = true
+                        SizeBytes = Some 42.0
+                        ObjectId = Some(String.replicate 64 "a")
+                    })
+
+                let mutable listings = 0
+
+                let materialization: ObjectMaterializationService = {
+                    ListObjects =
+                        fun _ -> async {
+                            listings <- listings + 1
+                            return OperationResult.succeeded objects
+                        }
+                    Materialize = fun _ _ -> async { return OperationResult.succeeded () }
+                    Dematerialize = fun _ _ -> async { return OperationResult.succeeded () }
+                }
+
+                let runtime =
+                    fakeProviderRuntimeWithStoragePolicy
+                        workspace
+                        (join [| root; "unused" |])
+                        None
+                        (Some materialization)
+
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                WorkspaceSessionHost.initialize host
+                let vault = registerVault 6061 workspace
+
+                let entryAt relativePath =
+                    let absolutePath =
+                        join [| workspace; relativePath |]
+                        |> Swate.Components.Shared.PathHelpers.normalizePath
+
+                    vault.fileTree.[absolutePath]
+
+                let cleanup () = promise {
+                    do! vault.StopFileWatcher()
+                    ARC_VAULTS.Vaults.Remove 6061 |> ignore
+                    electronMock?reset () |> ignore
+                    do! host.CloseAll() |> Async.StartAsPromise
+                    do! removeDirectoryAsync root
+                }
+
+                try
+                    let! firstPage = vault.EnsureInitialFileTreeRootPage workspace
+                    Vitest.expect(firstPage.Count).toBe 101
+                    Vitest.expect(listings).toBe 1
+
+                    firstPage.Values
+                    |> Seq.filter (fun entry -> entry.name.StartsWith "file-")
+                    |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject.IsSome).toBe true)
+
+                    do! vault.LoadNextFileTreeDirectoryPage ""
+                    Vitest.expect(vault.fileTree.Count).toBe 113
+                    Vitest.expect(listings).toBe 2
+
+                    for name in names do
+                        Vitest.expect((entryAt name).largeObject.IsSome).toBe true
+
+                    Vitest.expect((entryAt "ordinary.txt").largeObject.IsNone).toBe true
+
+                    let! prefix = Main.FileTreeCreator.readFileTreeDirectoryPrefix workspace "nested" 100
+                    Vitest.expect(prefix.Entries.[0].largeObject.IsSome).toBe true
+                    Vitest.expect(listings).toBe 3
+
+                    let! _ = Main.FileTreeCreator.getFileEntriesWithLfsMetadata workspace [| entryAt "nested" |]
+
+                    Vitest.expect(listings).toBe 3
+                    objects <- objects |> Array.map (fun state -> { state with IsMaterialized = true })
+
+                    let events =
+                        names.[0..1]
+                        |> Array.map (fun name -> Main.WatcherHelpers.buildWatcherEvent workspace "change" name)
+                        |> Array.toList
+
+                    do! vault.ApplyWatcherFileTreeEvents events
+                    Vitest.expect(listings).toBe 4
+
+                    for name in names.[0..1] do
+                        let state = (entryAt name).largeObject |> Option.get
+                        Vitest.expect(state.IsMaterialized).toBe true
+
+                    objects <- [||]
+                    do! vault.RefreshFileTreeDirectory ""
+                    Vitest.expect(listings).toBe 5
+
+                    vault.fileTree.Values
+                    |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject.IsNone).toBe true)
+
+                    do! cleanup ()
+                with error ->
+                    do! cleanup ()
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "materialization defers successful tree refreshes and refreshes after failure",
             fun () -> promise {
                 let! root = createTempDirectoryAsync "swate-vc-materialize-refresh-"

@@ -265,15 +265,10 @@ let readFileTreeDirectoryPrefix
             | _, Error error -> raise error
             | Ok page, Ok() -> page
 
-        // TEMPORARILY DISABLED due to LFS problems:
-        // FileTree LFS enrichment calls ObjectMaterialization.ListObjects, which enumerates
-        // repository-wide object state and makes this bounded read depend on repository size.
-        //
-        // TODO: Re-enable only after VersionControlService supports bounded object-state
-        // lookup for explicit repository paths. Keep the enrichment helpers and their tests.
-        // let! pageEntries = getFileEntriesWithLfsMetadata (normalizeRootPath arcPath) page.Entries
-
-        return page
+        // The provider currently lists all objects. Share that snapshot across this prefix;
+        // a path-scoped provider API would also bound the metadata lookup to the visible entries.
+        let! entries = getFileEntriesWithLfsMetadata arcPath page.Entries
+        return { page with Entries = entries }
     }
 
 type FileTreeRootPage = {
