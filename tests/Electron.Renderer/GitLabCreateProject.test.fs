@@ -83,18 +83,18 @@ let private expectNotAllowed (expected: string option) (error: CreateProjectErro
     | CreateProjectError.NotAllowed details -> Vitest.expect(details).toEqual (expected)
     | _ -> failwith "Expected NotAllowed."
 
-let private memberGroup id (name: string) (fullPath: string) (level: string option) = {|
+let private memberGroup id (name: string) (fullPath: string) (level: string option) : PublishMemberGroup = {
     id = id
     name = name
     full_path = fullPath
     project_creation_level = level
-|}
+}
 
-let private acceptingGroup id (name: string) (fullPath: string) = {|
+let private acceptingGroup id (name: string) (fullPath: string) : PublishAcceptingGroup = {
     id = id
     name = name
     full_path = fullPath
-|}
+}
 
 Vitest.describe (
     "classifyCreateProjectFailure",

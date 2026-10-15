@@ -154,6 +154,21 @@ type CreateProjectError =
     | NotAllowed of details: string option
     | Failed of GitLabError
 
+/// A group the user is a member of, with its project creation setting.
+type PublishMemberGroup = {
+    id: int
+    name: string
+    full_path: string
+    project_creation_level: string option
+}
+
+/// A group in which the user may create projects.
+type PublishAcceptingGroup = {
+    id: int
+    name: string
+    full_path: string
+}
+
 /// A group the user belongs to. can_create_projects tells whether a project may be created in it.
 type PublishGroupDto = {
     id: int
@@ -709,28 +724,21 @@ module private Internals =
     let listGroupsAcceptingProjects
         (baseUrl: string)
         (pat: string)
-        : JS.Promise<
-              Result<
-                  {|
-                      id: int
-                      name: string
-                      full_path: string
-                  |} array,
-                  GitLabError
-               >
-           >
-        =
+        : JS.Promise<Result<PublishAcceptingGroup array, GitLabError>> =
         let toAcceptingGroup (node: GraphQlGroupNode) =
             if isNull (box node) then
                 None
             else
                 Option.ofObj node.id
                 |> Option.bind tryParseGlobalId
-                |> Option.map (fun id -> {|
-                    id = id
-                    name = node.name
-                    full_path = node.fullPath
-                |})
+                |> Option.map (fun id ->
+                    ({
+                        id = id
+                        name = node.name
+                        full_path = node.fullPath
+                    }
+                    : PublishAcceptingGroup)
+                )
 
         let rec loadFrom after collected = promise {
             let! page = sendGroupsAcceptingProjectsPage baseUrl pat after
@@ -848,19 +856,8 @@ let classifyCreateProjectFailure (status: int) (bodyText: string) : CreateProjec
 /// appears in the accepting list (for example one shared with a group of the user) is added with an
 /// unknown creation level.
 let mergePublishGroups
-    (memberGroups:
-        {|
-            id: int
-            name: string
-            full_path: string
-            project_creation_level: string option
-        |} array)
-    (acceptingGroups:
-        {|
-            id: int
-            name: string
-            full_path: string
-        |} array)
+    (memberGroups: PublishMemberGroup array)
+    (acceptingGroups: PublishAcceptingGroup array)
     : PublishGroupDto array =
     let acceptingIds =
         acceptingGroups |> Array.map (fun group -> group.id) |> Set.ofArray
@@ -972,12 +969,15 @@ type GitLabApi =
                 | Ok acceptingGroups ->
                     let members =
                         memberGroups
-                        |> Array.map (fun group -> {|
-                            id = group.id
-                            name = group.name
-                            full_path = group.full_path
-                            project_creation_level = group.project_creation_level
-                        |})
+                        |> Array.map (fun group ->
+                            ({
+                                id = group.id
+                                name = group.name
+                                full_path = group.full_path
+                                project_creation_level = group.project_creation_level
+                            }
+                            : PublishMemberGroup)
+                        )
 
                     return
                         Ok {
