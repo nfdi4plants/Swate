@@ -294,11 +294,7 @@ type Navbar =
         let activity = Renderer.Context.ArcActivityContext.useArcActivityCtx ()
 
         let onSaveArc _ =
-            if
-                activity.state.hasUnsavedChanges
-                && not activity.state.isInitializing
-                && not isSaving
-            then
+            if activity.hasUnsavedChanges && not activity.isInitializing && not isSaving then
                 setIsSaving true
 
                 promise {
@@ -317,21 +313,17 @@ type Navbar =
 
         Html.button [
             prop.type'.button
-            prop.disabled (
-                activity.state.isInitializing
-                || isSaving
-                || not activity.state.hasUnsavedChanges
-            )
+            prop.disabled (activity.isInitializing || isSaving || not activity.hasUnsavedChanges)
             prop.className "swt:btn swt:btn-square swt:btn-info swt:btn-sm"
             prop.onClick onSaveArc
             prop.title (
-                if activity.state.isInitializing then
+                if activity.isInitializing then
                     "ARC loading still in progress."
                 else
                     "Save ARC"
             )
             prop.ariaLabel (
-                if activity.state.isInitializing then
+                if activity.isInitializing then
                     "ARC loading still in progress."
                 else
                     "Save ARC"
@@ -340,7 +332,7 @@ type Navbar =
                 Html.i [
                     prop.className [
                         "swt:iconify swt:size-5"
-                        if activity.state.isInitializing then
+                        if activity.isInitializing then
                             "swt:fluent--arrow-sync-16-regular swt:animate-spin"
                         else
                             "swt:fluent--save-16-filled"

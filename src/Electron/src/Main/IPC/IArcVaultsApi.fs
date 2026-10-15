@@ -50,6 +50,26 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(arcNotOpenError ())
     }
 
+/// Keeps cursor invalidation and parent refreshes inside the loaded-watcher suspension.
+let private withFileTreeMutation
+    (vault: ArcVault)
+    (affectedPaths: string list)
+    (parentPaths: string list)
+    (mutate: unit -> JS.Promise<Result<unit, exn>>)
+    =
+    vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+        do! vault.InvalidateFileTreeDirectoryCursors(Seq.append affectedPaths parentPaths)
+        let! result = mutate ()
+
+        match result with
+        | Ok() ->
+            for parentPath in parentPaths |> List.distinctBy PathHelpers.normalizeForComparison do
+                do! vault.RefreshFileTreeDirectory parentPath
+        | Error _ -> ()
+
+        return result
+    })
+
 let ensureNotesFolderAndRefreshFileTree (vault: ArcVault) (arcPath: string) = promise {
     match! Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath with
     | Error error -> return Error error
@@ -747,6 +767,35 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    getNoteTargets =
+        fun () -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            let arc = vault.arc.Value
+
+                            return
+                                Seq.append
+                                    (arc.Studies
+                                     |> Seq.map (fun study -> {
+                                         Name = study.Identifier
+                                         Kind = NotesTargetKind.Study
+                                     }))
+                                    (arc.Assays
+                                     |> Seq.map (fun assay -> {
+                                         Name = assay.Identifier
+                                         Kind = NotesTargetKind.Assay
+                                     }))
+                                |> Seq.distinct
+                                |> Seq.sortBy (fun target -> target.Kind, target.Name.ToLowerInvariant())
+                                |> Seq.toArray
+                                |> Ok
+                        })
+            with error ->
+                return Error error
+        }
     listProvenanceTables =
         fun () -> promise {
             try
@@ -781,7 +830,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match! vault.WriteArc() with
                             | Error saveError -> return Error saveError
                             | Ok() ->
-                                do! vault.ResetFileTreeToRoot()
+                                try
+                                    do! vault.RefreshLoadedFileTree()
+                                with refreshError ->
+                                    swatelogfn
+                                        vault.window.id
+                                        "Saved ARC, but File Explorer refresh failed: %s"
+                                        refreshError.Message
+
                                 return Ok()
                         })
             with e ->
@@ -844,19 +900,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
+                                    let parentPath =
+                                        PathHelpers.tryGetParentPath normalizedRelativePath |> Option.defaultValue ""
+
                                     return!
-                                        vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                            let parentPath =
-                                                PathHelpers.tryGetParentPath normalizedRelativePath
-                                                |> Option.defaultValue ""
-
-                                            do!
-                                                vault.InvalidateFileTreeDirectoryCursors [
-                                                    normalizedRelativePath
-                                                    parentPath
-                                                ]
-
-                                            let! result =
+                                        withFileTreeMutation
+                                            vault
+                                            [ normalizedRelativePath ]
+                                            [ parentPath ]
+                                            (fun () ->
                                                 vault.WithBusyWritingScope(fun () -> promise {
                                                     match!
                                                         ArcDeleteHelper.deleteArcEntityAsync
@@ -870,13 +922,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         vault.RefreshHasUnsavedArcChangesFlag()
                                                         return Ok()
                                                 })
-
-                                            match result with
-                                            | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
-                                            | Error _ -> ()
-
-                                            return result
-                                        })
+                                            )
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
                                                                                               normalizedDataMapPath) ->
                                 match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
@@ -913,29 +959,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
                                         )
                                 else
+                                    let parentPath =
+                                        PathHelpers.tryGetParentPath normalizedGenericPath |> Option.defaultValue ""
+
                                     return!
-                                        vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                            let parentPath =
-                                                PathHelpers.tryGetParentPath normalizedGenericPath
-                                                |> Option.defaultValue ""
-
-                                            do!
-                                                vault.InvalidateFileTreeDirectoryCursors [
-                                                    normalizedGenericPath
-                                                    parentPath
-                                                ]
-
-                                            let! result =
+                                        withFileTreeMutation
+                                            vault
+                                            [ normalizedGenericPath ]
+                                            [ parentPath ]
+                                            (fun () ->
                                                 ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                                     arcPath
                                                     normalizedGenericPath
-
-                                            match result with
-                                            | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
-                                            | Error _ -> ()
-
-                                            return result
-                                        })
+                                            )
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
                                                                                               _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
@@ -966,50 +1002,34 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match ArcEntityPathRules.classifyRenameTarget request.relativePath with
                             | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
+                                let parentPath =
+                                    PathHelpers.tryGetParentPath request.relativePath |> Option.defaultValue ""
+
+                                let targetPath = path.join [| parentPath; request.newName |]
+
                                 return!
-                                    vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                        let parentPath =
-                                            PathHelpers.tryGetParentPath request.relativePath
-                                            |> Option.defaultValue ""
-
-                                        let targetPath = path.join [| parentPath; request.newName |]
-
-                                        do!
-                                            vault.InvalidateFileTreeDirectoryCursors [
-                                                request.relativePath
-                                                targetPath
-                                                parentPath
-                                            ]
-
-                                        let! result =
+                                    withFileTreeMutation
+                                        vault
+                                        [ request.relativePath; targetPath ]
+                                        [ parentPath ]
+                                        (fun () ->
                                             ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
-
-                                        match result with
-                                        | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
-                                        | Error _ -> ()
-
-                                        return result
-                                    })
+                                        )
                             | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget _ ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
+                                    let parentPath =
+                                        PathHelpers.tryGetParentPath request.relativePath |> Option.defaultValue ""
+
+                                    let targetPath = path.join [| parentPath; request.newName |]
+
                                     return!
-                                        vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                            let parentPath =
-                                                PathHelpers.tryGetParentPath request.relativePath
-                                                |> Option.defaultValue ""
-
-                                            let targetPath = path.join [| parentPath; request.newName |]
-
-                                            do!
-                                                vault.InvalidateFileTreeDirectoryCursors [
-                                                    request.relativePath
-                                                    targetPath
-                                                    parentPath
-                                                ]
-
-                                            let! result =
+                                        withFileTreeMutation
+                                            vault
+                                            [ request.relativePath; targetPath ]
+                                            [ parentPath ]
+                                            (fun () ->
                                                 vault.WithBusyWritingScope(fun () -> promise {
                                                     match!
                                                         ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
@@ -1020,13 +1040,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         vault.RefreshHasUnsavedArcChangesFlag()
                                                         return Ok()
                                                 })
-
-                                            match result with
-                                            | Ok() -> do! vault.RefreshFileTreeDirectory parentPath
-                                            | Error _ -> ()
-
-                                            return result
-                                        })
+                                            )
                             | _ ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
@@ -1051,37 +1065,22 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
+                            let sourceParent =
+                                PathHelpers.tryGetParentPath request.sourceRelativePath
+                                |> Option.defaultValue ""
+
+                            let targetParent =
+                                PathHelpers.tryGetParentPath request.targetRelativePath
+                                |> Option.defaultValue ""
+
                             return!
-                                vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                    let sourceParent =
-                                        PathHelpers.tryGetParentPath request.sourceRelativePath
-                                        |> Option.defaultValue ""
-
-                                    let targetParent =
-                                        PathHelpers.tryGetParentPath request.targetRelativePath
-                                        |> Option.defaultValue ""
-
-                                    do!
-                                        vault.InvalidateFileTreeDirectoryCursors [
-                                            request.sourceRelativePath
-                                            request.targetRelativePath
-                                            sourceParent
-                                            targetParent
-                                        ]
-
-                                    let! result =
+                                withFileTreeMutation
+                                    vault
+                                    [ request.sourceRelativePath; request.targetRelativePath ]
+                                    [ sourceParent; targetParent ]
+                                    (fun () ->
                                         ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
-
-                                    match result with
-                                    | Ok() ->
-                                        do! vault.RefreshFileTreeDirectory sourceParent
-
-                                        if not (PathHelpers.pathsEqual sourceParent targetParent) then
-                                            do! vault.RefreshFileTreeDirectory targetParent
-                                    | Error _ -> ()
-
-                                    return result
-                                })
+                                    )
                         })
             with e ->
                 return Error e

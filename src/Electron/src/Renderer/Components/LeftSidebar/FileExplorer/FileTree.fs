@@ -137,8 +137,7 @@ type FileTree =
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
-        // This map describes only the bounded prefixes already requested by this renderer.
-        // A directory is absent until its first page has been loaded.
+        // Prevent overlapping page requests for the same directory.
         let directoriesLoadingPage = React.useRef Set.empty<string>
 
         React.useEffect ((fun () -> directoriesLoadingPage.current <- Set.empty), [| box arcScopeId |])
@@ -299,25 +298,21 @@ type FileTree =
             [| box fileStateCtx.state.FileTree |]
         )
 
-        let loadNextDirectoryPage (item: FileItem) =
-            match item.Path with
-            | Some path ->
-                let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
+        let loadNextDirectoryPage (path: string) =
+            let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
 
-                if not (directoriesLoadingPage.current.Contains normalizedPath) then
-                    directoriesLoadingPage.current <- directoriesLoadingPage.current.Add normalizedPath
+            if not (directoriesLoadingPage.current.Contains normalizedPath) then
+                directoriesLoadingPage.current <- directoriesLoadingPage.current.Add normalizedPath
 
-                    promise {
-                        try
-                            match! Api.ipcArcVaultApi.loadNextFileTreeDirectoryPage normalizedPath with
-                            | Ok _ -> ()
-                            | Error error ->
-                                console.error ($"Unable to load File Explorer directory page: {error.Message}")
-                        finally
-                            directoriesLoadingPage.current <- directoriesLoadingPage.current.Remove normalizedPath
-                    }
-                    |> Promise.start
-            | None -> ()
+                promise {
+                    try
+                        match! Api.ipcArcVaultApi.loadNextFileTreeDirectoryPage normalizedPath with
+                        | Ok _ -> ()
+                        | Error error -> console.error ($"Unable to load File Explorer directory page: {error.Message}")
+                    finally
+                        directoriesLoadingPage.current <- directoriesLoadingPage.current.Remove normalizedPath
+                }
+                |> Promise.start
 
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
             match item.Path with
@@ -325,7 +320,7 @@ type FileTree =
                 setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
 
                 if shouldLoadNextDirectoryPage path fileStateCtx.state.FileTreeDirectoryHasMore then
-                    loadNextDirectoryPage item
+                    loadNextDirectoryPage path
             | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
             | None -> ()
 
@@ -675,12 +670,12 @@ type FileTree =
                                     )
                                     |> Option.defaultValue false
                                 ),
-                            onLoadMoreChildren = loadNextDirectoryPage,
+                            onLoadMoreChildren = (fun item -> item.Path |> Option.iter loadNextDirectoryPage),
                             hasMoreRootItems =
                                 (fileStateCtx.state.FileTreeDirectoryHasMore
                                  |> Map.tryFind ""
                                  |> Option.defaultValue false),
-                            onLoadMoreRootItems = (fun () -> loadNextDirectoryPage { rootItem with Path = Some "" })
+                            onLoadMoreRootItems = (fun () -> loadNextDirectoryPage "")
                         )
                     ]
                 ]

@@ -158,6 +158,43 @@ Vitest.describe (
     "loaded FileTree directory watching",
     fun () ->
         Vitest.test (
+            "refreshing after save preserves loaded descendants and continues the existing directory cursor",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath nestedPath -> promise {
+                        let! _ = createNumberedFiles datasetPath 250
+                        do! vault.LoadNextFileTreeDirectoryPage "dataset"
+                        do! vault.LoadNextFileTreeDirectoryPage "dataset"
+                        do! vault.RefreshFileTreeDirectory "dataset/nested"
+                        let cursor = vault.FileTreeDirectoryCursors.["dataset"]
+                        let watcher = loadedDirectoryWatcher vault
+                        let loadedPaths = vault.fileTree.Keys |> Set.ofSeq
+
+                        do! vault.RefreshLoadedFileTree()
+
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe true
+                        Vitest.expect(vault.FileTreeDirectoryCursors.["dataset"]).toBe cursor
+                        Vitest.expect(loadedDirectoryWatcher vault).toEqual watcher
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
+                        Vitest.expect(Set.isSubset loadedPaths (vault.fileTree.Keys |> Set.ofSeq)).toBe true
+                        Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe true
+
+                        do! vault.LoadNextFileTreeDirectoryPage "dataset"
+
+                        let directChildCount =
+                            vault.fileTree.Values
+                            |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) datasetPath)
+                            |> Seq.length
+
+                        Vitest.expect(directChildCount).toBe 252
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
             "fresh snapshot publication waits for cursor closure and uses the latest tree and paging metadata",
             TestOptions(timeout = 15000),
             fun () -> promise {
@@ -243,7 +280,7 @@ Vitest.describe (
                 do!
                     withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
                         let! paths = createNumberedFiles datasetPath 150
-                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 100
                         let cachedPath = findEntryOutsidePage paths page
                         vault.fileTree.[cachedPath] <- FileEntry.create (basename cachedPath, cachedPath, false)
                         vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
@@ -263,7 +300,7 @@ Vitest.describe (
                 do!
                     withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
                         let! paths = createNumberedFiles datasetPath 150
-                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 100
                         let cachedDirectoryPath = findEntryOutsidePage paths page + "-directory"
                         let cachedDescendantPath = join [| cachedDirectoryPath; "deep.txt" |]
                         let! _ = mkdirAsync cachedDirectoryPath (MkdirOptions(recursive = true))
@@ -294,7 +331,7 @@ Vitest.describe (
                     withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
                         let! paths = createNumberedFiles datasetPath 150
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 100
 
                         let deletedPath = paths |> Array.find (fun path -> containsPath path vault)
 
@@ -1303,7 +1340,7 @@ Vitest.describe (
                     withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
                         let! paths = createNumberedFiles datasetPath 150
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 0 100
+                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 100
                         let cachedPath = findEntryOutsidePage paths page
                         vault.fileTree.[cachedPath] <- FileEntry.create (basename cachedPath, cachedPath, false)
 

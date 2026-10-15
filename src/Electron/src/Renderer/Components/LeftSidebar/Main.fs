@@ -42,7 +42,7 @@ let private FileOperationStatusNotice () =
                 && activeImport.phase = FileImportPhase.Copying
 
             Some(text, canCancel)
-        | None when arcActivity.state.isBusyWriting -> Some("Saving changes...", false)
+        | None when arcActivity.isBusyWriting -> Some("Saving changes...", false)
         | None -> None
 
     match status with

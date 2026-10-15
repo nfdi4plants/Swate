@@ -249,51 +249,21 @@ let readFileTreeDirectoryCursorPage
 let readFileTreeDirectoryPrefix
     (arcPath: string)
     (relativeDirectoryPath: string)
-    (offset: int)
     (pageSize: int)
     : Fable.Core.JS.Promise<FileTreeDirectoryPage> =
     promise {
-        if offset < 0 then
-            invalidArg (nameof offset) "Directory page offset must not be negative."
-
         if pageSize < 1 then
             invalidArg (nameof pageSize) "Directory page size must be at least one."
 
-        let normalizedArcPath = normalizeRootPath arcPath
-        let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
-        let! directory = openDirectoryAsync directoryPath
-        let entries = ResizeArray<FileEntry>()
-        let mutable acceptedIndex = 0
-        let mutable exhausted = false
+        let! directoryPath, cursor = openFileTreeDirectoryCursor arcPath relativeDirectoryPath
+        let! readResult = readFileTreeDirectoryCursorPage directoryPath cursor pageSize |> Promise.result
+        let! closeResult = cursor.Directory.close () |> Promise.result
 
-        try
-            // Read one accepted entry beyond the requested page. That single look-ahead tells the
-            // renderer whether another page exists without enumerating the rest of the directory.
-            while not exhausted && entries.Count <= pageSize do
-                let! dirent = directory.read ()
-
-                if isNull (box dirent) then
-                    exhausted <- true
-                else
-                    let name = dirent.name
-                    let isDirectory = dirent.isDirectory ()
-                    let fullPath = join [| directoryPath; name |] |> PathHelpers.normalizeSeparators
-
-                    if
-                        not (
-                            (isDirectory && shouldIgnoreDirName name)
-                            || (not isDirectory && shouldIgnorePath fullPath)
-                        )
-                    then
-                        if acceptedIndex >= offset then
-                            entries.Add(FileEntry.create (name, fullPath, isDirectory, None))
-
-                        acceptedIndex <- acceptedIndex + 1
-        finally
-            directory.close () |> Promise.start
-
-        let hasMore = entries.Count > pageSize
-        let pageEntries = entries |> Seq.truncate pageSize |> Array.ofSeq
+        let page =
+            match readResult, closeResult with
+            | Error error, _
+            | _, Error error -> raise error
+            | Ok page, Ok() -> page
 
         // TEMPORARILY DISABLED due to LFS problems:
         // FileTree LFS enrichment calls ObjectMaterialization.ListObjects, which enumerates
@@ -301,12 +271,9 @@ let readFileTreeDirectoryPrefix
         //
         // TODO: Re-enable only after VersionControlService supports bounded object-state
         // lookup for explicit repository paths. Keep the enrichment helpers and their tests.
-        // let! pageEntries = getFileEntriesWithLfsMetadata normalizedArcPath pageEntries
+        // let! pageEntries = getFileEntriesWithLfsMetadata (normalizeRootPath arcPath) page.Entries
 
-        return {
-            Entries = pageEntries
-            HasMore = hasMore
-        }
+        return page
     }
 
 type FileTreeRootPage = {

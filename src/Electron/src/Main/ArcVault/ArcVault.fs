@@ -72,12 +72,6 @@ type ArcVault(window: BrowserWindow) =
     let mutable watcherEpoch = 0
     let loadedDirectoryWatcherController = LoadedDirectoryWatcherController()
 
-    let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
-        JS.Constructors.Promise.resolve ()
-
-    let mutable pendingFileTreeReset: (string * Fable.Core.JS.Promise<unit>) option =
-        None
-
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, private set
@@ -114,6 +108,8 @@ type ArcVault(window: BrowserWindow) =
     /// Settles when the in-memory ARC model for the currently opening path is ready.
     member val internal ArcInitialization: Fable.Core.JS.Promise<unit> option = None with get, set
     member val internal FileTreeDirectoryCursors = Dictionary<string, FileTreeDirectoryCursor>() with get
+    member val internal FileTreeUpdateTail: JS.Promise<unit> = JS.Constructors.Promise.resolve () with get, set
+    member val internal PendingFileTreeReset: (string * JS.Promise<unit>) option = None with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -137,14 +133,6 @@ type ArcVault(window: BrowserWindow) =
     member internal this.IncrementWatcherEpoch() = watcherEpoch <- watcherEpoch + 1
 
     member internal _.LoadedDirectoryWatcherController = loadedDirectoryWatcherController
-
-    member internal this.FileTreeUpdateTail
-        with get () = fileTreeUpdateTail
-        and set value = fileTreeUpdateTail <- value
-
-    member internal this.PendingFileTreeReset
-        with get () = pendingFileTreeReset
-        and set value = pendingFileTreeReset <- value
 
     member internal this.CloseFileTreeDirectoryCursor(relativeDirectoryPath: string) = promise {
         let normalizedPath =
@@ -475,9 +463,6 @@ module ArcVaultExtensions =
                         this.SetFileTree(nextFileTree)
             })
 
-        member private this.NormalizeLoadedDirectoryPath(relativeDirectoryPath: string) =
-            PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
-
         member private this.CountLoadedDirectoryChildren(arcPath: string, relativeDirectoryPath: string) =
             let absoluteDirectoryPath =
                 join [| arcPath; relativeDirectoryPath |] |> PathHelpers.normalizePath
@@ -490,7 +475,7 @@ module ArcVaultExtensions =
 
         member this.IsFileTreeDirectoryLoaded(relativeDirectoryPath: string) =
             relativeDirectoryPath
-            |> this.NormalizeLoadedDirectoryPath
+            |> PathHelpers.normalizeCanonicalRelativePath
             |> this.loadedFileTreeDirectories.Contains
 
         member private this.RemoveUnavailableLoadedDirectories(arcPath: string) = promise {
@@ -526,7 +511,10 @@ module ArcVaultExtensions =
 
         member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string, ?watcherGeneration: int) =
             let controller = this.LoadedDirectoryWatcherController
-            let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
+
+            let normalizedRelativePath =
+                PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
             let capturedWatcherEpoch = this.WatcherEpoch
             let capturedArcPath = this.path
 
@@ -739,7 +727,7 @@ module ArcVaultExtensions =
                 if canPublish () then
                     let knownChildCount = this.CountLoadedDirectoryChildren(arcPath, relativePath)
 
-                    let! page = readFileTreeDirectoryPrefix arcPath relativePath 0 (max 100 knownChildCount)
+                    let! page = readFileTreeDirectoryPrefix arcPath relativePath (max 100 knownChildCount)
 
                     if canPublish () then
                         this.PublishFreshFileTreeDirectorySnapshot(arcPath, relativePath, page)
@@ -1193,7 +1181,9 @@ module ArcVaultExtensions =
             this.SetFileTree nextFileTree
 
         member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) =
-            let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
+            let normalizedRelativePath =
+                PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
             let capturedWatcherEpoch = this.WatcherEpoch
             let capturedArcPath = this.path
 
@@ -1216,7 +1206,7 @@ module ArcVaultExtensions =
                             this.CountLoadedDirectoryChildren(arcPath, normalizedRelativePath)
 
                         let! page =
-                            readFileTreeDirectoryPrefix arcPath normalizedRelativePath 0 (max 100 knownChildCount)
+                            readFileTreeDirectoryPrefix arcPath normalizedRelativePath (max 100 knownChildCount)
 
                         if lifecycleIsCurrent () then
                             let controller = this.LoadedDirectoryWatcherController
@@ -1266,7 +1256,9 @@ module ArcVaultExtensions =
 
         /// Loads exactly one additional page for an expanded directory.
         member this.LoadNextFileTreeDirectoryPage(relativeDirectoryPath: string) = promise {
-            let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
+            let normalizedRelativePath =
+                PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
             let mutable needsWatcherCoverage = false
             let capturedWatcherEpoch = this.WatcherEpoch
             let capturedArcPath = this.path
@@ -1367,6 +1359,20 @@ module ArcVaultExtensions =
 
                     this.PendingFileTreeReset <- Some(requestedArcPath, queuedReset)
                     queuedReset
+
+        /// Refreshes visible directory prefixes without discarding loaded descendants or paging cursors.
+        member this.RefreshLoadedFileTree() = promise {
+            let loadedDirectories =
+                this.loadedFileTreeDirectories
+                |> Seq.sortBy (fun path -> getPathDepth path, path)
+                |> Seq.toArray
+
+            do! this.RefreshFileTreeDirectory ""
+
+            for relativePath in loadedDirectories do
+                if this.PendingFileTreeReset.IsNone && this.IsFileTreeDirectoryLoaded relativePath then
+                    do! this.RefreshFileTreeDirectory relativePath
+        }
 
         /// Refreshes a directory only when File Explorer already knows its contents.
         /// The root is always visible and is therefore always eligible.

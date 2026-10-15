@@ -11,18 +11,7 @@ let private initialState: ArcActivityState = {
     hasUnsavedChanges = false
 }
 
-type ArcActivityController = {
-    state: ArcActivityState
-    isLoading: bool
-}
-
-let ArcActivityCtx =
-    React.createContext<ArcActivityController> (
-        {
-            state = initialState
-            isLoading = true
-        }
-    )
+let ArcActivityCtx = React.createContext<ArcActivityState> initialState
 
 [<Hook>]
 let useArcActivityCtx () = React.useContext ArcActivityCtx
@@ -47,10 +36,4 @@ let ArcActivityCtxProvider (children: ReactElement) =
             dependencies = [||]
         }
 
-    ArcActivityCtx.Provider(
-        {
-            state = activity.state
-            isLoading = activity.isLoading
-        },
-        children
-    )
+    ArcActivityCtx.Provider(activity.state, children)

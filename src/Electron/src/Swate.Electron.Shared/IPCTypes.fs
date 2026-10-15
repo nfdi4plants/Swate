@@ -108,6 +108,8 @@ type IArcVaultsApi = {
     showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
+    /// Studies and assays in the loaded ARC, independently of File Explorer paging.
+    getNoteTargets: unit -> JS.Promise<Result<ExistingTargetRef[], exn>>
     listProvenanceTables: unit -> JS.Promise<Result<ProvenanceTableSelectionDto[], exn>>
     loadProvenanceTable: ProvenanceTableSelectionDto -> JS.Promise<Result<ProvenanceLoadResultDto, exn>>
     /// Persists the active in-memory ARC scaffold to disk.
