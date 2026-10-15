@@ -25,20 +25,22 @@ module FileTreeDeleteWorkflow =
             setPendingDeleteItem (Some item)
 
     let confirmDeleteItem (config: ConfirmDeleteConfig) =
-        match
+        let deleteTarget =
             config.pendingDeleteItem
-            |> Option.bind _.Path
-            |> Option.map PathHelpers.normalizeCanonicalRelativePath
-        with
+            |> Option.filter canDeleteFileItem
+            |> Option.bind (fun item ->
+                item.Path
+                |> Option.map (fun path -> item, PathHelpers.normalizeCanonicalRelativePath path)
+            )
+
+        match deleteTarget with
         | None -> config.closeDeleteModal ()
-        | Some _ when config.pendingDeleteItem |> Option.exists canDeleteFileItem |> not -> config.closeDeleteModal ()
-        | Some deletePath ->
+        | Some(item, deletePath) ->
             let applyError message =
                 config.enqueueError (ErrorModalRequest.create (message, title = "Could not delete item"))
 
             let isLocked =
-                config.pendingDeleteItem
-                |> Option.exists (FileTreeContextMenu.isLockedByLfsActivity (config.getLfsActivePaths ()))
+                FileTreeContextMenu.isLockedByLfsActivity (config.getLfsActivePaths ()) item
 
             if isLocked then
                 config.closeDeleteModal ()
