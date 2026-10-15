@@ -409,6 +409,14 @@ module ArcEntityPathRules =
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
+    /// Like `isDeletePathAllowed` when the caller knows whether the item is a file. A file directly
+    /// inside an add zone has the path shape of an entity folder but is deleted as a generic file.
+    let isItemDeletePathAllowed (isFile: bool) (relativePath: string) =
+        match classifyDeleteTarget relativePath with
+        | DeletePathClassification.EntityFolderTarget(_, _, normalizedRelativePath) when isFile ->
+            isGenericFileSystemFileTargetAllowed normalizedRelativePath
+        | _ -> isDeletePathAllowed relativePath
+
     /// The path that a delete of `relativePath` removes from disk. Deleting a canonical entity
     /// workbook removes the whole entity folder, so the scope of the workbook is its parent folder.
     let deleteScopePath (relativePath: string) =
@@ -495,6 +503,14 @@ module ArcEntityPathRules =
         | RenamePathClassification.GenericTarget normalizedRelativePath ->
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
+
+    /// Like `isRenamePathAllowed` when the caller knows whether the item is a file. A file directly
+    /// inside an add zone has the path shape of an entity folder but is renamed as a generic file.
+    let isItemRenamePathAllowed (isFile: bool) (relativePath: string) =
+        match classifyRenameTarget relativePath with
+        | RenamePathClassification.EntityFolderTarget(_, _, normalizedRelativePath) when isFile ->
+            isGenericFileSystemFileTargetAllowed normalizedRelativePath
+        | _ -> isRenamePathAllowed relativePath
 
     let isGenericFileSystemParentAllowed (relativePath: string) =
         let normalizedRelativePath = normalizeRelativePath relativePath

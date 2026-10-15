@@ -200,6 +200,20 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "item-aware delete and rename checks treat files directly inside add zones as generic files",
+            fun () ->
+                [ "studies/overview.md", true; "studies/isa.study.xlsx", false; "studies/readme.md", false ]
+                |> List.iter (fun (path, expected) ->
+                    Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true path).toBe (expected)
+                    Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed true path).toBe (expected)
+                )
+
+                Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed false "studies/StudyA").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed false "studies/StudyA").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true "assays/AssayA/protocol.md").toBe (true)
+        )
+
+        Vitest.test (
             "files directly inside add zones are generic rename targets",
             fun () ->
                 match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "summary.md" with

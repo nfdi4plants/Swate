@@ -21,11 +21,7 @@ module FileTreeDeleteWorkflow =
     }
 
     let requestDeleteItem (setPendingDeleteItem: FileItem option -> unit) (item: FileItem) =
-        if
-            item.Path
-            |> Option.map PathHelpers.normalizeCanonicalRelativePath
-            |> Option.exists ArcEntityPathRules.isDeletePathAllowed
-        then
+        if canDeleteFileItem item then
             setPendingDeleteItem (Some item)
 
     let confirmDeleteItem (config: ConfirmDeleteConfig) =
@@ -35,7 +31,7 @@ module FileTreeDeleteWorkflow =
             |> Option.map PathHelpers.normalizeCanonicalRelativePath
         with
         | None -> config.closeDeleteModal ()
-        | Some deletePath when ArcEntityPathRules.isDeletePathAllowed deletePath |> not -> config.closeDeleteModal ()
+        | Some _ when config.pendingDeleteItem |> Option.exists canDeleteFileItem |> not -> config.closeDeleteModal ()
         | Some deletePath ->
             let applyError message =
                 config.enqueueError (ErrorModalRequest.create (message, title = "Could not delete item"))

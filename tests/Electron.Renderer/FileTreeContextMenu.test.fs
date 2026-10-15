@@ -495,6 +495,31 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "files directly inside ARC collection roots offer rename and delete only for generic files",
+            fun () ->
+                let labelsFor item = [
+                    yield! renameContextMenuItems [] ignore item |> List.map _.Label
+                    yield! deleteContextMenuItems [] ignore item |> List.map _.Label
+                ]
+
+                Vitest
+                    .expect(createFileItem "overview.md" (Some "studies/overview.md") |> labelsFor |> Array.ofList)
+                    .toEqual ([| "Rename"; "Delete" |])
+
+                Vitest
+                    .expect(
+                        createFileItem "isa.study.xlsx" (Some "studies/isa.study.xlsx")
+                        |> labelsFor
+                        |> Array.ofList
+                    )
+                    .toEqual ([||])
+
+                Vitest
+                    .expect(createFolderItem "StudyA" (Some "studies/StudyA") |> labelsFor |> Array.ofList)
+                    .toEqual ([| "Rename"; "Delete" |])
+        )
+
+        Vitest.test (
             "composed file context menu is grouped with open, copy, git, and ARC actions",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")

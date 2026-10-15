@@ -620,9 +620,7 @@ type FileTree =
                             canDeleteItem =
                                 (fun (item: FileItem) ->
                                     not (FileTreeContextMenu.isLockedByLfsActivity lfsActivePaths item)
-                                    && (item.Path
-                                        |> Option.map PathHelpers.normalizeCanonicalRelativePath
-                                        |> Option.exists ArcEntityPathRules.isDeletePathAllowed)
+                                    && canDeleteFileItem item
                                 ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,

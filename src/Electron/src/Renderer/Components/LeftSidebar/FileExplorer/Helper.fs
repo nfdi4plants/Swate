@@ -151,6 +151,16 @@ let canCreateFileSystemItemIn (kind: FileSystemItemKind) (item: FileItem) =
             || ArcEntityPathRules.isGenericFileSystemCreateParentAllowed (kind = FileSystemItemKind.File) path
         ))
 
+let canDeleteFileItem (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists (ArcEntityPathRules.isItemDeletePathAllowed (not item.IsDirectory))
+
+let canRenameFileItem (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists (ArcEntityPathRules.isItemRenamePathAllowed (not item.IsDirectory))
+
 let createItem (node: FileTreeNode) : FileItem =
     let item =
         if node.isDirectory then
