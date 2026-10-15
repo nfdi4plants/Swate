@@ -24,7 +24,11 @@ let private textDiffDisposeTimeoutMilliseconds = 5000
 // shortcut maintenance and exits when finished. app.quit() does not stop execution of the code below:
 // registering whenReady below can still load a window during shutdown and throw.
 // To avoid this issue, we gate the logic below fully behind the SquirrelStartup check.
-if not SquirrelStartup.started then
+if SquirrelStartup.started then
+    // The helper quits once Update.exe exits. Quitting here too keeps a hook run from
+    // staying open without a window if that exit is never reported.
+    app.quit ()
+else
     app
         .whenReady()
         .``then`` (fun () ->
