@@ -480,6 +480,96 @@ let detailAriaLabel (graph: ProcessDetailGraph) : string =
 
 let lineageAriaLabel (graph: LineageGraph) : string = $"Lineage graph for {graph.NodeId}"
 
+// Rows that are not finished
+
+/// Counts the rows without an output and the rows without an input. A row with neither counts in both.
+let countIncomplete (rows: seq<ProvenanceRow>) : IncompleteRows =
+    let mutable missingOutputs = 0
+    let mutable missingInputs = 0
+
+    for row in rows do
+        if row.Outputs.Length = 0 then
+            missingOutputs <- missingOutputs + 1
+
+        if row.Inputs.Length = 0 then
+            missingInputs <- missingInputs + 1
+
+    {
+        MissingOutputs = missingOutputs
+        MissingInputs = missingInputs
+    }
+
+/// The incomplete rows that belong to a view: all rows in the datasets view, the rows of the dataset in the
+/// processes view, the rows of the process in the groups view, the rows of the signatures of the selected group
+/// in the detail view, and the rows that touch a node of the lineage graph in the lineage view. The lineage view
+/// needs its graph, which the caller has after the cut. An id that the index does not know counts no row.
+let incompleteRows
+    (index: ProvenanceIndex)
+    (view: ProvenanceView)
+    (lineageGraph: LineageGraph option)
+    : IncompleteRows =
+    let rowOf (rowId: string) : ProvenanceRow option =
+        match index.RowById.TryGetValue rowId with
+        | true, row -> Some row
+        | _ -> None
+
+    let rowsOfNode (lookup: Dictionary<string, string[]>) (nodeId: string) : string[] =
+        match lookup.TryGetValue nodeId with
+        | true, rowIds -> rowIds
+        | _ -> [||]
+
+    match view with
+    | ProvenanceView.Datasets -> countIncomplete index.Rows
+    | ProvenanceView.Processes datasetId ->
+        index.Rows
+        |> Array.filter (fun row -> row.DatasetId = datasetId)
+        |> countIncomplete
+    | ProvenanceView.Groups(_, processKey) ->
+        match index.ProcessByKey.TryGetValue processKey with
+        | true, p -> p.RowIds |> Array.choose rowOf |> countIncomplete
+        | _ -> countIncomplete []
+    | ProvenanceView.Detail(_, processKey, groupId) ->
+        match index.ProcessByKey.TryGetValue processKey, index.GroupById.TryGetValue groupId with
+        | (true, p), (true, group) ->
+            let signatureIds = HashSet<string>(group.SignatureIds)
+
+            p.Signatures
+            |> Array.filter (fun signature -> signatureIds.Contains signature.Id)
+            |> Array.collect (fun signature -> signature.RowIds)
+            |> Array.choose rowOf
+            |> countIncomplete
+        | _ -> countIncomplete []
+    | ProvenanceView.Lineage _ ->
+        match lineageGraph with
+        | None -> countIncomplete []
+        | Some graph ->
+            // An unfinished row hangs on the node it has. The same row can touch several nodes of the graph.
+            let seen = HashSet<string>()
+            let rows = ResizeArray<ProvenanceRow>()
+
+            for node in graph.Nodes do
+                for rowId in Array.append (rowsOfNode index.ProducedBy node.Id) (rowsOfNode index.ConsumedBy node.Id) do
+                    if seen.Add rowId then
+                        match rowOf rowId with
+                        | Some row -> rows.Add row
+                        | None -> ()
+
+            countIncomplete rows
+
+/// The note for unfinished rows, such as "3 rows have no output yet". Empty when no row is unfinished.
+let incompleteNote (counts: IncompleteRows) : string =
+    let sentence (count: int) (missing: string) : string option =
+        if count = 0 then None
+        elif count = 1 then Some $"1 row has no {missing} yet."
+        else Some $"{count} rows have no {missing} yet."
+
+    [
+        sentence counts.MissingOutputs "output"
+        sentence counts.MissingInputs "input"
+    ]
+    |> List.choose id
+    |> String.concat " "
+
 // Legend
 
 let private legendItem (label: string) (swatch: LegendSwatch) : LegendItem = { Label = label; Swatch = swatch }

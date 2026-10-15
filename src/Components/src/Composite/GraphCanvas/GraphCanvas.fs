@@ -17,10 +17,12 @@ module private GraphCanvasTypes =
     /// The edges that are expanded, and the epoch they were expanded in.
     type Expansion = { ExpandedIn: int; Ids: string[] }
 
-    /// The result of one layout and the epoch it was requested in. No drawn layout means the layout failed.
+    /// The result of one layout and the epoch it was requested in. No drawn layout means the layout failed,
+    /// and Reason holds the message of the error.
     type Outcome = {
         RequestedIn: int
         Drawn: GraphLayout option
+        Reason: string
     }
 
     /// The open pill list. It belongs to one layout and one box width.
@@ -46,7 +48,7 @@ module private GraphCanvasHelper =
     let maxZoom = 2.0
     let zoomStep = 0.25
 
-    let mutedText = "color-mix(in oklch, var(--color-base-content) 65%, transparent)"
+    let mutedText = mutedTextColor
 
     // Tailwind reads class names from the generated code, so these are complete literals. The colors come
     // from custom properties on the root of the component, which are set from accentColor and neutralBorder.
@@ -648,6 +650,7 @@ type GraphCanvas =
                                     Some {
                                         RequestedIn = epoch
                                         Drawn = Some drawn
+                                        Reason = ""
                                     }
                                 )
                         ),
@@ -655,7 +658,13 @@ type GraphCanvas =
                             Browser.Dom.console.error ("Could not lay out the graph canvas", error)
 
                             if current.Value then
-                                setOutcome (Some { RequestedIn = epoch; Drawn = None })
+                                setOutcome (
+                                    Some {
+                                        RequestedIn = epoch
+                                        Drawn = None
+                                        Reason = Errors.messageOf error
+                                    }
+                                )
                         )
                     )
                     |> ignore
@@ -965,14 +974,24 @@ type GraphCanvas =
                         | None when shown.IsSome ->
                             Html.p [
                                 prop.testId "graph-status"
-                                prop.className "swt:m-0 swt:px-3.5 swt:py-4 swt:text-base-content/60"
+                                prop.className "swt:m-0 swt:px-3.5 swt:py-4 swt:text-base-content"
                                 prop.role.alert
-                                prop.text "Could not lay out this graph."
+                                prop.children [
+                                    Html.span "Could not lay out this graph."
+                                    // The reason is the message of the error, so the user can report it.
+                                    Html.span [
+                                        prop.testId "graph-status-reason"
+                                        prop.className "swt:ml-1 swt:break-words"
+                                        prop.text (
+                                            shown |> Option.map (fun result -> result.Reason) |> Option.defaultValue ""
+                                        )
+                                    ]
+                                ]
                             ]
                         | None ->
                             Html.p [
                                 prop.testId "graph-status"
-                                prop.className "swt:m-0 swt:px-3.5 swt:py-4 swt:text-base-content/60"
+                                prop.className "swt:m-0 swt:px-3.5 swt:py-4 swt:text-base-content/80"
                                 prop.role.status
                                 prop.text "Laying out…"
                             ]

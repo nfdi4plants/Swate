@@ -236,18 +236,28 @@ let palette: (string * string) list = [
     "--prov-other", "color-mix(in oklch, var(--color-base-content) 60%, transparent)"
 ]
 
-/// Border of neutral nodes, pills, the pill list and the zoom controls. Base content at 50 percent reaches
-/// a contrast of 3 to 1 on base-100 and base-200 in the sunrise and finster themes.
+/// Border of neutral nodes, pills, the pill list and the zoom controls. Base content at 60 percent reaches
+/// a contrast of 3 to 1 on base-100 and base-200 in the five app themes (finster, sunrise, planti, viola, amaze).
 let neutralBorder =
-    "color-mix(in oklch, var(--color-base-content) 50%, transparent)"
+    "color-mix(in oklch, var(--color-base-content) 60%, transparent)"
 
 /// Stroke and border of selected nodes, highlighted edges, the accent arrow and highlighted process pills.
-/// Primary mixed with base content reaches more contrast than primary alone on a light background.
+/// Primary mixed with base content reaches more contrast than primary alone, 3 to 1 or more in the five themes.
 let accentColor =
-    "color-mix(in oklch, var(--color-primary) 70%, var(--color-base-content))"
+    "color-mix(in oklch, var(--color-primary) 50%, var(--color-base-content))"
 
-/// Stroke of neutral edges and their arrows. Text stays at full base content.
-let neutralEdge = "color-mix(in oklch, var(--color-base-content) 55%, transparent)"
+/// Color of text in the accent, such as the links of the breadcrumbs. Text needs 4.5 to 1, which the
+/// accent of the strokes does not reach in the amaze theme, so this mix keeps less of the primary color.
+let accentTextColor =
+    "color-mix(in oklch, var(--color-primary) 35%, var(--color-base-content))"
+
+/// Stroke of neutral edges and their arrows. Same share of base content as the borders.
+let neutralEdge = "color-mix(in oklch, var(--color-base-content) 60%, transparent)"
+
+/// Secondary text, such as the names of pills and the subtitles of nodes. Base content at 80 percent reaches
+/// a contrast of 4.5 to 1 on base-100 and base-200 in the five themes.
+let mutedTextColor =
+    "color-mix(in oklch, var(--color-base-content) 80%, transparent)"
 
 let colorVar (color: CanvasColor) : string =
     match color with

@@ -57,6 +57,13 @@ type LegendSwatch =
 
 type LegendItem = { Label: string; Swatch: LegendSwatch }
 
+/// The rows of a view that are not finished yet: rows without an output and rows without an input.
+/// A row with neither counts in both. Work in progress ARCs have such rows, and the page says so.
+type IncompleteRows = {
+    MissingOutputs: int
+    MissingInputs: int
+}
+
 module ProvenanceView =
 
     /// The text of the level, without its ids.

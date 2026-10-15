@@ -5,11 +5,15 @@ module ElectronRenderer.ProvenanceGraphPageTests
 // object, and it returns to the datasets when the parent passes another index object. This test renders the
 // page the way the renderer does, through ReactDOM.createRoot without a compiler, counts the layouts through
 // the layout seam of the page, and builds the index from a structuredClone of the data, like the renderer
-// gets it over IPC.
+// gets it over IPC. A second test checks that the page leaves a focus that the user set alone when the parent
+// renders again, which needs a ref callback with a stable identity. A third test renders the target of the
+// renderer with a stub for the IPC call and checks that a failed load shows its message. A fourth test does
+// the same for a page that cannot show the loaded data.
 
 open Browser.Dom
 open Browser.Types
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Vitest
 open ARCtrl
@@ -18,6 +22,30 @@ open Swate.Components.Shared.ProvenanceGraph.BuildIndex
 open Swate.Components.Composite.GraphCanvas.Types
 open Swate.Components.Composite.GraphCanvas.Layout
 open Swate.Components.Page.ProvenanceGraph
+
+// The target loads the data through the IPC bridge of the arc vault. The preload is absent in tests, so the
+// bridge is a stub. It counts its calls and answers with the function a test sets. The factory runs before the
+// rest of the module, so it reads both variables only inside the stub.
+let mutable private loadCalls = 0
+
+let mutable private loadAnswer: int -> JS.Promise<Result<ProvenanceGraphData, exn>> =
+    fun _ -> promise { return failwith "No answer set." }
+
+Vitest.vi.mock (
+    "./src/Electron/src/Renderer/Api.js",
+    box (fun () ->
+        createObj [
+            "ipcArcVaultApi"
+            ==> createObj [
+                "loadProvenanceGraph"
+                ==> fun () ->
+                    loadCalls <- loadCalls + 1
+                    loadAnswer loadCalls
+            ]
+        ]
+    )
+)
+|> ignore
 
 let rec private waitUntil (what: string) (predicate: unit -> bool) (attempts: int) = promise {
     if predicate () then
@@ -47,6 +75,12 @@ let private renderToBody (element: ReactElement) = promise {
 [<Emit("$0.dispatchEvent(new MouseEvent('click', { bubbles: true }))")>]
 let private dispatchClick (el: Element) : unit = jsNative
 
+[<Emit("$0.focus()")>]
+let private focus (el: Element) : unit = jsNative
+
+let private isFocused (el: Element) : bool =
+    obj.ReferenceEquals(document.activeElement, el)
+
 [<Emit("structuredClone($0)")>]
 let private structuredClone<'T> (value: 'T) : 'T = jsNative
 
@@ -60,9 +94,9 @@ let private table (name: string) (headers: CompositeHeader list) (rows: Composit
 
     ArcTable.createFromRows (name, ResizeArray<CompositeHeader>(headers :> seq<CompositeHeader>), rows)
 
-/// A study that makes two samples and an assay that reads them. Every call builds a new index object from a
-/// clone of the data, like the renderer gets it over IPC.
-let private buildIndex () : ProvenanceIndex =
+/// A study that makes two samples, an assay that reads them and an assay without tables. The data is a clone,
+/// like the renderer gets it over IPC.
+let private buildData () : ProvenanceGraphData =
     let headers = [
         CompositeHeader.Input IOType.Sample
         CompositeHeader.Output IOType.Sample
@@ -93,9 +127,25 @@ let private buildIndex () : ProvenanceIndex =
         )
 
     let arc =
-        ArcInvestigation.create (identifier = "arc-1", studies = ResizeArray [ study ], assays = ResizeArray [ assay ])
+        ArcInvestigation.create (
+            identifier = "arc-1",
+            studies = ResizeArray [ study ],
+            assays = ResizeArray [ assay; ArcAssay.create (identifier = "Empty") ]
+        )
 
-    ProvenanceIndex.ofData (structuredClone (ProvenanceGraphData.ofInvestigation arc))
+    structuredClone (ProvenanceGraphData.ofInvestigation arc)
+
+/// Every call builds a new index object.
+let private buildIndex () : ProvenanceIndex = ProvenanceIndex.ofData (buildData ())
+
+/// The data with a first dataset whose identifier throws when the page reads it. The index builds without the
+/// identifier, and the datasets view needs it, so the load succeeds and the page fails.
+[<Emit("""(() => {
+    const broken = { ...$0.Datasets[0] };
+    Object.defineProperty(broken, 'Identifier', { get() { throw new Error('The dataset cannot be read.') } });
+    return { ...$0, Datasets: [broken, ...$0.Datasets.slice(1)] };
+})()""")>]
+let private withUnreadableDataset (data: ProvenanceGraphData) : ProvenanceGraphData = jsNative
 
 /// The parent holds the index in state, like the page that loads an ARC. The counter forces a render of the
 /// parent without a change of the index.
@@ -195,6 +245,96 @@ Vitest.describe (
                     Vitest.expect(crumbCount container).toBe 1
                     Vitest.expect(present container "graph-node-studies/S/::sampling").toBe false
                     Vitest.expect(layouts.Value).toBeGreaterThan afterNavigation
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "leaves the focus where the user put it when the parent renders again",
+            TestOptions(timeout = 60000),
+            fun () -> promise {
+                let first = buildIndex ()
+                let second = buildIndex ()
+                let! container, cleanup = renderToBody (Parent(first, second, layoutGraph))
+
+                try
+                    do! waitUntil "the datasets" (fun () -> present container "graph-node-assays/Empty/") 500
+
+                    // A dataset without processes shows the message, which takes the focus after the navigation.
+                    dispatchClick (find container "graph-node-assays/Empty/")
+                    do! waitUntil "the message" (fun () -> present container "provenance-empty") 500
+                    Vitest.expect(isFocused (find container "provenance-empty")).toBe true
+
+                    // The user moves the focus to the first crumb. A render of the parent with the same
+                    // index object must leave it there.
+                    let crumb = find container "provenance-crumb-0"
+                    focus crumb
+                    Vitest.expect(isFocused crumb).toBe true
+
+                    dispatchClick (find container "render-again")
+                    do! waitUntil "the next render" (fun () -> (find container "render-again").textContent = "1") 500
+                    do! Promise.sleep 100
+
+                    Vitest.expect(isFocused crumb).toBe true
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "shows the message of a failed load and loads once",
+            TestOptions(timeout = 60000),
+            fun () -> promise {
+                // The call of the bridge rejects.
+                loadCalls <- 0
+                loadAnswer <- fun _ -> promise { return failwith "The bridge is down." }
+
+                let! container, cleanup =
+                    renderToBody (Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphTarget())
+
+                try
+                    do! waitUntil "the load error" (fun () -> present container "provenance-graph-error") 500
+                    do! Promise.sleep 50
+
+                    Vitest
+                        .expect((find container "provenance-graph-error").textContent.Contains "The bridge is down.")
+                        .toBe
+                        true
+
+                    Vitest.expect(present container "provenance-graph").toBe false
+                    Vitest.expect(loadCalls).toBe 1
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "shows the message of the page when the loaded data cannot be shown",
+            TestOptions(timeout = 60000),
+            fun () -> promise {
+                // The load succeeds, and the datasets view cannot read the first dataset.
+                loadCalls <- 0
+                loadAnswer <- fun _ -> promise { return Ok(withUnreadableDataset (buildData ())) }
+
+                let! container, cleanup =
+                    renderToBody (Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphTarget())
+
+                try
+                    // The page shows its own alert with the breadcrumbs above it. The load itself did not fail.
+                    do! waitUntil "the page error" (fun () -> present container "provenance-error") 500
+
+                    Vitest
+                        .expect(
+                            (find container "provenance-error-message").textContent.Contains
+                                "The dataset cannot be read."
+                        )
+                        .toBe
+                        true
+
+                    Vitest.expect(present container "provenance-crumb-0").toBe true
+                    Vitest.expect(present container "provenance-graph-error").toBe false
+                    Vitest.expect(loadCalls).toBe 1
                 finally
                     cleanup ()
             }

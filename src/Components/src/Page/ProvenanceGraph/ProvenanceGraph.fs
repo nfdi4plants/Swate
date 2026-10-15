@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.JsBindings
 open Swate.Components.JsBindings.ReactHooks
+open Swate.Components.Primitive.ErrorBoundary
 open Swate.Components.Composite.GraphCanvas
 open Swate.Components.Composite.GraphCanvas.Types
 open Swate.Components.Shared.ProvenanceGraph.Types
@@ -17,13 +18,23 @@ open Swate.Components.Page.ProvenanceGraph.Header
 module private ProvenanceGraphTypes =
 
     /// What the canvas of a view shows. Cap holds the shown and the total node count of a lineage that was cut.
+    /// Incomplete counts the rows of the view that have no output or no input yet.
     type Shown = {
         Nodes: CanvasNode[]
         Edges: CanvasEdge[]
         AriaLabel: string
         CenterNodeId: string option
         Cap: (int * int) option
+        Incomplete: IncompleteRows
     }
+
+    /// What a view has to show. NoResult means that the index has no result for the selection. Failed holds the
+    /// message of an error that the query or the mapping threw.
+    [<RequireQualifiedAccess>]
+    type Content =
+        | NoResult
+        | Graph of Shown
+        | Failed of string
 
     /// The views that have no graph to draw. Only the first three levels can come up empty.
     /// A group always has a member and a lineage always contains its own node.
@@ -46,27 +57,30 @@ module private ProvenanceGraphHelper =
         else
             label
 
-    let toShown (graph: CanvasGraph) (ariaLabel: string) : Shown = {
+    let toShown (graph: CanvasGraph) (ariaLabel: string) (incomplete: IncompleteRows) : Shown = {
         Nodes = graph.Nodes
         Edges = graph.Edges
         AriaLabel = ariaLabel
         CenterNodeId = None
         Cap = None
+        Incomplete = incomplete
     }
 
     /// The canvas input of a view. None means that the index has no result for the selection.
     let shownOf (index: ProvenanceIndex) (view: ProvenanceView) : Shown option =
+        let incomplete = incompleteRows index view None
+
         match view with
-        | ProvenanceView.Datasets -> Some(toShown (datasetsToCanvas (datasetGraph index)) datasetsAriaLabel)
+        | ProvenanceView.Datasets -> Some(toShown (datasetsToCanvas (datasetGraph index)) datasetsAriaLabel incomplete)
         | ProvenanceView.Processes datasetId ->
             processGraph index datasetId
-            |> Option.map (fun graph -> toShown (processesToCanvas graph) processesAriaLabel)
+            |> Option.map (fun graph -> toShown (processesToCanvas graph) processesAriaLabel incomplete)
         | ProvenanceView.Groups(_, processKey) ->
             processGroups index processKey
-            |> Option.map (fun graph -> toShown (groupsToCanvas graph) (groupsAriaLabel graph))
+            |> Option.map (fun graph -> toShown (groupsToCanvas graph) (groupsAriaLabel graph) incomplete)
         | ProvenanceView.Detail(_, _, groupId) ->
             processDetail index groupId
-            |> Option.map (fun graph -> toShown (detailToCanvas graph) (detailAriaLabel graph))
+            |> Option.map (fun graph -> toShown (detailToCanvas graph) (detailAriaLabel graph) incomplete)
         | ProvenanceView.Lineage(_, processKey, _, nodeId) ->
             lineage index nodeId
             |> Option.map (fun full ->
@@ -84,20 +98,33 @@ module private ProvenanceGraphHelper =
                             Some(shownCount, limited.Total)
                         else
                             None
+                    Incomplete = incompleteRows index view (Some limited.Graph)
                 }
             )
 
-    let emptyKindOf (view: ProvenanceView) (shown: Shown option) : EmptyKind option =
-        match shown with
-        | None -> Some EmptyKind.NotInArc
-        | Some shown when shown.Nodes.Length = 0 ->
+    /// The query and the mapping of a view. An exception becomes a Failed content, so a broken index or a bug in
+    /// the mapping shows the message in the page and never reaches React as a thrown error.
+    let contentOf (index: ProvenanceIndex) (view: ProvenanceView) : Content =
+        try
+            match shownOf index view with
+            | Some shown -> Content.Graph shown
+            | None -> Content.NoResult
+        with error ->
+            Browser.Dom.console.error ("Could not compute the provenance view", error)
+            Content.Failed(Errors.messageOf error)
+
+    let emptyKindOf (view: ProvenanceView) (content: Content) : EmptyKind option =
+        match content with
+        | Content.NoResult -> Some EmptyKind.NotInArc
+        | Content.Failed _ -> None
+        | Content.Graph shown when shown.Nodes.Length = 0 ->
             match view with
             | ProvenanceView.Datasets -> Some EmptyKind.NoDatasets
             | ProvenanceView.Processes _ -> Some EmptyKind.NoProcesses
             | ProvenanceView.Groups _ -> Some EmptyKind.NoGroups
             | ProvenanceView.Detail _
             | ProvenanceView.Lineage _ -> None
-        | Some _ -> None
+        | Content.Graph _ -> None
 
     let emptyKindText (kind: EmptyKind) : string =
         match kind with
@@ -120,6 +147,7 @@ open ProvenanceGraphHelper
 /// groups of a process, the nodes around a group and the lineage of a node. A click on a node opens the next
 /// level, and the breadcrumbs lead back. The parent builds the index once for each ARC. A new index object
 /// returns the page to the datasets. The page fills its parent, which needs a height.
+/// A view that cannot be shown says so with the message of the error, and the breadcrumbs stay usable.
 [<Erase; Mangle(false)>]
 type ProvenanceGraph =
 
@@ -131,7 +159,7 @@ type ProvenanceGraph =
             prop.testId "provenance-legend"
             prop.ariaLabel "Legend"
             prop.className
-                "swt:m-0 swt:flex swt:list-none swt:flex-wrap swt:gap-x-3 swt:gap-y-1 swt:p-0 swt:text-xs swt:text-base-content/60"
+                "swt:m-0 swt:flex swt:list-none swt:flex-wrap swt:gap-x-3 swt:gap-y-1 swt:p-0 swt:text-xs swt:text-base-content/80"
             prop.children [
                 for item in items ->
                     Html.li [
@@ -160,6 +188,37 @@ type ProvenanceGraph =
                             Html.text item.Label
                         ]
                     ]
+            ]
+        ]
+
+    /// The alert of a view that could not be shown. The message comes from the error. The page shows the ARC as it
+    /// was when it opened, so the hint sends the user to open the graph again after a fix.
+    [<ReactComponent>]
+    static member private ErrorAlert(message: string) =
+        Html.div [
+            prop.testId "provenance-error"
+            prop.role.alert
+            prop.className "swt:alert swt:alert-error swt:m-3 swt:flex-none"
+            prop.children [
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--error-circle-24-regular swt:size-5"
+                ]
+                Html.div [
+                    Html.p [
+                        prop.className "swt:m-0"
+                        prop.text "This view could not be shown."
+                    ]
+                    Html.p [
+                        prop.testId "provenance-error-message"
+                        prop.className "swt:m-0 swt:break-words swt:text-xs"
+                        prop.text message
+                    ]
+                    Html.p [
+                        prop.className "swt:m-0 swt:text-xs"
+                        prop.text
+                            "The graph shows the ARC as it was when this page opened. After you fix the ARC, open the graph again."
+                    ]
+                ]
             ]
         ]
 
@@ -278,20 +337,26 @@ type ProvenanceGraph =
         let crumbItem (position: int) (crumb: Crumb) : ReactElement =
             let fullIndex = fullIndexOf crumb
             let isLast = position = lastPosition
-            // In the narrow header the crumb before the current one gives way first, then the current one.
+            // In the narrow header the crumb before the current one gives way first, then the first one, and the
+            // current one last. Every crumb keeps a small width and shows an ellipsis when it is cut.
             let givesWay = narrow && position > 0 && position = lastPosition - 1
             let shown = cutLabel crumb.Label
-            // The CSS can cut these two crumbs of the narrow header, so they always carry their full text.
+            // The CSS can cut the crumbs of the narrow header, so they always carry their full text.
             let title =
-                if shown = crumb.Label && not (narrow && (isLast || givesWay)) then
+                if shown = crumb.Label && not narrow then
                     None
                 else
                     Some crumb.Label
 
+            // A crumb after the first one starts with its separator, which takes about 26px of the item.
+            // The shrink factors set the order in which the items give way. Their sum stays at 1 or more for as long
+            // as an item can shrink, because a sum below 1 makes the browser take back only that part of the
+            // overflow, and the crumbs would stick out of the header.
             let itemClass =
-                if narrow && isLast then "swt:min-w-0 swt:shrink-[0.0001]"
-                elif givesWay then "swt:min-w-0"
-                else ""
+                if not narrow then ""
+                elif isLast then "swt:min-w-9 swt:shrink-[1]"
+                elif givesWay then "swt:min-w-12 swt:shrink-[1000]"
+                else "swt:min-w-7 swt:shrink-[10]"
 
             Html.li [
                 prop.key $"crumb-{fullIndex}"
@@ -304,7 +369,7 @@ type ProvenanceGraph =
                             // daisyUI makes the children of a crumb flex boxes, which show no ellipsis. A block does.
                             prop.className (
                                 if narrow then
-                                    "swt:block swt:min-w-0 swt:cursor-default swt:overflow-hidden swt:text-ellipsis swt:font-semibold swt:hover:no-underline"
+                                    "swt:block swt:min-w-0 swt:cursor-default swt:truncate swt:font-semibold swt:hover:no-underline"
                                 else
                                     "swt:cursor-default swt:font-semibold swt:hover:no-underline"
                             )
@@ -318,11 +383,13 @@ type ProvenanceGraph =
                             prop.type'.button
                             prop.testId $"provenance-crumb-{fullIndex}"
                             prop.className (
-                                if givesWay then
-                                    "swt:link swt:link-primary swt:link-hover swt:block swt:min-w-0 swt:overflow-hidden swt:text-ellipsis"
+                                if narrow then
+                                    "swt:link swt:link-hover swt:block swt:min-w-0 swt:truncate"
                                 else
-                                    "swt:link swt:link-primary swt:link-hover"
+                                    "swt:link swt:link-hover"
                             )
+                            // Link text needs a contrast of 4.5 to 1, which the primary color alone does not reach.
+                            prop.style [ style.custom ("color", accentTextColor) ]
                             match title with
                             | Some title -> prop.title title
                             | None -> ()
@@ -336,6 +403,7 @@ type ProvenanceGraph =
         let menuItem: ReactElement =
             Html.li [
                 prop.key "crumb-menu"
+                prop.className "swt:shrink-0"
                 prop.children [
                     ProvenanceGraph.HiddenCrumbs(
                         [| for crumb in layout.Hidden -> fullIndexOf crumb, crumb |],
@@ -350,7 +418,14 @@ type ProvenanceGraph =
             prop.children [
                 Html.nav [
                     prop.ariaLabel "Breadcrumb"
-                    prop.className "swt:breadcrumbs swt:min-w-0 swt:overflow-visible swt:p-0 swt:text-sm"
+                    // Without the menu nothing has to stick out of the nav, so what does not fit is cut. The list
+                    // of the menu needs the room below the nav.
+                    prop.className (
+                        if narrow && hiddenCount = 0 then
+                            "swt:breadcrumbs swt:min-w-0 swt:overflow-hidden swt:p-0 swt:text-sm"
+                        else
+                            "swt:breadcrumbs swt:min-w-0 swt:overflow-visible swt:p-0 swt:text-sm"
+                    )
                     prop.children [
                         Html.ol [
                             prop.children [
@@ -440,13 +515,18 @@ type ProvenanceGraph =
 
         // A level is only computed for the current view, and the arrays keep their identity until the index or
         // the view changes, because the canvas lays out again for new arrays.
-        let shown =
-            React.useMemo ((fun () -> shownOf index view), [| box index; box viewKey |])
+        let content =
+            React.useMemo ((fun () -> contentOf index view), [| box index; box viewKey |])
 
         let crumbs =
             React.useMemo ((fun () -> ProvenanceView.crumbs index view), [| box index; box viewKey |])
 
-        let empty = emptyKindOf view shown
+        let empty = emptyKindOf view content
+
+        let failed =
+            match content with
+            | Content.Failed _ -> true
+            | _ -> false
 
         // A ref callback needs a stable identity. React runs a new function again on every commit, and the
         // message would take the focus back each time the page renders.
@@ -459,6 +539,85 @@ type ProvenanceGraph =
                 [||]
             )
 
+        // The children carry keys, so the canvas keeps its place when a note or the hint comes and goes. Without
+        // them the position of the canvas shifts, React mounts it again and the zoom is lost.
+        let body =
+            Html.div [
+                prop.className "swt:flex swt:min-h-0 swt:min-w-0 swt:flex-1 swt:flex-col"
+                prop.children [
+                    match content with
+                    | Content.Graph { Cap = Some(shownCount, total) } ->
+                        Html.p [
+                            prop.key "cap"
+                            prop.testId "provenance-lineage-cap"
+                            prop.role.status
+                            prop.className
+                                "swt:m-0 swt:flex-none swt:border-b swt:border-base-300 swt:px-3.5 swt:py-1.5 swt:text-xs swt:text-base-content/80"
+                            prop.text $"Showing {shownCount} of {total} nodes."
+                        ]
+                    | _ -> ()
+
+                    match empty, content with
+                    | _, Content.Failed message -> React.KeyedFragment("error", [ ProvenanceGraph.ErrorAlert message ])
+                    | None, Content.Graph shown ->
+                        Html.div [
+                            prop.key "canvas"
+                            prop.className
+                                "swt:relative swt:flex swt:min-h-0 swt:min-w-0 swt:flex-1 swt:flex-col swt:overflow-hidden"
+                            prop.children [
+                                GraphCanvas.GraphCanvas(
+                                    shown.Nodes,
+                                    shown.Edges,
+                                    shown.AriaLabel,
+                                    viewKey,
+                                    onNodeClick = (fun id -> navigate (ProvenanceView.next index view id)),
+                                    ?centerNodeId = shown.CenterNodeId,
+                                    focusOnMount = navigated,
+                                    ?layout = layout
+                                )
+                            ]
+                        ]
+                    | Some kind, _ ->
+                        Html.p [
+                            prop.key "empty"
+                            prop.testId "provenance-empty"
+                            prop.custom ("data-empty", emptyKindText kind)
+                            prop.className
+                                "swt:m-auto swt:px-3.5 swt:py-[18px] swt:text-center swt:text-base-content/80"
+                            prop.tabIndex -1
+                            if navigated then
+                                prop.ref focusRef
+                            prop.text (emptyMessage kind)
+                        ]
+                    | None, _ -> ()
+
+                    match content with
+                    | Content.Graph shown when shown.Incomplete.MissingOutputs > 0 || shown.Incomplete.MissingInputs > 0 ->
+                        Html.p [
+                            prop.key "incomplete"
+                            prop.testId "provenance-incomplete"
+                            prop.custom ("data-missing-outputs", shown.Incomplete.MissingOutputs)
+                            prop.custom ("data-missing-inputs", shown.Incomplete.MissingInputs)
+                            prop.role.status
+                            prop.className
+                                "swt:m-0 swt:flex-none swt:border-t swt:border-base-300 swt:px-3.5 swt:py-1.5 swt:text-xs swt:text-base-content/80"
+                            prop.text (incompleteNote shown.Incomplete)
+                        ]
+                    | _ -> ()
+
+                    match view with
+                    | ProvenanceView.Detail _ when empty.IsNone && not failed ->
+                        Html.p [
+                            prop.key "hint"
+                            prop.testId "provenance-hint"
+                            prop.className
+                                "swt:m-0 swt:flex-none swt:border-t swt:border-base-300 swt:px-3.5 swt:py-1.5 swt:text-xs swt:text-base-content/80"
+                            prop.text "Select a node to see its lineage."
+                        ]
+                    | _ -> ()
+                ]
+            ]
+
         Html.section [
             prop.testId "provenance-graph"
             prop.ariaLabel "Provenance graph"
@@ -467,69 +626,13 @@ type ProvenanceGraph =
             prop.style [ for name, value in palette -> style.custom (name, value) ]
             prop.children [
                 ProvenanceGraph.Header(crumbs, navigate)
-                Html.div [
-                    prop.className "swt:flex swt:min-h-0 swt:min-w-0 swt:flex-1 swt:flex-col"
-                    // The children carry keys, so the canvas keeps its place when the note or the hint comes
-                    // and goes. Without them the position of the canvas shifts, React mounts it again and the
-                    // zoom is lost.
-                    prop.children [
-                        match shown with
-                        | Some { Cap = Some(shownCount, total) } ->
-                            Html.p [
-                                prop.key "cap"
-                                prop.testId "provenance-lineage-cap"
-                                prop.role.status
-                                prop.className
-                                    "swt:m-0 swt:flex-none swt:border-b swt:border-base-300 swt:px-3.5 swt:py-1.5 swt:text-xs swt:text-base-content/60"
-                                prop.text $"Showing {shownCount} of {total} nodes."
-                            ]
-                        | _ -> ()
-
-                        match empty, shown with
-                        | None, Some shown ->
-                            Html.div [
-                                prop.key "canvas"
-                                prop.className
-                                    "swt:relative swt:flex swt:min-h-0 swt:min-w-0 swt:flex-1 swt:flex-col swt:overflow-hidden"
-                                prop.children [
-                                    GraphCanvas.GraphCanvas(
-                                        shown.Nodes,
-                                        shown.Edges,
-                                        shown.AriaLabel,
-                                        viewKey,
-                                        onNodeClick = (fun id -> navigate (ProvenanceView.next index view id)),
-                                        ?centerNodeId = shown.CenterNodeId,
-                                        focusOnMount = navigated,
-                                        ?layout = layout
-                                    )
-                                ]
-                            ]
-                        | Some kind, _ ->
-                            Html.p [
-                                prop.key "empty"
-                                prop.testId "provenance-empty"
-                                prop.custom ("data-empty", emptyKindText kind)
-                                prop.className
-                                    "swt:m-auto swt:px-3.5 swt:py-[18px] swt:text-center swt:text-base-content/60"
-                                prop.tabIndex -1
-                                if navigated then
-                                    prop.ref focusRef
-                                prop.text (emptyMessage kind)
-                            ]
-                        | None, None -> ()
-
-                        match view with
-                        | ProvenanceView.Detail _ when empty.IsNone ->
-                            Html.p [
-                                prop.key "hint"
-                                prop.testId "provenance-hint"
-                                prop.className
-                                    "swt:m-0 swt:flex-none swt:border-t swt:border-base-300 swt:px-3.5 swt:py-1.5 swt:text-xs swt:text-base-content/60"
-                                prop.text "Select a node to see its lineage."
-                            ]
-                        | _ -> ()
-                    ]
-                ]
+                // An error while the body renders shows the alert in its place and leaves the header alone. A new
+                // view clears the error.
+                ErrorBoundary.ErrorBoundary(
+                    body,
+                    (fun error _ -> ProvenanceGraph.ErrorAlert error.Message),
+                    resetKey = viewKey
+                )
                 Html.div [
                     prop.className "swt:flex-none swt:border-t swt:border-base-300 swt:bg-base-200 swt:px-3.5 swt:py-2"
                     prop.children [ ProvenanceGraph.Legend view ]

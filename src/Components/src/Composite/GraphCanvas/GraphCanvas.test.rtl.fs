@@ -686,6 +686,29 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "names the reason of a failed layout in the alert",
+            fun () -> promise {
+                silenceConsoleError ()
+
+                let seam =
+                    seamOf [
+                        fun _ _ _ _ _ -> Promise.reject (exn "elk failed")
+                    ]
+
+                render {
+                    defaults with
+                        LayoutSeam = Some seam.Fn
+                }
+                |> ignore
+
+                do! eventually (fun () -> Vitest.expect(roleOf (statusEl ())).toBe "alert")
+
+                Vitest.expect((RTL.screen.getByTestId "graph-status-reason").textContent.Contains "elk failed").toBe
+                    true
+            }
+        )
+
+        Vitest.test (
             "moves focus to the container that shows the alert when the layout of a new view fails",
             fun () -> promise {
                 silenceConsoleError ()

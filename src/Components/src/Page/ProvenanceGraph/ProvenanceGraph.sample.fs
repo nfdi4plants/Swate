@@ -5,6 +5,9 @@
 /// Assay Measurement: the extracts give raw data files.
 /// Assay Empty: has no tables.
 /// Run Analysis: the raw data files give result files.
+///
+/// The work in progress ARC (wipIndex) has an assay Draft with unfinished rows: one extraction table whose rows
+/// lack an output or an input, and a planned table that holds only a protocol.
 module internal Swate.Components.Page.ProvenanceGraphSample
 
 open ARCtrl
@@ -127,6 +130,34 @@ module private Fixtures =
                 ]
         )
 
+    /// Rows that are not finished: two without an output, one without an input, and a table of two rows
+    /// that holds only a protocol.
+    let draftExtraction () =
+        let row leaf extract = [ text leaf; text "extraction.md"; text extract ]
+
+        table "Extraction" [
+            CompositeHeader.Input IOType.Sample
+            CompositeHeader.ProtocolREF
+            CompositeHeader.Output IOType.Sample
+        ] [
+            row "leaf-1" "extract-1"
+            row "leaf-2" ""
+            row "leaf-3" ""
+            row "" "extract-4"
+        ]
+
+    let draftPlanned () =
+        table "Planned" [ CompositeHeader.ProtocolREF ] [ [ text "measurement.md" ]; [ text "measurement.md" ] ]
+
+    let workInProgress () =
+        ArcInvestigation.create (
+            identifier = "Draft-example",
+            assays =
+                ResizeArray [
+                    ArcAssay.create (identifier = "Draft", tables = ResizeArray [ draftExtraction (); draftPlanned () ])
+                ]
+        )
+
 /// The plain data of the example ARC.
 let data: ProvenanceGraphData =
     ProvenanceGraphData.ofInvestigation (Fixtures.investigation ())
@@ -137,3 +168,7 @@ let index: ProvenanceIndex = ProvenanceIndex.ofData data
 /// An ARC without studies, assays and runs.
 let emptyIndex: ProvenanceIndex =
     ProvenanceIndex.ofData (ProvenanceGraphData.ofInvestigation (ArcInvestigation.init "Empty-example"))
+
+/// An ARC with unfinished rows, as a draft has them. Unfinished rows show as nodes without a connection.
+let wipIndex: ProvenanceIndex =
+    ProvenanceIndex.ofData (ProvenanceGraphData.ofInvestigation (Fixtures.workInProgress ()))

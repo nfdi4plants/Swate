@@ -1010,6 +1010,149 @@ let private keyTests =
 #endif
     ]
 
+// Work in progress ARC: rows without an output, rows without an input, a table with an Input column only, a table
+// whose headers have no cells filled, and a table with a protocol only. The same ARC serves the query tests.
+
+/// One assay Draft with five tables of 12 rows. Every row is unfinished except the first of outputs_missing and the
+/// second of inputs_missing.
+let wipInvestigation () =
+    let headers = [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.ProtocolREF
+        CompositeHeader.Output IOType.Sample
+    ]
+
+    let row input output = [ text input; text "draft.md"; text output ]
+
+    let outputsMissing =
+        table "outputs_missing" headers [ row "a1" "b1"; row "a2" ""; row "a3" "" ]
+
+    let inputsMissing = table "inputs_missing" headers [ row "" "c1"; row "d1" "d2" ]
+
+    let onlyInput =
+        table "only_input" [ CompositeHeader.Input IOType.Sample ] [ [ text "e1" ]; [ text "e2" ] ]
+
+    let unfilled = ArcTable.init "unfilled"
+    unfilled.AddColumn(CompositeHeader.Input IOType.Sample)
+    unfilled.AddColumn(CompositeHeader.Output IOType.Sample)
+    unfilled.AddRowsEmpty 3
+
+    let protocolOnly =
+        table "protocol_only" [ CompositeHeader.ProtocolREF ] [ [ text "plan.md" ]; [ text "plan.md" ] ]
+
+    investigation [] [
+        assayOf "Draft" [
+            outputsMissing
+            inputsMissing
+            onlyInput
+            unfilled
+            protocolOnly
+        ]
+    ] []
+
+let private wipData () =
+    ProvenanceGraphData.ofInvestigation (wipInvestigation ())
+
+let private draftKey (table: string) = $"assays/Draft/::{table}"
+
+let private wipTests =
+    testList "work in progress" [
+        testCase "builds the data without an error and keeps a process for every table with rows"
+        <| fun _ ->
+            let data = wipData ()
+
+            Expect.equal
+                (data.Processes |> Array.map (fun p -> p.Name, p.RowIds.Length))
+                [|
+                    ("outputs_missing", 3)
+                    ("inputs_missing", 2)
+                    ("only_input", 2)
+                    ("unfilled", 3)
+                    ("protocol_only", 2)
+                |]
+                "Every table keeps its rows."
+
+            Expect.equal data.Rows.Length 12 "all rows"
+
+        testCase "keeps the side of an unfinished row that has a value"
+        <| fun _ ->
+            let data = wipData ()
+
+            let ends (id: string) =
+                (rowWithId data id).Inputs, (rowWithId data id).Outputs
+
+            Expect.equal (ends (draftKey "outputs_missing" + "#0")) ([| "a1" |], [| "b1" |]) "finished row"
+            Expect.equal (ends (draftKey "outputs_missing" + "#1")) ([| "a2" |], [||]) "no output"
+            Expect.equal (ends (draftKey "inputs_missing" + "#0")) ([||], [| "c1" |]) "no input"
+            Expect.equal (ends (draftKey "only_input" + "#1")) ([| "e2" |], [||]) "input column only"
+            Expect.equal (ends (draftKey "unfilled" + "#2")) ([||], [||]) "headers without cells"
+            Expect.equal (ends (draftKey "protocol_only" + "#0")) ([||], [||]) "protocol only"
+
+        testCase "keeps the nodes of unfinished rows and makes no node of an empty cell"
+        <| fun _ ->
+            let data = wipData ()
+            let ids = data.Nodes |> Array.map (fun n -> n.Id) |> Array.sort
+
+            Expect.equal
+                ids
+                [| "a1"; "a2"; "a3"; "b1"; "c1"; "d1"; "d2"; "e1"; "e2" |]
+                "Input and output nodes of unfinished rows stay, empty cells make no node."
+
+        testCase "puts the unfinished rows into the groups and creates no edge for a missing end"
+        <| fun _ ->
+            let data = wipData ()
+            let processOf name = processNamed data name
+
+            let outputsMissing = processOf "outputs_missing"
+
+            Expect.equal
+                (outputsMissing.InputGroups |> Array.map (fun g -> sortedStrings g.NodeIds))
+                [| [| "a1"; "a2"; "a3" |] |]
+                "The inputs of the unfinished rows share the group of the finished row."
+
+            Expect.equal (outputsMissing.OutputGroups |> Array.map (fun g -> g.NodeIds)) [| [| "b1" |] |] "outputs"
+
+            Expect.equal
+                (outputsMissing.GroupEdges |> Array.map (fun e -> e.RowIds))
+                [| [| draftKey "outputs_missing" + "#0" |] |]
+                "one edge"
+
+            let inputsMissing = processOf "inputs_missing"
+            Expect.equal (inputsMissing.InputGroups |> Array.map (fun g -> g.NodeIds)) [| [| "d1" |] |] "inputs"
+
+            Expect.equal
+                (inputsMissing.OutputGroups |> Array.map (fun g -> sortedStrings g.NodeIds))
+                [| [| "c1"; "d2" |] |]
+                "outputs"
+
+            Expect.equal
+                (inputsMissing.GroupEdges |> Array.map (fun e -> e.RowIds))
+                [| [| draftKey "inputs_missing" + "#1" |] |]
+                "one edge"
+
+            let onlyInput = processOf "only_input"
+
+            Expect.equal
+                (onlyInput.InputGroups |> Array.map (fun g -> sortedStrings g.NodeIds))
+                [| [| "e1"; "e2" |] |]
+                "inputs"
+
+            Expect.isEmpty onlyInput.OutputGroups "no output group"
+            Expect.isEmpty onlyInput.GroupEdges "no edge"
+
+            for name in [ "unfilled"; "protocol_only" ] do
+                let p = processOf name
+                Expect.isEmpty p.Signatures $"{name}: no signature"
+                Expect.isEmpty p.InputGroups $"{name}: no input group"
+                Expect.isEmpty p.OutputGroups $"{name}: no output group"
+                Expect.isEmpty p.GroupEdges $"{name}: no edge"
+
+            Expect.equal
+                (data.Processes |> Array.sumBy (fun p -> p.GroupEdges.Length))
+                2
+                "Only the two finished rows make an edge."
+    ]
+
 let tests =
     testList "ProvenanceGraph BuildIndex" [
         datasetTests
@@ -1017,4 +1160,5 @@ let tests =
         signatureTests
         nodeTests
         keyTests
+        wipTests
     ]

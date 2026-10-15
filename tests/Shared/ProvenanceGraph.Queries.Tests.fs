@@ -724,6 +724,118 @@ let private unknownIdTests =
             Expect.isNone (lineage index "nope") "lineage"
     ]
 
+// The ARC of ProvenanceGraphBuildIndexTests.wipInvestigation has rows without an output or an input. Every query
+// has to answer for every id of it, and unfinished rows show as nodes without a connection.
+let private wipTests =
+    let index () =
+        ProvenanceIndex.ofData (
+            ProvenanceGraphData.ofInvestigation (ProvenanceGraphBuildIndexTests.wipInvestigation ())
+        )
+
+    let key (table: string) = $"assays/Draft/::{table}"
+
+    testList "work in progress" [
+        testCase "answers every query for every id"
+        <| fun _ ->
+            let index = index ()
+
+            let datasets = datasetGraph index
+            Expect.equal datasets.Nodes.Length 1 "one dataset"
+            Expect.isEmpty datasets.Edges "A dataset has no edge to itself."
+
+            for dataset in index.Datasets do
+                Expect.isSome (processGraph index dataset.Id) $"processGraph {dataset.Id}"
+
+            for p in index.Processes do
+                Expect.isSome (processGroups index p.Key) $"processGroups {p.Key}"
+
+                for group in Array.append p.InputGroups p.OutputGroups do
+                    Expect.isSome (processDetail index group.Id) $"processDetail {group.Id}"
+
+            for n in index.Nodes do
+                Expect.isSome (lineage index n.Id) $"lineage {n.Id}"
+
+        testCase "shows the processes of the draft, also the ones without groups"
+        <| fun _ ->
+            let graph = (processGraph (index ()) "assays/Draft/").Value
+
+            Expect.equal
+                (graph.Nodes |> Array.map (fun n -> n.Label, n.RowCount))
+                [|
+                    ("outputs_missing", 3)
+                    ("inputs_missing", 2)
+                    ("only_input", 2)
+                    ("unfilled", 3)
+                    ("protocol_only", 2)
+                |]
+                "All five processes are own processes with their rows."
+
+            Expect.isEmpty graph.Edges "No row connects two processes."
+
+        testCase "gives the groups of unfinished rows and no edge for a missing end"
+        <| fun _ ->
+            let index = index ()
+            let groups = (processGroups index (key "outputs_missing")).Value
+
+            Expect.equal
+                (groups.Nodes |> Array.map (fun n -> IoSide.toText n.Side, n.Label))
+                [| ("inputs", "Inputs A"); ("outputs", "Outputs A") |]
+                "groups"
+
+            Expect.equal
+                (groups.Edges |> Array.map (fun e -> e.Id))
+                [| key "outputs_missing" + "@0" |]
+                "The finished row makes the only edge."
+
+            let planned = (processGroups index (key "protocol_only")).Value
+            Expect.isEmpty planned.Nodes "A table with a protocol only has no group."
+            Expect.isEmpty planned.Edges "and no edge."
+
+        testCase "shows the inputs of unfinished rows in the detail view without an edge"
+        <| fun _ ->
+            let index = index ()
+            let detail = (processDetail index (key "outputs_missing" + "#in0")).Value
+
+            Expect.equal (nodeIds detail.Nodes) [| "a1"; "a2"; "a3"; "b1" |] "The unfinished inputs are nodes."
+
+            Expect.equal
+                (detail.Nodes |> Array.map (fun n -> n.Emphasized))
+                [| true; true; true; false |]
+                "Members are emphasized."
+
+            Expect.equal
+                (edgeIds detail.Edges)
+                [| key "outputs_missing" + "#0|a1|b1" |]
+                "Only the finished row has an edge."
+
+            let onlyInput = (processDetail index (key "only_input" + "#in0")).Value
+            Expect.equal (nodeIds onlyInput.Nodes) [| "e1"; "e2" |] "inputs of the table with an input column only"
+            Expect.isEmpty onlyInput.Edges "no edge"
+
+            let outputsOnly = (processDetail index (key "inputs_missing" + "#out0")).Value
+            Expect.equal (nodeIds outputsOnly.Nodes) [| "c1"; "d2"; "d1" |] "An output without an input stays a node."
+
+            Expect.equal
+                (edgeIds outputsOnly.Edges)
+                [| key "inputs_missing" + "#1|d1|d2" |]
+                "Only the finished row has an edge."
+
+        testCase "gives the lineage of a node of an unfinished row"
+        <| fun _ ->
+            let index = index ()
+
+            let noOutput = (lineage index "a2").Value
+            Expect.equal (nodeIds noOutput.Nodes) [| "a2" |] "The node stands alone."
+            Expect.isEmpty noOutput.Edges "no edge"
+
+            let noInput = (lineage index "c1").Value
+            Expect.equal (nodeIds noInput.Nodes) [| "c1" |] "The node stands alone."
+            Expect.isEmpty noInput.Edges "no edge"
+
+            let finished = (lineage index "b1").Value
+            Expect.equal (nodeIds finished.Nodes |> Array.sort) [| "a1"; "b1" |] "A finished row still connects."
+    ]
+
 let tests =
     testList "ProvenanceGraph Queries" [
         datasetGraphTests
@@ -734,4 +846,5 @@ let tests =
         sameNameTests
         splitTests
         unknownIdTests
+        wipTests
     ]

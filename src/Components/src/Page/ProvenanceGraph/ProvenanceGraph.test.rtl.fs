@@ -12,8 +12,11 @@ module internal Swate.Components.Page.ProvenanceGraph.ProvenanceGraphTests
 // shorter, three crumbs, four crumbs).
 //
 // New: a selection that the index does not know, the same index object that keeps the navigation, the
-// legend swatches, the list of hidden crumbs (state, Escape, click outside), the focus that stays where the
-// user put it when the page renders again, and the canvas that stays mounted when the cap note comes and goes.
+// legend swatches, the list of hidden crumbs (state, Escape, click outside), the canvas that stays mounted
+// when the cap note comes and goes, the note about unfinished rows of a work in progress ARC, and the error
+// state of a view that cannot be computed or drawn. The test for the focus that stays where the user put it
+// when a parent renders again lives in tests/Electron.Renderer/ProvenanceGraphPage.test.fs, because it needs a
+// real parent render.
 //
 // Dropped: the query name next to the crumbs (the label is not part of this page), and the assertions on the
 // texts of the legend, the empty messages, the hint and the aria labels. The tests find the elements by test id,
@@ -28,6 +31,8 @@ open Vitest
 open ARCtrl
 open Swate.Components.Shared.ProvenanceGraph.Types
 open Swate.Components.Shared.ProvenanceGraph.BuildIndex
+open Swate.Components.Composite.GraphCanvas.Types
+open Swate.Components.Composite.GraphCanvas.Layout
 open Swate.Components.Page.ProvenanceGraph.Types
 
 module Sample = Swate.Components.Page.ProvenanceGraphSample
@@ -355,23 +360,6 @@ Vitest.describe (
                 click (byTestId "provenance-crumb-0")
                 do! waitNode extraction
                 do! eventually (fun () -> Vitest.expect(isFocused (byTestId "graph-canvas")).toBe true)
-            }
-        )
-
-        Vitest.test (
-            "leaves the focus where the user put it when the page renders again",
-            longTest,
-            fun () -> promise {
-                let result = render Sample.index
-                do! waitNode "assays/Empty/"
-                click (nodeEl "assays/Empty/")
-                Vitest.expect(isFocused (empty ())).toBe true
-
-                let crumb = byTestId "provenance-crumb-0"
-                crumb.focus ()
-                result.rerender (ProvenanceGraph.ProvenanceGraph(Sample.index))
-
-                Vitest.expect(isFocused crumb).toBe true
             }
         )
 
@@ -736,6 +724,253 @@ Vitest.describe (
                 RTL.fireEvent.custom ("mouseDown", document.body)
 
                 Vitest.expect(present (menuItem 1)).toBe false
+            }
+        )
+)
+
+// Work in progress: unfinished rows stay as nodes without a connection, and the page counts them.
+
+Vitest.describe (
+    "ProvenanceGraph work in progress",
+    fun () ->
+        let draft = "assays/Draft/"
+        let extractionOfDraft = "assays/Draft/::Extraction"
+        let plannedOfDraft = "assays/Draft/::Planned"
+
+        let missing (name: string) : string =
+            (byTestId "provenance-incomplete").getAttribute name
+
+        let counts () : string * string =
+            missing "data-missing-outputs", missing "data-missing-inputs"
+
+        Vitest.test (
+            "counts the rows without an output or an input in the datasets and the processes view",
+            longTest,
+            fun () -> promise {
+                render Sample.wipIndex |> ignore
+                do! waitNode draft
+
+                // Two rows of the extraction and two of the planned table have no output.
+                // One row of the extraction and the two rows of the planned table have no input.
+                Vitest.expect(counts ()).toEqual ("4", "3")
+                Vitest.expect((byTestId "provenance-incomplete").textContent.Contains "4").toBe true
+
+                do! open' draft extractionOfDraft
+                Vitest.expect(counts ()).toEqual ("4", "3")
+            }
+        )
+
+        Vitest.test (
+            "shows the unfinished rows of a process as nodes without a connection",
+            longTest,
+            fun () -> promise {
+                render Sample.wipIndex |> ignore
+                do! waitNode draft
+                do! open' draft extractionOfDraft
+
+                // One input group and one output group. Only the finished row connects them.
+                do! open' extractionOfDraft (extractionOfDraft + "#in0")
+                Vitest.expect(counts ()).toEqual ("2", "1")
+                Vitest.expect(nodeCount ()).toBe 2
+
+                // The detail view holds the inputs of the unfinished rows next to the finished row.
+                do! open' (extractionOfDraft + "#in0") "leaf-2"
+                Vitest.expect(counts ()).toEqual ("2", "1")
+                Vitest.expect(present (maybeTestId "graph-node-leaf-3")).toBe true
+                Vitest.expect(present (maybeTestId "graph-node-extract-1")).toBe true
+
+                Vitest
+                    .expect(
+                        document
+                            .querySelectorAll("[data-testid^='graph-edge-']:not([data-testid^='graph-edge-toggle'])")
+                            .length
+                    )
+                    .toBe
+                    1
+            }
+        )
+
+        Vitest.test (
+            "counts the unfinished rows around a node in the lineage view",
+            longTest,
+            fun () -> promise {
+                render Sample.wipIndex |> ignore
+                do! waitNode draft
+                do! open' draft extractionOfDraft
+                do! open' extractionOfDraft (extractionOfDraft + "#in0")
+                do! open' (extractionOfDraft + "#in0") "leaf-2"
+
+                click (nodeEl "leaf-2")
+                do! eventually (fun () -> Vitest.expect(crumbCount ()).toBe 5)
+                do! waitNode "leaf-2"
+
+                // The node has one row, and that row has no output.
+                Vitest.expect(counts ()).toEqual ("1", "0")
+            }
+        )
+
+        Vitest.test (
+            "keeps the note beside the empty message of a process that has only a protocol",
+            longTest,
+            fun () -> promise {
+                render Sample.wipIndex |> ignore
+                do! waitNode draft
+                do! open' draft plannedOfDraft
+
+                click (nodeEl plannedOfDraft)
+
+                Vitest.expect(emptyKind ()).toBe "no-groups"
+                Vitest.expect(counts ()).toEqual ("2", "2")
+            }
+        )
+
+        Vitest.test (
+            "shows no note for a finished ARC",
+            longTest,
+            fun () -> promise {
+                render Sample.index |> ignore
+                do! waitNode extraction
+
+                Vitest.expect(present (maybeTestId "provenance-incomplete")).toBe false
+
+                do! open' extraction extractionProcess
+                Vitest.expect(present (maybeTestId "provenance-incomplete")).toBe false
+            }
+        )
+)
+
+// Errors: a view that cannot be shown says so, and the path above it stays usable.
+
+[<Emit("""(() => {
+    globalThis.__pageOriginalError = console.error;
+    console.error = () => {};
+})()""")>]
+let private silenceConsoleError () : unit = jsNative
+
+[<Emit("(globalThis.__pageOriginalError && (console.error = globalThis.__pageOriginalError), delete globalThis.__pageOriginalError)")>]
+let private restoreConsoleError () : unit = jsNative
+
+/// The example index where the node leaf-1 has no annotation array. The detail and the lineage view of that node
+/// throw while the canvas input is computed, and the datasets, processes and groups views work.
+let private withBrokenNode: ProvenanceIndex =
+    let nodes =
+        Sample.index.Nodes
+        |> Array.map (fun node ->
+            if node.Id = "leaf-1" then
+                {
+                    node with
+                        Annotations = Unchecked.defaultof<Annotation[]>
+                }
+            else
+                node
+        )
+
+    let byId = Dictionary<string, ProvenanceNode>()
+
+    for node in nodes do
+        byId.[node.Id] <- node
+
+    {
+        Sample.index with
+            Nodes = nodes
+            NodeById = byId
+    }
+
+/// The real layout, except that the result is broken when the graph holds the node leaf-1. The canvas then throws
+/// while it renders the layout.
+let private breakingLayout
+    (nodes: CanvasNode[])
+    (edges: CanvasEdge[])
+    (expanded: string[])
+    (measure: MeasureText)
+    (options: LayoutOptions)
+    : JS.Promise<GraphLayout> =
+    layoutGraph nodes edges expanded measure options
+    |> Promise.map (fun layout ->
+        if nodes |> Array.exists (fun node -> node.Id = "leaf-1") then
+            {
+                layout with
+                    LaidOutEdges = Unchecked.defaultof<LaidOutEdge[]>
+            }
+        else
+            layout
+    )
+
+Vitest.describe (
+    "ProvenanceGraph errors",
+    fun () ->
+        Vitest.beforeEach (fun () -> silenceConsoleError ())
+        Vitest.afterEach (fun () -> restoreConsoleError ())
+
+        Vitest.test (
+            "shows the message of an error in the computation of a view and keeps the path usable",
+            longTest,
+            fun () -> promise {
+                render withBrokenNode |> ignore
+                do! waitNode extraction
+                do! open' extraction extractionProcess
+                do! open' extractionProcess inputGroup
+
+                // The detail view of the group with leaf-1 cannot be computed.
+                click (nodeEl inputGroup)
+
+                Vitest.expect(present (maybeTestId "provenance-error")).toBe true
+                Vitest.expect((byTestId "provenance-error-message").textContent <> "").toBe true
+                Vitest.expect(present (maybeTestId "graph-canvas")).toBe false
+                Vitest.expect(crumbCount ()).toBe 4
+
+                // The crumb before it leads back to a view that works.
+                click (byTestId "provenance-crumb-2")
+                do! waitNode inputGroup
+
+                Vitest.expect(present (maybeTestId "provenance-error")).toBe false
+                Vitest.expect(crumbCount ()).toBe 3
+            }
+        )
+
+        Vitest.test (
+            "shows the message of an error that the canvas throws while it renders and keeps the path usable",
+            longTest,
+            fun () -> promise {
+                RTL.render (ProvenanceGraph.ProvenanceGraph(Sample.index, layout = breakingLayout))
+                |> ignore
+
+                do! waitNode extraction
+                do! open' extraction extractionProcess
+                do! open' extractionProcess inputGroup
+
+                click (nodeEl inputGroup)
+                do! eventually (fun () -> Vitest.expect(present (maybeTestId "provenance-error")).toBe true)
+
+                Vitest.expect((byTestId "provenance-error-message").textContent <> "").toBe true
+                Vitest.expect(crumbCount ()).toBe 4
+
+                // A new view clears the error, and the canvas works again.
+                click (byTestId "provenance-crumb-2")
+                do! waitNode inputGroup
+
+                Vitest.expect(present (maybeTestId "provenance-error")).toBe false
+            }
+        )
+
+        Vitest.test (
+            "shows the message of an error on the datasets view, where no crumb leads back",
+            longTest,
+            fun () -> promise {
+                // The first dataset is missing, so the datasets view cannot be computed.
+                let datasets = Array.copy Sample.index.Datasets
+                datasets.[0] <- Unchecked.defaultof<ProvenanceDataset>
+
+                render {
+                    Sample.index with
+                        Datasets = datasets
+                }
+                |> ignore
+
+                Vitest.expect(present (maybeTestId "provenance-error")).toBe true
+                Vitest.expect((byTestId "provenance-error-message").textContent <> "").toBe true
+                Vitest.expect(present (maybeTestId "graph-canvas")).toBe false
+                Vitest.expect(crumbCount ()).toBe 1
             }
         )
 )

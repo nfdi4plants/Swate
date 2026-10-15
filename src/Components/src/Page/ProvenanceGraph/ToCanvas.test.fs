@@ -1038,3 +1038,185 @@ Vitest.describe (
                     "leaf-1"
         )
 )
+
+// Unfinished rows
+
+Vitest.describe (
+    "incompleteRows",
+    fun () ->
+        let wip = Sample.wipIndex
+        let draft = "assays/Draft/"
+        let extractionOfDraft = "assays/Draft/::Extraction"
+        let plannedOfDraft = "assays/Draft/::Planned"
+
+        let counts (c: IncompleteRows) = c.MissingOutputs, c.MissingInputs
+
+        // The extraction table of the draft has four rows: one finished, two without an output and one without
+        // an input. The planned table has two rows with a protocol and nothing else, so they count in both.
+
+        Vitest.test (
+            "counts the rows of the whole ARC in the datasets view",
+            fun () -> Vitest.expect(counts (incompleteRows wip ProvenanceView.Datasets None)).toEqual (4, 3)
+        )
+
+        Vitest.test (
+            "counts the rows of the dataset in the processes view",
+            fun () ->
+                Vitest.expect(counts (incompleteRows wip (ProvenanceView.Processes draft) None)).toEqual (4, 3)
+                Vitest.expect(counts (incompleteRows wip (ProvenanceView.Processes "assays/Nope/") None)).toEqual (0, 0)
+        )
+
+        Vitest.test (
+            "counts the rows of the process in the groups and detail views",
+            fun () ->
+                let groups = ProvenanceView.Groups(draft, extractionOfDraft)
+
+                let detail =
+                    ProvenanceView.Detail(draft, extractionOfDraft, extractionOfDraft + "#in0")
+
+                let planned = ProvenanceView.Groups(draft, plannedOfDraft)
+
+                Vitest.expect(counts (incompleteRows wip groups None)).toEqual (2, 1)
+                Vitest.expect(counts (incompleteRows wip detail None)).toEqual (2, 1)
+                Vitest.expect(counts (incompleteRows wip planned None)).toEqual (2, 2)
+                Vitest.expect(counts (incompleteRows wip (ProvenanceView.Groups(draft, "nope")) None)).toEqual (0, 0)
+        )
+
+        Vitest.test (
+            "counts only the rows of the selected group in the detail view",
+            fun () ->
+                let dataset = "assays/Extraction/"
+                let extractionProcess = "assays/Extraction/::Extraction"
+                let proc = Sample.index.ProcessByKey.[extractionProcess]
+
+                // The example process has two input groups, each in a signature of its own. A row of the first
+                // signature loses its output.
+                let first = proc.InputGroups.[0]
+                let signatureId = first.SignatureIds.[0]
+                let signature = proc.Signatures |> Array.find (fun s -> s.Id = signatureId)
+
+                let second =
+                    proc.InputGroups
+                    |> Array.find (fun group -> not (Array.contains signatureId group.SignatureIds))
+
+                let rowById =
+                    System.Collections.Generic.Dictionary<string, ProvenanceRow>(Sample.index.RowById)
+
+                rowById.[signature.RowIds.[0]] <- {
+                    rowById.[signature.RowIds.[0]] with
+                        Outputs = [||]
+                }
+
+                let unfinished = { Sample.index with RowById = rowById }
+
+                let detailOf (group: IoGroup) =
+                    ProvenanceView.Detail(dataset, extractionProcess, group.Id)
+
+                Vitest.expect(counts (incompleteRows unfinished (detailOf first) None)).toEqual (1, 0)
+                Vitest.expect(counts (incompleteRows unfinished (detailOf second) None)).toEqual (0, 0)
+
+                // The groups view counts the whole process.
+                Vitest
+                    .expect(counts (incompleteRows unfinished (ProvenanceView.Groups(dataset, extractionProcess)) None))
+                    .toEqual (1, 0)
+
+                Vitest
+                    .expect(
+                        counts (
+                            incompleteRows unfinished (ProvenanceView.Detail(dataset, extractionProcess, "nope")) None
+                        )
+                    )
+                    .toEqual (0, 0)
+        )
+
+        Vitest.test (
+            "counts the rows that touch a node of the lineage graph",
+            fun () ->
+                let view =
+                    ProvenanceView.Lineage(draft, extractionOfDraft, extractionOfDraft + "#in0", "leaf-2")
+
+                let graph = (lineage wip "leaf-2").Value
+
+                // The only row of leaf-2 has no output.
+                Vitest.expect(counts (incompleteRows wip view (Some graph))).toEqual (1, 0)
+                Vitest.expect(counts (incompleteRows wip view None)).toEqual (0, 0)
+
+                // The node extract-4 has a row without an input.
+                let other = (lineage wip "extract-4").Value
+                Vitest.expect(counts (incompleteRows wip view (Some other))).toEqual (0, 1)
+
+                // The finished row connects leaf-1 and extract-1 and counts nothing.
+                let finished = (lineage wip "leaf-1").Value
+                Vitest.expect(counts (incompleteRows wip view (Some finished))).toEqual (0, 0)
+        )
+
+        Vitest.test (
+            "counts no row of a finished ARC",
+            fun () ->
+                let index = Sample.index
+                let extractionProcess = "assays/Extraction/::Extraction"
+
+                for view in
+                    [|
+                        ProvenanceView.Datasets
+                        ProvenanceView.Processes "assays/Extraction/"
+                        ProvenanceView.Groups("assays/Extraction/", extractionProcess)
+                        ProvenanceView.Detail("assays/Extraction/", extractionProcess, extractionProcess + "#in0")
+                    |] do
+                    Vitest.expect(counts (incompleteRows index view None)).toEqual (0, 0)
+
+                let graph = (lineage index "leaf-1").Value
+
+                let lineageView =
+                    ProvenanceView.Lineage(
+                        "assays/Extraction/",
+                        extractionProcess,
+                        extractionProcess + "#in0",
+                        "leaf-1"
+                    )
+
+                Vitest.expect(counts (incompleteRows index lineageView (Some graph))).toEqual (0, 0)
+        )
+
+        Vitest.test (
+            "counts a row without input and output once for each side",
+            fun () ->
+                let row: ProvenanceRow = {
+                    Id = "r"
+                    Name = "r"
+                    ProcessKey = "p"
+                    DatasetId = "d"
+                    Inputs = [||]
+                    Outputs = [||]
+                    Annotations = [||]
+                }
+
+                Vitest.expect(counts (countIncomplete [ row ])).toEqual (1, 1)
+                Vitest.expect(counts (countIncomplete [])).toEqual (0, 0)
+        )
+)
+
+Vitest.describe (
+    "incompleteNote",
+    fun () ->
+        let note (outputs: int) (inputs: int) : string =
+            incompleteNote {
+                MissingOutputs = outputs
+                MissingInputs = inputs
+            }
+
+        Vitest.test ("says nothing when no row is unfinished", fun () -> Vitest.expect(note 0 0).toBe "")
+
+        Vitest.test (
+            "names the counts and tells one row from several",
+            fun () ->
+                Vitest.expect((note 3 0).Contains "3").toBe true
+                Vitest.expect((note 0 5).Contains "5").toBe true
+                Vitest.expect(note 1 0 = note 3 0).toBe false
+                Vitest.expect((note 2 7).Contains "2").toBe true
+                Vitest.expect((note 2 7).Contains "7").toBe true
+                // Both sentences stand in one note, and a side without rows does not appear.
+                Vitest.expect((note 2 7).Length > (note 2 0).Length).toBe true
+                Vitest.expect((note 0 5).Length < (note 2 5).Length).toBe true
+        )
+)

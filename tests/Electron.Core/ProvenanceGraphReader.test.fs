@@ -102,6 +102,38 @@ let private investigationFixture () =
             ]
     )
 
+// A work in progress ARC: rows without an output, rows without an input, a table with an Input column only,
+// a table whose headers have no cells filled, and a table with a protocol only.
+let private wipInvestigation () =
+    let headers = [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.ProtocolREF
+        CompositeHeader.Output IOType.Sample
+    ]
+
+    let row input output = [ text input; text "draft.md"; text output ]
+
+    let unfilled = ArcTable.init "unfilled"
+    unfilled.AddColumn(CompositeHeader.Input IOType.Sample)
+    unfilled.AddColumn(CompositeHeader.Output IOType.Sample)
+    unfilled.AddRowsEmpty 3
+
+    let tables = [
+        table "outputs_missing" headers [ row "a1" "b1"; row "a2" ""; row "a3" "" ]
+        table "inputs_missing" headers [ row "" "c1"; row "d1" "d2" ]
+        table "only_input" [ CompositeHeader.Input IOType.Sample ] [ [ text "e1" ]; [ text "e2" ] ]
+        unfilled
+        table "protocol_only" [ CompositeHeader.ProtocolREF ] [ [ text "plan.md" ]; [ text "plan.md" ] ]
+    ]
+
+    ArcInvestigation.create (
+        identifier = "arc-wip",
+        assays =
+            ResizeArray [
+                ArcAssay.create (identifier = "Draft", tables = ResizeArray tables)
+            ]
+    )
+
 let private requireSome (what: string) (value: 'T option) : 'T =
     match value with
     | Some value -> value
@@ -182,6 +214,34 @@ Vitest.describe (
                 Vitest.expect(fromClone.Length).toBe (expectedCount)
                 Vitest.expect(fromClone |> Array.forall (fun result -> result.Length > 2)).toBe (true)
                 Vitest.expect(fromClone).toEqual (original)
+        )
+
+        Vitest.test (
+            "queries on a structuredClone of a work in progress ARC give the results of the original",
+            fun () ->
+                let data = ProvenanceGraphData.ofInvestigation (wipInvestigation ())
+                let cloned = structuredClone data
+
+                let original = runAllQueries data
+                let fromClone = runAllQueries cloned
+
+                Vitest.expect(fromClone.Length).toBeGreaterThan (10)
+                Vitest.expect(fromClone |> Array.forall (fun result -> result.Length > 2)).toBe (true)
+                Vitest.expect(fromClone).toEqual (original)
+
+                // The unfinished rows keep their nodes on the clone, and no edge joins a missing end.
+                let index = ProvenanceIndex.ofData cloned
+                let noOutput = requireSome "a2" (lineage index "a2")
+                let noInput = requireSome "c1" (lineage index "c1")
+
+                Vitest.expect(noOutput.Nodes |> Array.map (fun n -> n.Id)).toEqual ([| "a2" |])
+                Vitest.expect(noOutput.Edges.Length).toBe (0)
+                Vitest.expect(noInput.Nodes |> Array.map (fun n -> n.Id)).toEqual ([| "c1" |])
+                Vitest.expect(noInput.Edges.Length).toBe (0)
+
+                let edgeCount = index.Processes |> Array.sumBy (fun p -> p.GroupEdges.Length)
+
+                Vitest.expect(edgeCount).toBe (2)
         )
 
         Vitest.test (
