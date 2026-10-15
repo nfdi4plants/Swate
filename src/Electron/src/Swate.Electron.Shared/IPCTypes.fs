@@ -177,7 +177,8 @@ type IGitLabApi = {
     loadOrganisationGroups: ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
     loadOrganisationRepos:
         ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
-    createProject: string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
+    createProject: CreateProjectRequest -> JS.Promise<Result<ExploreProjectDto, CreateProjectError>>
+    loadPublishOwners: unit -> JS.Promise<Result<PublishOwnersDto, GitLabError>>
 }
 
 /// Two Way Bridge: Renderer <-> Main

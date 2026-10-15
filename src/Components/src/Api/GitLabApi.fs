@@ -138,6 +138,51 @@ type GroupDto = {
     avatar_url: string option
 }
 
+/// A project to create. NamespaceId None creates it in the personal namespace of the token's user.
+type CreateProjectRequest = {
+    Name: string
+    NamespaceId: int option
+}
+
+/// Why creating a project failed. The first two cases let the caller ask the user to change the
+/// input. Every other failure stays a plain GitLabError.
+[<RequireQualifiedAccess>]
+type CreateProjectError =
+    /// GitLab refused the project name or the path derived from it, for example a duplicate.
+    | NameRefused of details: string option
+    /// The user may not create projects in the chosen namespace, or reached a creation limit.
+    | NotAllowed of details: string option
+    | Failed of GitLabError
+
+/// A group the user is a member of, with its project creation setting.
+type PublishMemberGroup = {
+    id: int
+    name: string
+    full_path: string
+    project_creation_level: string option
+}
+
+/// A group in which the user may create projects.
+type PublishAcceptingGroup = {
+    id: int
+    name: string
+    full_path: string
+}
+
+/// A group the user belongs to. can_create_projects tells whether a project may be created in it.
+type PublishGroupDto = {
+    id: int
+    name: string
+    full_path: string
+    project_creation_level: string option
+    can_create_projects: bool
+}
+
+type PublishOwnersDto = {
+    username: string
+    groups: PublishGroupDto array
+}
+
 type PaginationMetadata = {
     Link: string option
     NextPage: int option
@@ -237,7 +282,42 @@ type private GitLabGroupResponse = {
     full_path: string
     web_url: string
     avatar_url: string option
+    project_creation_level: string option
 }
+
+type private GraphQlGroupNode = {
+    id: string
+    name: string
+    fullPath: string
+}
+
+type private GraphQlPageInfo = {
+    hasNextPage: bool
+    endCursor: string option
+}
+
+type private GraphQlGroupConnection = {
+    nodes: GraphQlGroupNode array
+    pageInfo: GraphQlPageInfo
+}
+
+type private GraphQlCurrentUser = { groups: GraphQlGroupConnection }
+
+type private GraphQlData = {
+    currentUser: GraphQlCurrentUser option
+}
+
+type private GraphQlError = { message: string }
+
+type private GraphQlGroupsResponse = {
+    data: GraphQlData option
+    errors: GraphQlError array option
+}
+
+[<RequireQualifiedAccess>]
+type private JsonFailure =
+    | HttpStatus of status: int * bodyText: string
+    | Other of GitLabError
 
 module private Internals =
 
@@ -496,20 +576,21 @@ module private Internals =
                 return Error(GitLabError.NetworkError networkError)
     }
 
-    let sendJson<'TResponse>
+    let sendJsonRawWith<'TResponse>
+        (authHeader: HttpRequestHeaders)
         (url: string)
         (pat: string)
         (method': HttpMethod)
         (body: obj)
-        : JS.Promise<Result<'TResponse, GitLabError>> =
+        : JS.Promise<Result<'TResponse, JsonFailure>> =
         promise {
             if String.IsNullOrWhiteSpace pat then
-                return Error(GitLabError.InvalidRequest "Personal Access Token is required.")
+                return Error(JsonFailure.Other(GitLabError.InvalidRequest "Personal Access Token is required."))
             else
                 let requestOptions = [
                     RequestProperties.Method method'
                     requestHeaders [
-                        HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat)
+                        authHeader
                         HttpRequestHeaders.Accept "application/json"
                         HttpRequestHeaders.ContentType "application/json"
                     ]
@@ -521,16 +602,25 @@ module private Internals =
 
                     if not response.Ok then
                         let! errorText = readResponseText response
-                        return Error(mapHttpErrorWithBody response.Status errorText)
+                        return Error(JsonFailure.HttpStatus(response.Status, errorText))
                     else
                         try
                             let! payload = response.json<'TResponse> ()
                             return Ok payload
                         with decodeError ->
-                            return Error(GitLabError.DecodeError decodeError)
+                            return Error(JsonFailure.Other(GitLabError.DecodeError decodeError))
                 with networkError ->
-                    return Error(GitLabError.NetworkError networkError)
+                    return Error(JsonFailure.Other(GitLabError.NetworkError networkError))
         }
+
+    /// A JSON request authenticated with PRIVATE-TOKEN. A failed response keeps its status and body text.
+    let sendJsonRaw<'TResponse>
+        (url: string)
+        (pat: string)
+        (method': HttpMethod)
+        (body: obj)
+        : JS.Promise<Result<'TResponse, JsonFailure>> =
+        sendJsonRawWith<'TResponse> (HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat)) url pat method' body
 
     let sendPostNoBody<'TResponse> (url: string) (pat: string) : JS.Promise<Result<'TResponse, GitLabError>> = promise {
         if String.IsNullOrWhiteSpace pat then
@@ -558,6 +648,246 @@ module private Internals =
             with networkError ->
                 return Error(GitLabError.NetworkError networkError)
     }
+
+    /// Lists every group of the current user (all pages), including the project_creation_level REST field.
+    let listMemberGroups (baseUrl: string) (pat: string) : JS.Promise<Result<GitLabGroupResponse array, GitLabError>> =
+        let rec loadPage (page: int) (collected: GitLabGroupResponse array list) = promise {
+            let query =
+                []
+                |> addInt "min_access_level" (Some 10)
+                |> addInt "per_page" (Some 100)
+                |> addInt "page" (Some page)
+
+            let! response =
+                sendGet<GitLabGroupResponse>
+                    (appendQueryParams $"{baseUrl.TrimEnd('/')}/api/v4/groups" query)
+                    (Some pat)
+
+            match response with
+            | Error error -> return Error error
+            | Ok paged ->
+                let collected = paged.Items :: collected
+
+                match paged.Pagination.NextPage with
+                | Some nextPage -> return! loadPage nextPage collected
+                | None -> return Ok(collected |> List.rev |> Array.concat)
+        }
+
+        loadPage 1 []
+
+    // GitLab has no REST filter for "may create projects here". The GraphQL permissionScope filter does exactly that.
+    let private groupsAcceptingProjectsQuery =
+        "query($after: String) { currentUser { groups(permissionScope: CREATE_PROJECTS, first: 100, after: $after) { nodes { id name fullPath } pageInfo { hasNextPage endCursor } } } }"
+
+    /// The numeric id at the end of a global id such as gid://gitlab/Group/123.
+    let tryParseGlobalId (globalId: string) : int option =
+        match Option.ofObj globalId with
+        | Some value when value.LastIndexOf '/' >= 0 -> tryParseInt (Some(value.Substring(value.LastIndexOf '/' + 1)))
+        | _ -> None
+
+    let private sendGroupsAcceptingProjectsPage
+        (baseUrl: string)
+        (pat: string)
+        (after: string option)
+        : JS.Promise<Result<GraphQlGroupConnection, GitLabError>> =
+        promise {
+            let! response =
+                sendJsonRawWith<GraphQlGroupsResponse>
+                    (HttpRequestHeaders.Authorization $"Bearer {pat}")
+                    $"{baseUrl.TrimEnd('/')}/api/graphql"
+                    pat
+                    HttpMethod.POST
+                    (createObj [
+                        "query" ==> groupsAcceptingProjectsQuery
+                        "variables" ==> createObj [ "after" ==> Option.toObj after ]
+                    ])
+
+            return
+                match response with
+                | Error(JsonFailure.HttpStatus(status, _)) -> Error(mapHttpError status)
+                | Error(JsonFailure.Other error) -> Error error
+                | Ok payload ->
+                    match payload.errors with
+                    | Some errors when errors.Length > 0 ->
+                        Error(
+                            GitLabError.InvalidRequest(
+                                errors |> Array.map (fun error -> error.message) |> String.concat "; "
+                            )
+                        )
+                    | _ ->
+                        match payload.data |> Option.bind (fun data -> data.currentUser) with
+                        | Some user -> Ok user.groups
+                        | None -> Error GitLabError.Unauthorized
+        }
+
+    /// Lists the groups the current user may create projects in (all pages). Nodes whose global id has no trailing integer are skipped.
+    let listGroupsAcceptingProjects
+        (baseUrl: string)
+        (pat: string)
+        : JS.Promise<Result<PublishAcceptingGroup array, GitLabError>> =
+        let toAcceptingGroup (node: GraphQlGroupNode) =
+            if isNull (box node) then
+                None
+            else
+                Option.ofObj node.id
+                |> Option.bind tryParseGlobalId
+                |> Option.map (fun id ->
+                    ({
+                        id = id
+                        name = node.name
+                        full_path = node.fullPath
+                    }
+                    : PublishAcceptingGroup)
+                )
+
+        let rec loadFrom after collected = promise {
+            let! page = sendGroupsAcceptingProjectsPage baseUrl pat after
+
+            match page with
+            | Error error -> return Error error
+            | Ok connection ->
+                let collected = (connection.nodes |> Array.choose toAcceptingGroup) :: collected
+
+                match connection.pageInfo.hasNextPage, connection.pageInfo.endCursor with
+                | true, Some cursor -> return! loadFrom (Some cursor) collected
+                | _ -> return Ok(collected |> List.rev |> Array.concat)
+        }
+
+        loadFrom None []
+
+/// Reads the `message` and `error` fields of a GitLab error body through typed bindings.
+module private ErrorBody =
+
+    [<AllowNullLiteral>]
+    type IErrorBody =
+        abstract message: obj
+        abstract error: obj
+
+    /// GitLab sends the text of a failure as a string or an array of strings, in `message` or in `error`.
+    /// The text sits in `error` only when `message` is absent, for example the 403 limit reply
+    /// {"error":["Your project limit is 5 projects! ..."]}. Validation failures put an object
+    /// in `message` that maps field names to arrays of texts.
+    [<RequireQualifiedAccess>]
+    type Message =
+        | Text of string
+        | Fields of (string * string list) list
+
+    let private toTexts (value: obj) : string list =
+        if JS.Constructors.Array.isArray value then
+            unbox<obj array> value
+            |> Array.filter (fun item -> jsTypeof item = "string")
+            |> Array.map unbox<string>
+            |> List.ofArray
+        elif jsTypeof value = "string" then
+            [ unbox<string> value ]
+        else
+            []
+
+    let private isPlainObject (value: obj) =
+        not (isNull value)
+        && jsTypeof value = "object"
+        && not (JS.Constructors.Array.isArray value)
+
+    let private tryText (value: obj) : Message option =
+        if JS.Constructors.Array.isArray value || jsTypeof value = "string" then
+            Some(Message.Text(String.concat "; " (toTexts value)))
+        else
+            None
+
+    let tryParse (bodyText: string) : Message option =
+        try
+            let parsed = JS.JSON.parse bodyText
+
+            if isNull parsed || jsTypeof parsed <> "object" then
+                None
+            else
+                let body = unbox<IErrorBody> parsed
+
+                if isPlainObject body.message then
+                    Some(
+                        Message.Fields [
+                            for key, value in JS.Constructors.Object.entries body.message -> key, toTexts value
+                        ]
+                    )
+                else
+                    match tryText body.message with
+                    | Some text -> Some text
+                    | None -> tryText body.error
+        with _ ->
+            None
+
+/// Tells a refused name and a missing permission apart from other failures of POST /api/v4/projects.
+let classifyCreateProjectFailure (status: int) (bodyText: string) : CreateProjectError =
+    let message = ErrorBody.tryParse bodyText
+
+    let joined (texts: string list) =
+        texts
+        |> List.filter (String.IsNullOrWhiteSpace >> not)
+        |> function
+            | [] -> None
+            | filtered -> Some(String.concat "; " filtered)
+
+    let messageText =
+        match message with
+        | Some(ErrorBody.Message.Text text) -> joined [ text ]
+        | _ -> None
+
+    let namespaceTexts =
+        match message with
+        | Some(ErrorBody.Message.Fields fields) ->
+            fields |> List.tryFind (fun (key, _) -> key = "namespace") |> Option.map snd
+        | _ -> None
+
+    match namespaceTexts, status with
+    // GitLab's namespace messages are field fragments such as "is not valid". They mean nothing to the user.
+    | Some _, _ -> CreateProjectError.NotAllowed None
+    | None, 403 -> CreateProjectError.NotAllowed messageText
+    | None, (400 | 409) ->
+        match message with
+        | Some(ErrorBody.Message.Fields fields) ->
+            fields
+            |> List.collect (fun (key, texts) -> texts |> List.map (fun text -> $"{key} {text}"))
+            |> joined
+            |> CreateProjectError.NameRefused
+        | _ -> CreateProjectError.NameRefused messageText
+    | None, _ -> CreateProjectError.Failed(Internals.mapHttpErrorWithBody status bodyText)
+
+/// Combines the groups of the user with the groups that accept new projects. A group that only
+/// appears in the accepting list (for example one shared with a group of the user) is added with an
+/// unknown creation level.
+let mergePublishGroups
+    (memberGroups: PublishMemberGroup array)
+    (acceptingGroups: PublishAcceptingGroup array)
+    : PublishGroupDto array =
+    let acceptingIds =
+        acceptingGroups |> Array.map (fun group -> group.id) |> Set.ofArray
+
+    let fromMembers =
+        memberGroups
+        |> Array.map (fun group -> {
+            id = group.id
+            name = group.name
+            full_path = group.full_path
+            project_creation_level = group.project_creation_level
+            can_create_projects = acceptingIds.Contains group.id
+        })
+
+    let memberIds = fromMembers |> Array.map (fun group -> group.id) |> Set.ofArray
+
+    let onlyAccepting =
+        acceptingGroups
+        |> Array.filter (fun group -> not (memberIds.Contains group.id))
+        |> Array.map (fun group -> {
+            id = group.id
+            name = group.name
+            full_path = group.full_path
+            project_creation_level = None
+            can_create_projects = true
+        })
+
+    Array.append fromMembers onlyAccepting
+    |> Array.distinctBy (fun group -> group.id)
+    |> Array.sortBy (fun group -> group.full_path.ToLowerInvariant())
 
 [<AttachMembers>]
 type GitLabApi =
@@ -589,27 +919,72 @@ type GitLabApi =
             return response |> Result.map Internals.toRotatedPersonalAccessTokenDto
         }
 
+    /// POST /api/v4/projects
     static member CreateProject
-        (baseUrl: string, pat: string, projectName: string)
-        : JS.Promise<Result<ExploreProjectDto, GitLabError>> =
+        (baseUrl: string, pat: string, request: CreateProjectRequest)
+        : JS.Promise<Result<ExploreProjectDto, CreateProjectError>> =
         promise {
-            let normalizedName = projectName.Trim()
+            let normalizedName = request.Name.Trim()
 
             if String.IsNullOrWhiteSpace normalizedName then
-                return Error(GitLabError.InvalidRequest "Repository name is required.")
+                return Error(CreateProjectError.NameRefused(Some "Repository name is required."))
             else
                 let! response =
-                    Internals.sendJson<GitLabProjectResponse>
+                    Internals.sendJsonRaw<GitLabProjectResponse>
                         $"{baseUrl.TrimEnd('/')}/api/v4/projects"
                         pat
                         HttpMethod.POST
                         (createObj [
                             "name" ==> normalizedName
                             "initialize_with_readme" ==> false
+                            match request.NamespaceId with
+                            | Some namespaceId -> "namespace_id" ==> namespaceId
+                            | None -> ()
                         ])
 
-                return response |> Result.map Internals.toExploreProjectDto
+                return
+                    match response with
+                    | Ok project -> Ok(Internals.toExploreProjectDto project)
+                    | Error(JsonFailure.HttpStatus(status, errorText)) ->
+                        Error(classifyCreateProjectFailure status errorText)
+                    | Error(JsonFailure.Other error) -> Error(CreateProjectError.Failed error)
         }
+
+    /// The owners to choose from when publishing: the username of the personal namespace and the groups of the user.
+    static member ListPublishOwners(baseUrl: string, pat: string) : JS.Promise<Result<PublishOwnersDto, GitLabError>> = promise {
+        let! user = GitLabApi.GetCurrentUser(baseUrl, pat)
+
+        match user with
+        | Error error -> return Error error
+        | Ok user ->
+            let! memberGroups = Internals.listMemberGroups baseUrl pat
+
+            match memberGroups with
+            | Error error -> return Error error
+            | Ok memberGroups ->
+                let! acceptingGroups = Internals.listGroupsAcceptingProjects baseUrl pat
+
+                match acceptingGroups with
+                | Error error -> return Error error
+                | Ok acceptingGroups ->
+                    let members =
+                        memberGroups
+                        |> Array.map (fun group ->
+                            ({
+                                id = group.id
+                                name = group.name
+                                full_path = group.full_path
+                                project_creation_level = group.project_creation_level
+                            }
+                            : PublishMemberGroup)
+                        )
+
+                    return
+                        Ok {
+                            username = user.username
+                            groups = mergePublishGroups members acceptingGroups
+                        }
+    }
 
     /// GET /api/v4/projects
     static member ListProjects
