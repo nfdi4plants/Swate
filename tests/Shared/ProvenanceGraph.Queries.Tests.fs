@@ -579,6 +579,15 @@ let private lineageTests =
             let graph = getSome (lineage (fixture ()) "S1")
             Expect.equal (nodeIds graph.Nodes) [| "S1"; "A"; "E1"; "F1"; "F2" |] "node order"
 
+        testCase "lists the rows of the walk with the upstream rows first and leaves out the row of a sibling"
+        <| fun _ ->
+            let rowIds (nodeId: string) =
+                lineageRows (fixture ()) nodeId |> Array.map (fun r -> r.Id)
+
+            Expect.equal (rowIds "S1") [| "s1"; "x1"; "m1"; "m2" |] "upstream rows, then downstream rows"
+            Expect.equal (rowIds "F1") [| "m1"; "x1"; "s1" |] "The row m2 of the sibling F2 is not walked."
+            Expect.isEmpty (rowIds "nope") "An unknown node has no rows."
+
         testCase "keeps only ancestors of F1 and leaves out the branch of its sibling F2"
         <| fun _ ->
             let graph = getSome (lineage (fixture ()) "F1")

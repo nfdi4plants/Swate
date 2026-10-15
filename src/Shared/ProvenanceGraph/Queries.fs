@@ -467,6 +467,19 @@ let private walk
 
     { NodeIds = nodeIds; Rows = rows }
 
+/// The rows of the upstream walk, then the rows of the downstream walk, each row once.
+let private walkedRows (upstream: Walked) (downstream: Walked) : ProvenanceRow[] =
+    Array.append (upstream.Rows.ToArray()) (downstream.Rows.ToArray())
+    |> Array.distinctBy (fun row -> row.Id)
+
+/// The rows that the lineage of a node walks over, in the order the lineage uses them: first the rows that
+/// produce the node and, further upstream, the rows that produce their inputs, then the rows that consume the
+/// node and, further downstream, the rows that consume their outputs. A row that only shares a node with the
+/// walk, such as another consumer of an upstream node, is not among them. A node that the index does not
+/// know has no rows.
+let lineageRows (index: ProvenanceIndex) (nodeId: string) : ProvenanceRow[] =
+    walkedRows (walk index nodeId index.ProducedBy IoSide.Inputs) (walk index nodeId index.ConsumedBy IoSide.Outputs)
+
 let lineage (index: ProvenanceIndex) (nodeId: string) : LineageGraph option =
     if not (index.NodeById.ContainsKey nodeId) then
         None
@@ -485,13 +498,9 @@ let lineage (index: ProvenanceIndex) (nodeId: string) : LineageGraph option =
 
         let seenNodes = HashSet<string>(nodeIds)
 
-        let rows =
-            Array.append (upstream.Rows.ToArray()) (downstream.Rows.ToArray())
-            |> Array.distinctBy (fun row -> row.Id)
-
         let links = ResizeArray<RowLink>()
 
-        for row in rows do
+        for row in walkedRows upstream downstream do
             for source in row.Inputs do
                 if seenNodes.Contains source then
                     // A row whose input and output share a name would draw as a loop on one node.

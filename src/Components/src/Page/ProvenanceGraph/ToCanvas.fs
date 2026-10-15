@@ -4,6 +4,7 @@ module Swate.Components.Page.ProvenanceGraph.ToCanvas
 open System
 open System.Collections.Generic
 open Swate.Components.Shared.ProvenanceGraph.Types
+open Swate.Components.Shared.ProvenanceGraph.Queries
 open Swate.Components.Composite.GraphCanvas.Types
 open Swate.Components.Page.ProvenanceGraph.Types
 
@@ -499,40 +500,6 @@ let countIncomplete (rows: seq<ProvenanceRow>) : IncompleteRows =
         MissingInputs = missingInputs
     }
 
-/// The rows that the lineage walk of a node reaches. Upstream it follows the rows that produce a node and then
-/// the inputs of those rows. Downstream it follows the rows that consume a node and then their outputs. A row
-/// that only shares a node with the walk, such as another consumer of an upstream node, is not part of it.
-let private walkedRows (index: ProvenanceIndex) (startId: string) : ProvenanceRow[] =
-    let walk (rowIdsByNode: Dictionary<string, string[]>) (farIds: ProvenanceRow -> string[]) : ProvenanceRow[] =
-        let queue = ResizeArray<string>()
-        let visited = HashSet<string>()
-        let rows = ResizeArray<ProvenanceRow>()
-        queue.Add startId
-        visited.Add startId |> ignore
-        let mutable position = 0
-
-        // The queue grows while the loop runs.
-        while position < queue.Count do
-            match rowIdsByNode.TryGetValue queue.[position] with
-            | true, rowIds ->
-                for rowId in rowIds do
-                    match index.RowById.TryGetValue rowId with
-                    | true, row ->
-                        rows.Add row
-
-                        for id in farIds row do
-                            if visited.Add id then
-                                queue.Add id
-                    | _ -> ()
-            | _ -> ()
-
-            position <- position + 1
-
-        rows.ToArray()
-
-    Array.append (walk index.ProducedBy (fun row -> row.Inputs)) (walk index.ConsumedBy (fun row -> row.Outputs))
-    |> Array.distinctBy (fun row -> row.Id)
-
 /// The incomplete rows that belong to a view: all rows in the datasets view, the rows of the dataset in the
 /// processes view, and the rows of the process in the groups view. The detail view counts the rows that the
 /// detail graph shows, the rows of the process that have a member of the selected group on the side of the group.
@@ -579,7 +546,7 @@ let incompleteRows
         | Some graph ->
             let shown = HashSet<string>(graph.Nodes |> Array.map (fun node -> node.Id))
 
-            walkedRows index graph.NodeId
+            lineageRows index graph.NodeId
             |> Array.filter (fun row ->
                 Array.exists shown.Contains row.Inputs
                 || Array.exists shown.Contains row.Outputs
