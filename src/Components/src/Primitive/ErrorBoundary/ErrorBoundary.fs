@@ -12,7 +12,7 @@ module private ErrorBoundaryTypes =
     /// ResetKey is empty when the caller gives none.
     type Props = {|
         Children: ReactElement
-        Fallback: exn -> (unit -> unit) -> ReactElement
+        Fallback: exn -> ReactElement
         ResetKey: string
     |}
 
@@ -59,9 +59,6 @@ type private ErrorBoundaryClass(initialProps: Props) =
         else
             null
 
-    member this.reset() : unit =
-        this.setState (fun state _ -> {| state with Error = noError |})
-
     override this.componentDidCatch(error: exn, info: obj) : unit =
         Browser.Dom.console.error ("The error boundary caught an error", error, info)
 
@@ -71,17 +68,17 @@ type private ErrorBoundaryClass(initialProps: Props) =
         if isNull (box error) then
             this.props.Children
         else
-            this.props.Fallback error (fun () -> this.reset ())
+            this.props.Fallback error
 
 /// Catches the errors that the children throw while rendering and shows the fallback in their place.
-/// The fallback gets the error and a function that clears it. A new resetKey clears it as well, which fits
-/// a view that changes. The boundary catches errors of the children only, not an error in its own parent.
+/// The fallback gets the error. A new resetKey clears the error, which fits a view that changes. The boundary
+/// catches errors of the children only, not an error in its own parent.
 [<Erase; Mangle(false)>]
 type ErrorBoundary =
 
     [<ReactComponent>]
     static member ErrorBoundary
-        (children: ReactElement, fallback: exn -> (unit -> unit) -> ReactElement, ?resetKey: string)
+        (children: ReactElement, fallback: exn -> ReactElement, ?resetKey: string)
         : ReactElement =
         let props: Props = {|
             Children = children

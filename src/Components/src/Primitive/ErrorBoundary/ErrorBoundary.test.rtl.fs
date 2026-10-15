@@ -45,17 +45,13 @@ let private ThrowsText () =
     throwText ()
     Html.none
 
-let private fallbackWith (reset: (unit -> unit) option ref) : exn -> (unit -> unit) -> ReactElement =
-    fun error resetFn ->
-        reset.Value <- Some resetFn
-
-        Html.div [
-            prop.testId "fallback"
-            prop.children [
-                Html.span [ prop.testId "message"; prop.text error.Message ]
-                Html.button [ prop.testId "retry"; prop.onClick (fun _ -> resetFn ()) ]
-            ]
+let private fallback (error: exn) : ReactElement =
+    Html.div [
+        prop.testId "fallback"
+        prop.children [
+            Html.span [ prop.testId "message"; prop.text error.Message ]
         ]
+    ]
 
 let private present (testId: string) : bool =
     (RTL.screen.queryByTestId testId).IsSome
@@ -67,10 +63,7 @@ Vitest.describe (
             "shows the fallback with the message of the error when a child throws",
             fun () ->
                 throws.Value <- true
-                let reset = ref None
-
-                RTL.render (ErrorBoundary.ErrorBoundary(Child "boom", fallbackWith reset))
-                |> ignore
+                RTL.render (ErrorBoundary.ErrorBoundary(Child "boom", fallback)) |> ignore
 
                 Vitest.expect(present "fallback").toBe true
                 Vitest.expect(present "child").toBe false
@@ -79,32 +72,12 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "shows the children again when the fallback resets the boundary",
-            fun () ->
-                throws.Value <- true
-                let reset = ref None
-
-                RTL.render (ErrorBoundary.ErrorBoundary(Child "boom", fallbackWith reset))
-                |> ignore
-
-                Vitest.expect(present "fallback").toBe true
-
-                // The child works now. Resetting renders it again.
-                throws.Value <- false
-                RTL.fireEvent.click (RTL.screen.getByTestId "retry")
-
-                Vitest.expect(present "child").toBe true
-                Vitest.expect(present "fallback").toBe false
-        )
-
-        Vitest.test (
             "keeps the error while the resetKey stays and clears it when the resetKey changes",
             fun () ->
                 throws.Value <- true
-                let reset = ref None
 
                 let boundary (key: string) =
-                    ErrorBoundary.ErrorBoundary(Child "boom", fallbackWith reset, resetKey = key)
+                    ErrorBoundary.ErrorBoundary(Child "boom", fallback, resetKey = key)
 
                 let result = RTL.render (boundary "a")
                 Vitest.expect(present "fallback").toBe true
@@ -122,10 +95,9 @@ Vitest.describe (
             "catches the error of a new key again",
             fun () ->
                 throws.Value <- false
-                let reset = ref None
 
                 let boundary (key: string) =
-                    ErrorBoundary.ErrorBoundary(Child "boom", fallbackWith reset, resetKey = key)
+                    ErrorBoundary.ErrorBoundary(Child "boom", fallback, resetKey = key)
 
                 let result = RTL.render (boundary "a")
                 Vitest.expect(present "child").toBe true
@@ -139,12 +111,11 @@ Vitest.describe (
             "renders the siblings outside the boundary",
             fun () ->
                 throws.Value <- true
-                let reset = ref None
 
                 RTL.render (
                     Html.div [
                         Html.span [ prop.testId "sibling" ]
-                        ErrorBoundary.ErrorBoundary(Child "boom", fallbackWith reset)
+                        ErrorBoundary.ErrorBoundary(Child "boom", fallback)
                     ]
                 )
                 |> ignore
@@ -156,10 +127,7 @@ Vitest.describe (
         Vitest.test (
             "gives the fallback the text of a thrown value that is not an Error",
             fun () ->
-                let reset = ref None
-
-                RTL.render (ErrorBoundary.ErrorBoundary(ThrowsText(), fallbackWith reset))
-                |> ignore
+                RTL.render (ErrorBoundary.ErrorBoundary(ThrowsText(), fallback)) |> ignore
 
                 Vitest.expect((RTL.screen.getByTestId "message").textContent).toBe "plain text"
         )
