@@ -2305,7 +2305,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A failed owner lookup stops the publish before anything is created",
+            "A failed owner lookup stops the publish before anything is created and a later upload works",
             fun () -> promise {
                 let createRequests = ResizeArray<CreateProjectRequest>()
 
@@ -2322,6 +2322,27 @@ Vitest.describe (
                 Vitest.expect(createRequests.Count).toBe (0)
                 Vitest.expect(next.PendingPublishRename).toEqual (None)
                 Vitest.expect(next.ErrorNotice.Value).toContain (GitLabError.Forbidden.GitLabErrorToString)
+
+                // Once the lookup works again, the next upload creates the repository.
+                let retryDeps =
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [||]) })
+                        (fun request ->
+                            createRequests.Add request
+                            promise { return Ok remoteProject }
+                        )
+
+                let! retried = runPush retryDeps next
+
+                Vitest
+                    .expect(createRequests |> Seq.toArray)
+                    .toEqual (
+                        [|
+                            ({ Name = "arc"; NamespaceId = None }: CreateProjectRequest)
+                        |]
+                    )
+
+                Vitest.expect(retried.ErrorNotice).toEqual (None)
             }
         )
 
