@@ -46,12 +46,12 @@ let tryBuildRenameTargetPath (sourcePath: string) (newName: string) =
             else
                 Ok targetPath
 
-let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
+let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name: string) =
     let normalizedParentPath = normalizeRelativePath parentPath
 
     let parentIsAllowed =
         String.IsNullOrWhiteSpace normalizedParentPath
-        || ArcEntityPathRules.isGenericFileSystemParentAllowed normalizedParentPath
+        || ArcEntityPathRules.isGenericFileSystemCreateParentAllowed isFile normalizedParentPath
 
     if parentIsAllowed |> not then
         Error "Generic file and folder creation is only allowed inside safe ARC directories."
@@ -65,22 +65,28 @@ let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
                 else
                     $"{normalizedParentPath}/{normalizedName}"
 
-            if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
+            if ArcEntityPathRules.isGenericFileSystemCreateTargetAllowed isFile targetPath then
                 Ok targetPath
             else
                 Error
                     "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
 
-let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: string) =
+let tryBuildGenericFileSystemRenameTargetPath (isFile: bool) (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
 
-    if ArcEntityPathRules.isGenericFileSystemTargetAllowed normalizedSourcePath |> not then
+    let isTargetAllowed =
+        if isFile then
+            ArcEntityPathRules.isGenericFileSystemFileTargetAllowed
+        else
+            ArcEntityPathRules.isGenericFileSystemTargetAllowed
+
+    if isTargetAllowed normalizedSourcePath |> not then
         Error "Generic file and folder rename is only allowed for safe non-canonical paths inside the ARC."
     else
         match tryBuildRenameTargetPath normalizedSourcePath newName with
         | Error validationError -> Error validationError
         | Ok targetPath ->
-            if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
+            if isTargetAllowed targetPath then
                 Ok targetPath
             else
                 Error

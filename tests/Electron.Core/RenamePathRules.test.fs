@@ -116,11 +116,11 @@ Vitest.describe (
         Vitest.test (
             "root-level generic filesystem child paths are allowed for safe targets only",
             fun () ->
-                match tryBuildGenericFileSystemChildPath "" "docs" with
+                match tryBuildGenericFileSystemChildPath false "" "docs" with
                 | Ok targetPath -> Vitest.expect(targetPath).toBe ("docs")
                 | Error errorMessage -> failwith errorMessage
 
-                match tryBuildGenericFileSystemChildPath "" "notes.txt" with
+                match tryBuildGenericFileSystemChildPath true "" "notes.txt" with
                 | Ok targetPath -> Vitest.expect(targetPath).toBe ("notes.txt")
                 | Error errorMessage -> failwith errorMessage
 
@@ -133,16 +133,86 @@ Vitest.describe (
                     ".git"
                     ".gitattributes"
                     ".gitkeep"
-                    "readme.md"
                     "../escape"
                 ]
 
                 rejectedRootTargets
                 |> List.iter (fun name ->
-                    match tryBuildGenericFileSystemChildPath "" name with
-                    | Ok targetPath -> failwith $"Expected root target '{targetPath}' to be rejected."
+                    [ true; false ]
+                    |> List.iter (fun isFile ->
+                        match tryBuildGenericFileSystemChildPath isFile "" name with
+                        | Ok targetPath -> failwith $"Expected root target '{targetPath}' to be rejected."
+                        | Error _ -> ()
+                    )
+                )
+        )
+
+        Vitest.test (
+            "README files can be created anywhere generic files are allowed",
+            fun () ->
+                let parents = [
+                    ""
+                    "test"
+                    "assays/AssayA"
+                    "assays/AssayA/dataset"
+                    "studies"
+                ]
+
+                parents
+                |> List.iter (fun parentPath ->
+                    [ "README.md"; "readme.md" ]
+                    |> List.iter (fun name ->
+                        match tryBuildGenericFileSystemChildPath true parentPath name with
+                        | Ok _ -> ()
+                        | Error errorMessage ->
+                            failwith $"Expected '{parentPath}/{name}' to be creatable: {errorMessage}"
+                    )
+                )
+
+                match tryBuildGenericFileSystemChildPath false "" "README.md" with
+                | Ok targetPath -> failwith $"Expected README folder '{targetPath}' to be rejected."
+                | Error _ -> ()
+
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "README.md").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/AssayA/README.md").toBe (false)
+        )
+
+        Vitest.test (
+            "add zone roots accept new files but not new folders",
+            fun () ->
+                [ "studies"; "assays"; "workflows"; "runs" ]
+                |> List.iter (fun zone ->
+                    Vitest.expect(ArcEntityPathRules.isGenericFileSystemCreateParentAllowed true zone).toBe (true)
+                    Vitest.expect(ArcEntityPathRules.isGenericFileSystemCreateParentAllowed false zone).toBe (false)
+
+                    match tryBuildGenericFileSystemChildPath true zone "overview.md" with
+                    | Ok targetPath -> Vitest.expect(targetPath).toBe ($"{zone}/overview.md")
+                    | Error errorMessage -> failwith errorMessage
+
+                    match tryBuildGenericFileSystemChildPath false zone "NewEntity" with
+                    | Ok targetPath -> failwith $"Expected entity-shaped folder '{targetPath}' to be rejected."
                     | Error _ -> ()
                 )
+
+                match tryBuildGenericFileSystemChildPath true "studies" ".gitkeep" with
+                | Ok targetPath -> failwith $"Expected protected file '{targetPath}' to be rejected."
+                | Error _ -> ()
+        )
+
+        Vitest.test (
+            "files directly inside add zones are generic rename targets",
+            fun () ->
+                match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "summary.md" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/summary.md")
+                | Error errorMessage -> failwith errorMessage
+
+                match tryBuildGenericFileSystemRenameTargetPath false "studies/StudyA" "StudyB" with
+                | Ok targetPath -> failwith $"Expected entity folder rename '{targetPath}' to be rejected."
+                | Error _ -> ()
+
+                match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "README.md" with
+                | Ok targetPath -> failwith $"Expected rename to protected '{targetPath}' to be rejected."
+                | Error _ -> ()
         )
 )
 

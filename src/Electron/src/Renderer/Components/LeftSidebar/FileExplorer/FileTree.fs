@@ -308,15 +308,7 @@ type FileTree =
             setActiveDialog None
 
         let openFileSystemCreateModal kind (item: FileItem) =
-            if
-                item.IsDirectory
-                && (item.Path
-                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
-                    |> Option.exists (fun path ->
-                        System.String.IsNullOrWhiteSpace path
-                        || ArcEntityPathRules.isGenericFileSystemParentAllowed path
-                    ))
-            then
+            if canCreateFileSystemItemIn kind item then
                 openDialog (FileSystemCreateDialog { Parent = item; Kind = kind })
 
         let requestDeleteItem =

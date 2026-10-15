@@ -185,24 +185,14 @@ let fileSystemCreateContextMenuItems
     (openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit)
     (item: FileItem)
     =
-    if
-        item.IsDirectory
-        && (item.Path
-            |> Option.map PathHelpers.normalizeCanonicalRelativePath
-            |> Option.exists (fun path ->
-                String.IsNullOrWhiteSpace path
-                || ArcEntityPathRules.isGenericFileSystemParentAllowed path
-            ))
-    then
-        fileSystemCreateKinds
-        |> List.map (fun kind ->
-            ContextMenuItem.create
-                $"New {fileSystemCreateKindLabel kind}"
-                (fileSystemCreateKindIcon kind)
-                (fun () -> openFileSystemCreateModal kind item)
-        )
-    else
-        []
+    fileSystemCreateKinds
+    |> List.filter (fun kind -> canCreateFileSystemItemIn kind item)
+    |> List.map (fun kind ->
+        ContextMenuItem.create
+            $"New {fileSystemCreateKindLabel kind}"
+            (fileSystemCreateKindIcon kind)
+            (fun () -> openFileSystemCreateModal kind item)
+    )
 
 let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
     withDividers [

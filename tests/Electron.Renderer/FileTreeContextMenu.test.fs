@@ -483,12 +483,15 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "generic file system creation is hidden for ARC collection roots",
+            "ARC collection roots offer new files but not new folders",
             fun () ->
-                let item = createFolderItem "assays" (Some "assays")
-                let menuItems = fileSystemCreateContextMenuItems (fun _ _ -> ()) item
+                [ "studies"; "assays"; "workflows"; "runs" ]
+                |> List.iter (fun zone ->
+                    let item = createFolderItem zone (Some zone)
+                    let menuItems = fileSystemCreateContextMenuItems (fun _ _ -> ()) item
 
-                Vitest.expect(menuItems.Length).toBe (0)
+                    Vitest.expect(menuItems |> List.map _.Label |> Array.ofList).toEqual ([| "New File" |])
+                )
         )
 
         Vitest.test (
