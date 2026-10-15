@@ -296,7 +296,7 @@ let private buildSingleConflictDocument currentLines incomingLines =
     |> String.concat "\n"
 
 let private unexpectedPromise<'T> name : JS.Promise<Result<'T, string>> = promise { return failwith name }
-let private unexpectedGitLab<'T> name : JS.Promise<Result<'T, GitLabError>> = promise { return failwith name }
+let private unexpectedGitLab<'T> name : JS.Promise<Result<'T, CreateProjectError>> = promise { return failwith name }
 
 let private conflictPage path =
     PageState.GitMergeConflictPage {
@@ -321,6 +321,8 @@ let private defaultDependencies: GitDependencies = {
     initializeWorkspace = fun _ -> unexpectedPromise "initializeWorkspace"
     bindWorkspace = fun _ -> unexpectedPromise "bindWorkspace"
     createRemoteProject = fun _ -> unexpectedGitLab "createRemoteProject"
+    // An account without groups creates the repository in its personal namespace without a dialog.
+    loadPublishOwners = fun () -> promise { return Ok { username = "carol"; groups = [||] } }
     renameOpenArcRoot = fun _ -> unexpectedPromise "renameOpenArcRoot"
     checkDependencies = fun _ -> unexpectedPromise "checkDependencies"
     installDependency = fun _ -> unexpectedPromise "installDependency"
@@ -433,6 +435,74 @@ let private runningState = {
         ArcSessionId = 1
         WorkspaceVersion = Some "v1"
 }
+
+let private noOwnerSelection: GitPublishOwnerSelection = { Owners = None; Choice = None }
+
+let private publishGroup groupId path canCreate level : PublishGroupDto = {
+    id = groupId
+    name = path
+    full_path = path
+    project_creation_level = level
+    can_create_projects = canCreate
+}
+
+let private publishOwnersDto groups : PublishOwnersDto = { username = "carol"; groups = groups }
+
+/// Applies one message and collects the messages its command dispatches.
+let private step deps model message = promise {
+    let next, cmd = update deps ignore message model
+    let! messages = collectMessages cmd
+    return next, messages
+}
+
+/// Runs a push and applies its completion.
+let private runPush deps model = promise {
+    let! writing, messages = step deps model (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
+    let! finished, _ = step deps writing messages[0]
+    return finished
+}
+
+/// Runs the refresh a renamed ARC path starts. It holds the publish back until the workspace
+/// token is loaded, then the publish runs.
+let private runRefreshAndPublish deps model = promise {
+    let! refreshing, refreshMessages = step deps model RefreshRequested
+    let! refreshed, afterRefresh = step deps refreshing refreshMessages[0]
+
+    Vitest
+        .expect(afterRefresh)
+        .toEqual (
+            [|
+                WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+            |]
+        )
+
+    return! runPush deps refreshed
+}
+
+/// Dependencies of a first publish. The synchronize reports the missing publish target until
+/// the workspace is bound. The two calls under test are passed in.
+let private firstPublishDeps loadOwners createProject : GitDependencies =
+    let bindCalls = ResizeArray<string>()
+    let sync = cleanStatus.Synchronization.Value
+
+    {
+        (withRefresh cleanStatus defaultDependencies) with
+            synchronize =
+                fun _ ->
+                    if bindCalls.Count = 0 then
+                        promise {
+                            return
+                                Ok(failed Validation VersionControlCodes.PublishTargetMissing "publish target missing")
+                        }
+                    else
+                        promise { return Ok(succeededWithPublication PublicationStateDto.Published sync) }
+            bindWorkspace =
+                fun _ ->
+                    bindCalls.Add "bindWorkspace"
+                    promise { return Ok(succeeded sessionInfo) }
+            loadPublishOwners = loadOwners
+            createRemoteProject = createProject
+    }
 
 let private requestAndConfirmDiscard deps state paths =
     let pendingConfirmation, _ =
@@ -976,10 +1046,18 @@ Vitest.describe (
                 )
 
                 try
-                    let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", " My ARC Project ")
+                    let! result =
+                        GitLabApi.CreateProject(
+                            "https://gitlab.example/",
+                            "token-123",
+                            {
+                                Name = " My ARC Project "
+                                NamespaceId = None
+                            }
+                        )
 
                     match result with
-                    | Error err -> failwith err.GitLabErrorToString
+                    | Error _ -> failwith "Expected the project to be created."
                     | Ok project ->
                         Vitest.expect(project.name).toBe ("My ARC Project")
                         Vitest.expect(project.path_with_namespace).toBe ("carol/my-arc-project")
@@ -995,7 +1073,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitLabApi.CreateProject includes GitLab's duplicate-name response in the error",
+            "GitLabApi.CreateProject reports GitLab's duplicate-name response as a refused name",
             fun () -> promise {
                 let duplicateNameError =
                     createObj [
@@ -1021,14 +1099,21 @@ Vitest.describe (
                 )
 
                 try
-                    let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", "Existing ARC")
+                    let! result =
+                        GitLabApi.CreateProject(
+                            "https://gitlab.example/",
+                            "token-123",
+                            {
+                                Name = "Existing ARC"
+                                NamespaceId = None
+                            }
+                        )
 
                     match result with
                     | Ok _ -> failwith "Expected duplicate project creation to fail."
-                    | Error error ->
-                        let message = error.GitLabErrorToString
-                        Vitest.expect(message).toContain ("HTTP 400")
-                        Vitest.expect(message).toContain ("has already been taken")
+                    | Error(CreateProjectError.NameRefused details) ->
+                        Vitest.expect(details |> Option.defaultValue "").toContain ("has already been taken")
+                    | Error _ -> failwith "Expected NameRefused."
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
             }
@@ -1815,7 +1900,7 @@ Vitest.describe (
                                     }
                                 else
                                     unexpectedPromise "unexpected pull"
-                        createRemoteProject = fun _ -> promise { return Error(GitLabError.HttpError 400) }
+                        createRemoteProject = fun _ -> promise { return Error(CreateProjectError.NameRefused None) }
                 }
 
                 let model, command =
@@ -1836,6 +1921,463 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "publishOwnersOf puts the personal owner first and disables groups that refuse new projects",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (
+                        publishOwnersDto [|
+                            publishGroup 3 "lab/team" true (Some "developer")
+                            publishGroup 4 "lab/locked" false (Some "owner")
+                            publishGroup 5 "lab/unknown" false None
+                        |]
+                    )
+
+                Vitest.expect(owners |> Array.map _.NamespaceId).toEqual ([| None; Some 3; Some 4; Some 5 |])
+                Vitest.expect(owners[0].Label).toContain ("carol")
+                Vitest.expect(owners[1].Label).toBe ("lab/team")
+
+                Vitest
+                    .expect(owners |> Array.map (fun owner -> owner.DisabledReason.IsSome))
+                    .toEqual ([| false; false; true; true |])
+            }
+        )
+
+        Vitest.test (
+            "A first publish with a group that accepts projects asks for the owner before creating anything",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) })
+                        (fun request ->
+                            createRequests.Add request
+                            unexpectedGitLab "createRemoteProject"
+                        )
+
+                let! next = runPush deps runningState
+                let prompt = next.PendingPublishRename.Value
+
+                Vitest.expect(createRequests.Count).toBe (0)
+                Vitest.expect(prompt.Owners |> Array.map _.NamespaceId).toEqual ([| None; Some 7 |])
+                Vitest.expect(prompt.SelectedNamespaceId).toEqual (None)
+                Vitest.expect(next.PublishOwners.IsSome).toBe (true)
+                Vitest.expect(next.PublishOwnerChoice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A first publish without a group that accepts projects creates in the personal namespace without a dialog",
+            fun () -> promise {
+                let publishWith groups = promise {
+                    let createRequests = ResizeArray<CreateProjectRequest>()
+
+                    let deps =
+                        firstPublishDeps
+                            (fun () -> promise { return Ok(publishOwnersDto groups) })
+                            (fun request ->
+                                createRequests.Add request
+                                promise { return Ok remoteProject }
+                            )
+
+                    let! next = runPush deps runningState
+                    return createRequests |> Seq.toArray, next
+                }
+
+                let expectedRequest: CreateProjectRequest = { Name = "arc"; NamespaceId = None }
+
+                let! lockedRequests, lockedState = publishWith [| publishGroup 7 "lab/locked" false (Some "owner") |]
+
+                let! noGroupRequests, noGroupState = publishWith [||]
+
+                Vitest.expect(lockedRequests).toEqual ([| expectedRequest |])
+                Vitest.expect(noGroupRequests).toEqual ([| expectedRequest |])
+                Vitest.expect(lockedState.PendingPublishRename).toEqual (None)
+                Vitest.expect(noGroupState.PendingPublishRename).toEqual (None)
+                Vitest.expect(noGroupState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "Submitting the dialog with the current folder name and a group publishes there without renaming",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+                let loadCalls = ResizeArray<string>()
+                let renameCalls = ResizeArray<string>()
+
+                let deps = {
+                    firstPublishDeps
+                        (fun () ->
+                            loadCalls.Add "loadPublishOwners"
+                            promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) }
+                        )
+                        (fun request ->
+                            createRequests.Add request
+                            promise { return Ok remoteProject }
+                        ) with
+                        renameOpenArcRoot =
+                            fun name ->
+                                renameCalls.Add name
+                                unexpectedPromise "renameOpenArcRoot"
+                }
+
+                let! prompted = runPush deps runningState
+
+                let! submitted, publishMessages =
+                    step deps prompted (SubmitPublishRenameRequested { Name = " ARC "; NamespaceId = Some 7 })
+
+                Vitest.expect(submitted.PendingPublishRename).toEqual (None)
+
+                Vitest
+                    .expect(publishMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
+
+                let! _ = runPush deps submitted
+
+                Vitest.expect(renameCalls.Count).toBe (0)
+                Vitest.expect(loadCalls.Count).toBe (1)
+                Vitest.expect(createRequests |> Seq.map _.NamespaceId |> Seq.toArray).toEqual ([| Some 7 |])
+            }
+        )
+
+        Vitest.test (
+            "The chosen owner survives a rename when the reply comes before the path change",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+
+                let deps = {
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) })
+                        (fun request ->
+                            createRequests.Add request
+                            promise { return Ok remoteProject }
+                        ) with
+                        renameOpenArcRoot = fun _ -> promise { return Ok "C:/work/Renamed ARC" }
+                }
+
+                let! prompted = runPush deps runningState
+
+                let! submitted, renameMessages =
+                    step
+                        deps
+                        prompted
+                        (SubmitPublishRenameRequested {
+                            Name = "Renamed ARC"
+                            NamespaceId = Some 7
+                        })
+
+                let! renamed, _ = step deps submitted renameMessages[0]
+                let! moved, _ = step deps renamed (ArcPathChanged(Some "C:/work/Renamed ARC"))
+                let! _ = runRefreshAndPublish deps moved
+
+                Vitest
+                    .expect(
+                        createRequests
+                        |> Seq.toArray
+                        |> Array.map (fun request -> request.Name, request.NamespaceId)
+                    )
+                    .toEqual ([| "Renamed ARC", Some 7 |])
+            }
+        )
+
+        Vitest.test (
+            "The chosen owner survives a rename when the path change comes before the reply",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+
+                let deps = {
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) })
+                        (fun request ->
+                            createRequests.Add request
+                            promise { return Ok remoteProject }
+                        ) with
+                        renameOpenArcRoot = fun _ -> promise { return Ok "C:/work/Renamed ARC" }
+                }
+
+                let! prompted = runPush deps runningState
+
+                let! submitted, renameMessages =
+                    step
+                        deps
+                        prompted
+                        (SubmitPublishRenameRequested {
+                            Name = "Renamed ARC"
+                            NamespaceId = Some 7
+                        })
+
+                let! moved, _ = step deps submitted (ArcPathChanged(Some "C:/work/Renamed ARC"))
+                let! replied, replyMessages = step deps moved renameMessages[0]
+
+                Vitest.expect(replyMessages).toEqual ([| RefreshRequested |])
+
+                let! _ = runRefreshAndPublish deps replied
+
+                Vitest
+                    .expect(
+                        createRequests
+                        |> Seq.toArray
+                        |> Array.map (fun request -> request.Name, request.NamespaceId)
+                    )
+                    .toEqual ([| "Renamed ARC", Some 7 |])
+            }
+        )
+
+        Vitest.test (
+            "A refusal for the chosen group reopens the dialog with that group disabled and no owner selected",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return failwith "loadPublishOwners" })
+                        (fun _ -> promise { return Error(CreateProjectError.NotAllowed(Some "limit reached")) })
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[1]
+                }
+
+                let! next = runPush deps state
+                let prompt = next.PendingPublishRename.Value
+
+                Vitest.expect(prompt.Owners.Length).toBe (2)
+                Vitest.expect(prompt.Owners[0].DisabledReason).toEqual (None)
+                Vitest.expect(prompt.Owners[1].DisabledReason.IsSome).toBe (true)
+                Vitest.expect(prompt.SelectedNamespaceId).toEqual (None)
+                Vitest.expect(prompt.Message).toContain ("lab/team")
+                Vitest.expect(prompt.Message).not.toContain ("limit reached")
+                Vitest.expect(next.PublishOwners).toEqual (Some prompt.Owners)
+                Vitest.expect(next.PublishOwnerChoice).toEqual (None)
+                Vitest.expect(next.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A refusal for the personal namespace reopens the dialog with it disabled when a group is left",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return failwith "loadPublishOwners" })
+                        (fun _ -> promise { return Error(CreateProjectError.NotAllowed(Some "limit reached")) })
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[0]
+                }
+
+                let! next = runPush deps state
+                let prompt = next.PendingPublishRename.Value
+
+                Vitest.expect(prompt.Owners[0].DisabledReason.IsSome).toBe (true)
+                Vitest.expect(prompt.Owners[1].DisabledReason).toEqual (None)
+                Vitest.expect(prompt.Message).toContain ("limit reached")
+                Vitest.expect(prompt.SelectedNamespaceId).toEqual (None)
+                Vitest.expect(next.PublishOwnerChoice).toEqual (None)
+                Vitest.expect(next.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A name refused inside the chosen group keeps the owners and the group in the dialog",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return failwith "loadPublishOwners" })
+                        (fun _ -> promise { return Error(CreateProjectError.NameRefused None) })
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[1]
+                }
+
+                let! next = runPush deps state
+                let prompt = next.PendingPublishRename.Value
+
+                Vitest.expect(prompt.Owners).toEqual (owners)
+                Vitest.expect(prompt.SelectedNamespaceId).toEqual (Some 7)
+                Vitest.expect(next.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A primary save with a group that accepts projects asks for the owner and creates nothing",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+
+                let deps = {
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) })
+                        (fun request ->
+                            createRequests.Add request
+                            unexpectedGitLab "createRemoteProject"
+                        ) with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let! requested, requestMessages = step deps state (PrimarySaveAllRequested "Publish")
+                let writing, writeCmd = update deps ignore requestMessages[0] requested
+                let! completionMessages = collectWriteMessages writeCmd
+
+                match completionMessages with
+                | [| WriteCompleted(_, _, PrimarySave _, Ok(RequiresRemoteProjectRename _)) |] -> ()
+                | _ -> failwith "Expected the primary save to ask for the owner."
+
+                let finished, _ = update deps ignore completionMessages[0] writing
+
+                Vitest.expect(createRequests.Count).toBe (0)
+
+                Vitest
+                    .expect(
+                        finished.PendingPublishRename
+                        |> Option.map (fun prompt -> prompt.Owners |> Array.map _.NamespaceId)
+                    )
+                    .toEqual (Some [| None; Some 7 |])
+            }
+        )
+
+        Vitest.test (
+            "A completed write other than the owner prompt clears the owners and the owner choice",
+            fun () -> promise {
+                let owners =
+                    publishOwnersOf (publishOwnersDto [| publishGroup 7 "lab/team" true None |])
+
+                let state = {
+                    runningState with
+                        PublishOwners = Some owners
+                        PublishOwnerChoice = Some owners[1]
+                }
+
+                let publishWith createResult = promise {
+                    let deps =
+                        firstPublishDeps
+                            (fun () -> promise { return failwith "loadPublishOwners" })
+                            (fun _ -> createResult)
+
+                    return! runPush deps state
+                }
+
+                let! published = publishWith (promise { return Ok remoteProject })
+
+                let! failed = publishWith (promise { return Error(CreateProjectError.Failed GitLabError.Forbidden) })
+
+                for finished in [| published; failed |] do
+                    Vitest.expect(finished.PendingPublishRename).toEqual (None)
+                    Vitest.expect(finished.PublishOwners).toEqual (None)
+                    Vitest.expect(finished.PublishOwnerChoice).toEqual (None)
+
+                Vitest.expect(failed.ErrorNotice.IsSome).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A refusal for the personal namespace without another group is an error and opens no dialog",
+            fun () -> promise {
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [||]) })
+                        (fun _ -> promise { return Error(CreateProjectError.NotAllowed None) })
+
+                let! next = runPush deps runningState
+
+                Vitest.expect(next.PendingPublishRename).toEqual (None)
+                Vitest.expect(next.ErrorNotice.IsSome).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A failed owner lookup stops the publish before anything is created and a later upload works",
+            fun () -> promise {
+                let createRequests = ResizeArray<CreateProjectRequest>()
+
+                let deps =
+                    firstPublishDeps
+                        (fun () -> promise { return Error GitLabError.Forbidden })
+                        (fun request ->
+                            createRequests.Add request
+                            unexpectedGitLab "createRemoteProject"
+                        )
+
+                let! next = runPush deps runningState
+
+                Vitest.expect(createRequests.Count).toBe (0)
+                Vitest.expect(next.PendingPublishRename).toEqual (None)
+                Vitest.expect(next.ErrorNotice.Value).toContain (GitLabError.Forbidden.GitLabErrorToString)
+
+                // Once the lookup works again, the next upload creates the repository.
+                let retryDeps =
+                    firstPublishDeps
+                        (fun () -> promise { return Ok(publishOwnersDto [||]) })
+                        (fun request ->
+                            createRequests.Add request
+                            promise { return Ok remoteProject }
+                        )
+
+                let! retried = runPush retryDeps next
+
+                Vitest
+                    .expect(createRequests |> Seq.toArray)
+                    .toEqual (
+                        [|
+                            ({ Name = "arc"; NamespaceId = None }: CreateProjectRequest)
+                        |]
+                    )
+
+                Vitest.expect(retried.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "Canceling the dialog clears the chosen owner so the next publish loads the owners again",
+            fun () -> promise {
+                let loadCalls = ResizeArray<string>()
+
+                let deps =
+                    firstPublishDeps
+                        (fun () ->
+                            loadCalls.Add "loadPublishOwners"
+                            promise { return Ok(publishOwnersDto [| publishGroup 7 "lab/team" true None |]) }
+                        )
+                        (fun _ -> unexpectedGitLab "createRemoteProject")
+
+                let! prompted = runPush deps runningState
+                let groupOwner = prompted.PublishOwners.Value[1]
+
+                let canceled, _ =
+                    update deps ignore CancelPublishRenameRequested {
+                        prompted with
+                            PublishOwnerChoice = Some groupOwner
+                    }
+
+                Vitest.expect(canceled.PublishOwners).toEqual (None)
+                Vitest.expect(canceled.PublishOwnerChoice).toEqual (None)
+
+                let! _ = runPush deps canceled
+
+                Vitest.expect(loadCalls.Count).toBe (2)
+            }
+        )
+
+        Vitest.test (
             "Canceling the publish rename refreshes the committed status and keeps the saved locally notice",
             fun () -> promise {
                 let deps = withRefresh cleanStatus defaultDependencies
@@ -1847,6 +2389,8 @@ Vitest.describe (
                             Some {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository with this name already exists. Enter a different name."
+                                Owners = [||]
+                                SelectedNamespaceId = None
                             }
                 }
 
@@ -2943,17 +3487,26 @@ Vitest.describe (
                             Some {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
+                                Owners = [||]
+                                SelectedNamespaceId = None
                             }
                 }
 
                 let stateAfterSubmit, renameCmd =
-                    update deps ignore (SubmitPublishRenameRequested " Renamed ARC ") initialState
+                    update
+                        deps
+                        ignore
+                        (SubmitPublishRenameRequested {
+                            Name = " Renamed ARC "
+                            NamespaceId = None
+                        })
+                        initialState
 
                 let! renameMessages = collectMessages renameCmd
 
                 let stateAfterRename, completionCmd =
                     match renameMessages with
-                    | [| PublishRenameCompleted(_, Ok "C:/work/Renamed ARC") |] ->
+                    | [| PublishRenameCompleted(_, Ok "C:/work/Renamed ARC", _) |] ->
                         update deps ignore renameMessages[0] stateAfterSubmit
                     | _ -> failwith "Expected rename completion to be dispatched."
 
@@ -3035,11 +3588,13 @@ Vitest.describe (
                             Some {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
+                                Owners = [||]
+                                SelectedNamespaceId = None
                             }
                 }
 
                 let afterRename, renameCmd =
-                    update deps ignore (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC")) state
+                    update deps ignore (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC", noOwnerSelection)) state
 
                 let! renameMessages = collectMessages renameCmd
 
@@ -3099,6 +3654,8 @@ Vitest.describe (
                             Some {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
+                                Owners = [||]
+                                SelectedNamespaceId = None
                             }
                 }
 
@@ -3108,7 +3665,11 @@ Vitest.describe (
                 let! pathChangeMessages = collectMessages pathChangeCmd
 
                 let stateAfterRenameCompletion, retryCmd =
-                    update deps ignore (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC")) stateAfterPathChange
+                    update
+                        deps
+                        ignore
+                        (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC", noOwnerSelection))
+                        stateAfterPathChange
 
                 let! retryMessages = collectMessages retryCmd
 
@@ -7740,7 +8301,7 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (PublishRenameCompleted(runningState.ArcSessionId, Ok "C:/renamed-arc"))
+                        (PublishRenameCompleted(runningState.ArcSessionId, Ok "C:/renamed-arc", noOwnerSelection))
                         state
 
                 let! messages = collectMessages cmd
@@ -7773,7 +8334,7 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (PublishRenameCompleted(model.ArcSessionId - 1, Ok "C:\\arc"))
+                        (PublishRenameCompleted(model.ArcSessionId - 1, Ok "C:\\arc", noOwnerSelection))
                         model
 
                 let! messages = collectMessages command
@@ -7798,7 +8359,7 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (PublishRenameCompleted(model.ArcSessionId - 1, Ok "C:\\arc"))
+                        (PublishRenameCompleted(model.ArcSessionId - 1, Ok "C:\\arc", noOwnerSelection))
                         model
 
                 let! messages = collectMessages command
@@ -10040,8 +10601,10 @@ Vitest.describe (
                             publishRenamePrompt = {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
+                                Owners = [||]
+                                SelectedNamespaceId = None
                             },
-                            onSubmitPublishRename = (fun name -> submittedName <- Some name),
+                            onSubmitPublishRename = (fun submit -> submittedName <- Some submit.Name),
                             onCancelPublishRename = (fun () -> cancelCalls <- cancelCalls + 1)
                         )
                     )
@@ -10051,12 +10614,16 @@ Vitest.describe (
 
                 Vitest.expect(input.value).toBe ("Existing ARC")
 
-                setInputValue input "Renamed ARC"
-                do! Promise.sleep 0
-
                 let submitButton =
                     document.body.querySelector ("[data-testid='GitSidebarPublishRenameSubmit']") :?> HTMLButtonElement
 
+                // The refused name can't be sent again unchanged.
+                Vitest.expect(submitButton.disabled).toBe (true)
+
+                setInputValue input "Renamed ARC"
+                do! Promise.sleep 0
+
+                Vitest.expect(submitButton.disabled).toBe (false)
                 submitButton.click ()
                 do! Promise.sleep 0
 

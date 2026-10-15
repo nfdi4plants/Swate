@@ -7,6 +7,7 @@ open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Page.ValidationPackageBrowser.Types
 open Swate.Components.Shared
+open Swate.Components.Shared.ProvenanceGraph.Types
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open AuthTypes
@@ -97,6 +98,8 @@ type IArcVaultsApi = {
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     listProvenanceTables: unit -> JS.Promise<Result<ProvenanceTableSelectionDto[], exn>>
     loadProvenanceTable: ProvenanceTableSelectionDto -> JS.Promise<Result<ProvenanceLoadResultDto, exn>>
+    /// Builds the provenance graph data of the active vault's in-memory ARC.
+    loadProvenanceGraph: unit -> JS.Promise<Result<ProvenanceGraphData, exn>>
     /// Persists the active in-memory ARC scaffold to disk.
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.
@@ -177,7 +180,8 @@ type IGitLabApi = {
     loadOrganisationGroups: ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
     loadOrganisationRepos:
         ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
-    createProject: string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
+    createProject: CreateProjectRequest -> JS.Promise<Result<ExploreProjectDto, CreateProjectError>>
+    loadPublishOwners: unit -> JS.Promise<Result<PublishOwnersDto, GitLabError>>
 }
 
 /// Two Way Bridge: Renderer <-> Main

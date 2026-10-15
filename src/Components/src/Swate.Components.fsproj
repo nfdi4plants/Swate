@@ -75,6 +75,9 @@
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
+    <Compile Include="JsBindings\Elk.fs" />
+    <Compile Include="JsBindings\Dom.fs" />
+    <Compile Include="JsBindings\Errors.fs" />
     <Compile Include="Util\Download.fs" />
     <Compile Include="Util\SemVer.fs" />
     <Compile Include="Util\SemVer.test.fs" />
@@ -134,6 +137,8 @@
     <Compile Include="Primitive\ComboBox\Types.fs" />
     <Compile Include="Primitive\ComboBox\ComboBox.fs" />
     <Compile Include="Primitive\Dropdown\Dropdown.fs" />
+    <Compile Include="Primitive\ErrorBoundary\ErrorBoundary.fs" />
+    <Compile Include="Primitive\ErrorBoundary\ErrorBoundary.test.rtl.fs" />
     <Compile Include="Primitive\ErrorModal\Types.fs" />
     <Compile Include="Primitive\ErrorModal\Helper.fs" />
     <Compile Include="Primitive\ErrorModal\Context.fs" />
@@ -228,6 +233,7 @@
     <Compile Include="Composite\Layout\Layout.fs" />
     <Compile Include="Composite\TemplateBrowser\Types.fs" />
     <Compile Include="Composite\TemplateBrowser\Helper.fs" />
+    <Compile Include="Composite\TemplateBrowser\Helper.test.fs" />
     <Compile Include="Composite\TemplateBrowser\Context.fs" />
     <Compile Include="Composite\TemplateBrowser\TemplateCacheContext.fs" />
     <Compile Include="Composite\TemplateBrowser\TemplateCacheProvider.fs" />
@@ -268,6 +274,13 @@
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
+    <Compile Include="Composite\GraphCanvas\Types.fs" />
+    <Compile Include="Composite\GraphCanvas\Pills.fs" />
+    <Compile Include="Composite\GraphCanvas\Pills.test.fs" />
+    <Compile Include="Composite\GraphCanvas\Layout.fs" />
+    <Compile Include="Composite\GraphCanvas\Layout.test.fs" />
+    <Compile Include="Composite\GraphCanvas\GraphCanvas.fs" />
+    <Compile Include="Composite\GraphCanvas\GraphCanvas.test.rtl.fs" />
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
     <Compile Include="Page\ProvenanceGrouping\ViewSupport.fs" />
@@ -290,6 +303,14 @@
     <Compile Include="Page\ProvenanceGrouping\EditorSurface.fs" />
     <Compile Include="Page\ProvenanceGrouping\Tutorial.fs" />
     <Compile Include="Page\ProvenanceGrouping\ProvenanceGrouping.fs" />
+    <Compile Include="Page\ProvenanceGraph\Types.fs" />
+    <Compile Include="Page\ProvenanceGraph\ToCanvas.fs" />
+    <Compile Include="Page\ProvenanceGraph\Header.fs" />
+    <Compile Include="Page\ProvenanceGraph\ProvenanceGraph.sample.fs" />
+    <Compile Include="Page\ProvenanceGraph\ProvenanceGraph.fs" />
+    <Compile Include="Page\ProvenanceGraph\ProvenanceGraph.test.rtl.fs" />
+    <Compile Include="Page\ProvenanceGraph\ToCanvas.test.fs" />
+    <Compile Include="Page\ProvenanceGraph\Header.test.fs" />
     <Compile Include="Page\Changelog\Changelog.fs" />
     <Compile Include="Page\Changelog\Changelog.test.rtl.fs" />
     <Compile Include="Page\Changelog\Changelog.sample.fs" />
@@ -300,8 +321,18 @@
     <Compile Include="Page\Metadata\FormComponents\OntologyAnnotationInput.fs" />
     <Compile Include="Page\Metadata\FormComponents\DateTimeInput.fs" />
     <Compile Include="Page\Metadata\FormComponents\CommentsInput.fs" />
-    <Compile Include="Page\Metadata\FormComponents\PersonsInput.fs" />
-    <Compile Include="Page\Metadata\FormComponents\PublicationsInput.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\Types.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\Lookup.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\Lookup.test.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonSearchDialog.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonsInput.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonsInput.test.rtl.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Types.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Lookup.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Lookup.test.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\PublicationSearchDialog.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\PublicationsInput.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PublicationsInput\PublicationsInput.test.rtl.fs" />
     <Compile Include="Page\Metadata\FormComponents\OntologySourceReferencesInput.fs" />
     <Compile Include="Page\Metadata\TemplateMetadata.fs" />
     <Compile Include="Page\Metadata\AssayMetadata.fs" />
@@ -374,6 +405,7 @@
       <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0"
         ResolutionStrategy="Max" />
+      <NpmPackage Name="elkjs" Version="gte 0.9.3 lt 0.10.0" ResolutionStrategy="Max" />
       <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />

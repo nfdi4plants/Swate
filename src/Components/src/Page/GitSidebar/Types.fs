@@ -60,7 +60,26 @@ type GitSidebarConfirmationDialog = {
     CancelLabel: string
 }
 
-type GitSidebarPublishRenamePrompt = { CurrentName: string; Message: string }
+/// One choice of the owner picker. NamespaceId None is the personal namespace.
+/// A DisabledReason marks an owner that cannot be selected and says why.
+type GitSidebarPublishOwner = {
+    NamespaceId: int option
+    Label: string
+    DisabledReason: string option
+}
+
+/// Owners is empty when the dialog only asks for another name.
+type GitSidebarPublishRenamePrompt = {
+    CurrentName: string
+    Message: string
+    Owners: GitSidebarPublishOwner[]
+    SelectedNamespaceId: int option
+}
+
+type GitSidebarPublishSubmit = {
+    Name: string
+    NamespaceId: int option
+}
 
 type GitSidebarCallbacks = {
     OnRefresh: unit -> unit

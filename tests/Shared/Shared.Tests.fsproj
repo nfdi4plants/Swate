@@ -9,6 +9,8 @@
     <Compile Include="GitLfsRules.Tests.fs"/>
     <Compile Include="ProvenanceGrouping.Tests.fs"/>
     <Compile Include="ProvenanceGrouping.ARCtrlConverter.Tests.fs"/>
+    <Compile Include="ProvenanceGraph.BuildIndex.Tests.fs"/>
+    <Compile Include="ProvenanceGraph.Queries.Tests.fs"/>
     <Compile Include="Shared.Tests.fs"/>
   </ItemGroup>
   <ItemGroup>

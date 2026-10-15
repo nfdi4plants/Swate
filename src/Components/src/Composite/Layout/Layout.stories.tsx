@@ -166,6 +166,63 @@ export const ContentLeftSidebarActions: Story = {
   }
 }
 
+// A button with an indicator shows a badge on its top right corner. The badge stays inside the action column,
+// so the column does not grow and nothing cuts the badge.
+export const LeftActionIndicator: Story = {
+  name: "Left Action With Indicator",
+  args: {
+    navbar: <div className="swt:flex swt:items-center swt:justify-center swt:h-full swt:grow">
+        Navbar
+      </div>,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+    leftSidebar: <ul className="swt:menu swt:flex-nowrap">
+      <li className="menu-title">Left Sidebar</li>
+    </ul>,
+    leftSidebarDefaultOpen: true,
+    leftActions: <>
+      <LayoutBtn
+        iconClassName="swt:fluent--search-24-regular"
+        tooltip="Search"
+        onClick={() => {}} />
+      <LayoutBtn
+        iconClassName="swt:fluent--flowchart-24-regular"
+        tooltip="Flow"
+        indicator="new"
+        onClick={() => {}} />
+      <LayoutBtn
+        iconClassName="swt:fluent--info-24-regular"
+        tooltip="Info"
+        onClick={() => {}} />
+    </>,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const column = canvas.getByTestId('layout-main-left-navbar');
+    const badge = canvas.getByTestId('layout-btn-indicator');
+    const button = canvas.getByRole('button', { name: 'Flow' });
+
+    // Only the button with an indicator has a badge, and the badge belongs to that button.
+    await expect(canvas.getAllByTestId('layout-btn-indicator')).toHaveLength(1);
+    await expect(badge.parentElement).toContainElement(button);
+
+    const columnBox = column.getBoundingClientRect();
+    const badgeBox = badge.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+
+    await expect(badgeBox.width).toBeGreaterThan(0);
+    await expect(badgeBox.left).toBeGreaterThanOrEqual(columnBox.left);
+    await expect(badgeBox.right).toBeLessThanOrEqual(columnBox.right);
+    await expect(badgeBox.top).toBeGreaterThanOrEqual(columnBox.top);
+
+    // The badge sits on the top right of the button, and the column is as wide as a column without badge.
+    await expect(badgeBox.right).toBeGreaterThan(buttonBox.right - 2);
+    await expect(badgeBox.top).toBeLessThan(buttonBox.top + buttonBox.height / 2);
+    await expect(columnBox.width).toBeLessThan(buttonBox.width + 16);
+  },
+}
+
 export const ContentRightSidebar: Story = {
   name: "Content + Right Sidebar",
   args: {

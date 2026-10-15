@@ -8,6 +8,7 @@ open Swate.Components
 open Swate.Components.Primitive.LayoutComponents
 open Swate.Components.Page.Metadata
 open Swate.Components.Page.Metadata.FormComponents
+open Swate.Components.Page.Metadata.FormComponents.PersonsInput
 
 [<Erase; Mangle(false)>]
 type AssayMetadata =

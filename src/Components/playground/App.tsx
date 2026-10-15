@@ -251,7 +251,7 @@ function DataAnnotatorContainer() {
 
 const App = () => {
     return (
-        <ChangelogSample />
+        <ArcFileEditorContainer />
     );
 };
 
