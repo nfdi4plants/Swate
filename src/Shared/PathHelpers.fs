@@ -176,6 +176,7 @@ module ArcEntityPathRules =
         | OtherPath
 
     let private protectedDeleteTargetNames = [ ".gitattributes"; ".gitkeep"; "readme.md" ]
+    let private creatableProtectedFileNames = [ "readme.md" ]
     let private protectedRenameRootFolderNames = [ "notes" ]
     let private disallowedGenericPathSegments = [ ".git" ]
 
@@ -349,22 +350,65 @@ module ArcEntityPathRules =
                     | Some target -> DeletePathClassification.CanonicalFileTarget(target, normalizedRelativePath)
                     | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
 
-    let isGenericFileSystemTargetAllowed (relativePath: string) =
+    let private isGenericFileSystemPathAllowed (isCreate: bool) (isFile: bool) (relativePath: string) =
         let normalizedRelativePath = normalizeRelativePath relativePath
         let segments = normalizedRelativePath |> splitPathSegments
         let structuralPath = classifyStructuralArcPath segments
 
+        let isCreatableProtectedFile =
+            isCreate
+            && isFile
+            && PathHelpers.isProtectedDeleteTarget creatableProtectedFileNames normalizedRelativePath
+
+        let isBlockedStructuralPath =
+            match structuralPath with
+            | StructuralArcPath.EntityFolder when isFile -> false
+            | _ -> blocksGenericFileSystemTarget structuralPath
+
         if
             String.IsNullOrWhiteSpace normalizedRelativePath
             || PathHelpers.containsPathTraversalSegments normalizedRelativePath
-            || isProtectedTarget normalizedRelativePath structuralPath
+            || (isProtectedTarget normalizedRelativePath structuralPath
+                && not isCreatableProtectedFile)
         then
             false
         else
             segments.Length >= 1
             && (segments |> containsDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
-            && (blocksGenericFileSystemTarget structuralPath |> not)
+            && not isBlockedStructuralPath
+
+    /// True when `relativePath` names an item directly inside an add zone (for example `studies/notes.md`
+    /// or `studies/.DS_Store`), whatever its classification.
+    let isAddZoneRootChildPath (relativePath: string) =
+        match normalizeRelativePath relativePath |> splitPathSegments with
+        | [| zoneSegment; _ |] -> isAddZoneSegment zoneSegment
+        | _ -> false
+
+    /// Checks the name of a new file or rename target. ARC identifiers only allow letters, digits,
+    /// `_`, `-` and whitespace, so a file directly inside an add zone must contain a `.` (an extension).
+    /// Otherwise a file such as `assays/Assay1` would block a later "Add Assay" with that identifier.
+    let isNewGenericFileSystemNameAllowed (relativePath: string) =
+        match
+            normalizeRelativePath relativePath
+            |> splitPathSegments
+            |> classifyStructuralArcPath
+        with
+        | StructuralArcPath.EntityFolder -> (PathHelpers.getFileName relativePath).Contains "."
+        | _ -> true
+
+    let isGenericFileSystemTargetAllowed (relativePath: string) =
+        isGenericFileSystemPathAllowed false false relativePath
+
+    /// Like `isGenericFileSystemTargetAllowed` for a path that is known to be a file.
+    /// Files directly inside an add zone (for example `studies/notes.md`) are generic files.
+    let isGenericFileSystemFileTargetAllowed (relativePath: string) =
+        isGenericFileSystemPathAllowed false true relativePath
+
+    /// Checks a new generic file or folder path. Unlike rename and delete targets, a missing
+    /// protected file such as `readme.md` may be created.
+    let isGenericFileSystemCreateTargetAllowed (isFile: bool) (relativePath: string) =
+        isGenericFileSystemPathAllowed true isFile relativePath
 
     let tryNormalizeGenericFileSystemTarget (errorMessage: string) (relativePath: string) : Result<string, string> =
         let normalizedRelativePath = normalizeRelativePath relativePath
@@ -383,6 +427,14 @@ module ArcEntityPathRules =
         | DeletePathClassification.AddZoneDescendantTarget(_, normalizedRelativePath) ->
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
+
+    /// Like `isDeletePathAllowed` when the caller knows whether the item is a file. A file directly
+    /// inside an add zone has the path shape of an entity folder but is deleted as a generic file.
+    let isItemDeletePathAllowed (isFile: bool) (relativePath: string) =
+        match classifyDeleteTarget relativePath with
+        | DeletePathClassification.EntityFolderTarget(_, _, normalizedRelativePath) when isFile ->
+            isGenericFileSystemFileTargetAllowed normalizedRelativePath
+        | _ -> isDeletePathAllowed relativePath
 
     /// The path that a delete of `relativePath` removes from disk. Deleting a canonical entity
     /// workbook removes the whole entity folder, so the scope of the workbook is its parent folder.
@@ -471,6 +523,14 @@ module ArcEntityPathRules =
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
+    /// Like `isRenamePathAllowed` when the caller knows whether the item is a file. A file directly
+    /// inside an add zone has the path shape of an entity folder but is renamed as a generic file.
+    let isItemRenamePathAllowed (isFile: bool) (relativePath: string) =
+        match classifyRenameTarget relativePath with
+        | RenamePathClassification.EntityFolderTarget(_, _, normalizedRelativePath) when isFile ->
+            isGenericFileSystemFileTargetAllowed normalizedRelativePath
+        | _ -> isRenamePathAllowed relativePath
+
     let isGenericFileSystemParentAllowed (relativePath: string) =
         let normalizedRelativePath = normalizeRelativePath relativePath
 
@@ -487,6 +547,15 @@ module ArcEntityPathRules =
             structuralPath <> StructuralArcPath.AddZoneRoot
             && (segments |> containsDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
+
+    /// Checks whether a new generic file or folder may be created inside `relativePath`.
+    /// Folders directly inside an add zone are ARC entities, but files may be created there.
+    let isGenericFileSystemCreateParentAllowed (isFile: bool) (relativePath: string) =
+        isGenericFileSystemParentAllowed relativePath
+        || (isFile
+            && (normalizeRelativePath relativePath
+                |> splitPathSegments
+                |> classifyStructuralArcPath) = StructuralArcPath.AddZoneRoot)
 
     let resolveRenameSourcePath (relativePath: string) =
         match classifyRenameTarget relativePath with
