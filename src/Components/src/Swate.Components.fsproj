@@ -77,6 +77,7 @@
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Elk.fs" />
     <Compile Include="JsBindings\Dom.fs" />
+    <Compile Include="JsBindings\Errors.fs" />
     <Compile Include="JsBindings\ReactHooks.fs" />
     <Compile Include="Util\Download.fs" />
     <Compile Include="Util\SemVer.fs" />
@@ -137,6 +138,8 @@
     <Compile Include="Primitive\ComboBox\Types.fs" />
     <Compile Include="Primitive\ComboBox\ComboBox.fs" />
     <Compile Include="Primitive\Dropdown\Dropdown.fs" />
+    <Compile Include="Primitive\ErrorBoundary\ErrorBoundary.fs" />
+    <Compile Include="Primitive\ErrorBoundary\ErrorBoundary.test.rtl.fs" />
     <Compile Include="Primitive\ErrorModal\Types.fs" />
     <Compile Include="Primitive\ErrorModal\Helper.fs" />
     <Compile Include="Primitive\ErrorModal\Context.fs" />
