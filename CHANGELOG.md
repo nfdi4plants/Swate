@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - When DataHUB refuses a new repository because of missing permissions, Swate says so and no longer asks for a different name. #1404 (by @caroott)
 - The tabs on the "Download ARC from DataHUB" page are shown as tabs again. #1404 (by @caroott)
+- The import mode options in the template import dialog no longer look disabled. #1401 (by @Freymaurer)
 - Swate app installation sometimes showed a startup error. This has been fixed (hopefully 😶). #1398 (by @Freymaurer)
 
 ## 2.5.2 - 2026-10-15

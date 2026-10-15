@@ -99,37 +99,32 @@ type TemplateImportModal =
                     prop.className "swt:flex swt:flex-col swt:gap-2"
                     prop.children [
                         Html.div [
-                            prop.className "swt:flex swt:flex-col swt:gap-2"
+                            prop.className "swt:text-sm swt:font-medium swt:truncate"
+                            prop.text "Import mode"
+                        ]
+                        Html.div [
+                            prop.className "swt:flex swt:flex-col swt:gap-1"
                             prop.children [
-                                Html.div [
-                                    prop.className "swt:text-sm swt:font-medium swt:truncate"
-                                    prop.text "Import mode"
-                                ]
-                                Html.div [
-                                    prop.className "swt:flex swt:flex-col swt:gap-1"
-                                    prop.children [
-                                        for importMode, _, label in Helper.TemplateImportMode.options do
-                                            let isChecked = importType = importMode
+                                for importMode, _, label in Helper.TemplateImportMode.options do
+                                    let isChecked = importType = importMode
 
-                                            Html.label [
-                                                prop.className
-                                                    "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
-                                                prop.children [
-                                                    Html.input [
-                                                        prop.type'.radio
-                                                        prop.name "template-import-mode"
-                                                        prop.className "swt:radio swt:radio-sm"
-                                                        prop.isChecked isChecked
-                                                        prop.onChange (fun (_: bool) -> setImportType importMode)
-                                                    ]
-                                                    Html.span [
-                                                        prop.className "swt:text-sm swt:text-base-content"
-                                                        prop.text label
-                                                    ]
-                                                ]
+                                    Html.label [
+                                        prop.className
+                                            "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
+                                        prop.children [
+                                            Html.input [
+                                                prop.type'.radio
+                                                prop.name "template-import-mode"
+                                                prop.className "swt:radio swt:radio-sm"
+                                                prop.isChecked isChecked
+                                                prop.onChange (fun (_: bool) -> setImportType importMode)
                                             ]
+                                            Html.span [
+                                                prop.className "swt:text-sm swt:text-base-content"
+                                                prop.text label
+                                            ]
+                                        ]
                                     ]
-                                ]
                             ]
                         ]
                         Html.div [ prop.className "swt:divider swt:my-1" ]
