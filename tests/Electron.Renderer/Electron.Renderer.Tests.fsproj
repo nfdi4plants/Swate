@@ -18,6 +18,7 @@
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="GitDiffPageWorkflow.test.fs" />
     <Compile Include="GitWorkflowUnitResult.test.fs" />
+    <Compile Include="GitLabCreateProject.test.fs" />
     <Compile Include="LfsActivityContext.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
   </ItemGroup>

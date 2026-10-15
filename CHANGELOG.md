@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+- The first upload of an ARC to DataHUB asks whether the repository goes to your own account or to one of your groups. The question only appears when at least one of your groups accepts new repositories. Groups where you can't create repositories are listed but disabled, with the reason next to them. #1404 (by @caroott)
+
+### 🐛 Fixed
+
+- When DataHUB refuses a new repository because of missing permissions, Swate says so and no longer asks for a different name. #1404 (by @caroott)
+- The tabs on the "Download ARC from DataHUB" page are shown as tabs again. #1404 (by @caroott)
+
 ## 2.5.2 - 2026-10-15
 
 ### 🐛 Fixed
