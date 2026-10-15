@@ -142,6 +142,25 @@ let fileSystemCreateKindIcon =
     | FileSystemItemKind.File -> "swt:fluent--document-add-24-regular"
     | FileSystemItemKind.Folder -> "swt:fluent--folder-add-24-regular"
 
+let canCreateFileSystemItemIn (kind: FileSystemItemKind) (item: FileItem) =
+    item.IsDirectory
+    && (item.Path
+        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+        |> Option.exists (fun path ->
+            String.IsNullOrWhiteSpace path
+            || ArcEntityPathRules.isGenericFileSystemCreateParentAllowed (kind = FileSystemItemKind.File) path
+        ))
+
+let canDeleteFileItem (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists (ArcEntityPathRules.isItemDeletePathAllowed (not item.IsDirectory))
+
+let canRenameFileItem (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists (ArcEntityPathRules.isItemRenamePathAllowed (not item.IsDirectory))
+
 let createItem (node: FileTreeNode) : FileItem =
     let item =
         if node.isDirectory then

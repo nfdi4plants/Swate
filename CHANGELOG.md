@@ -19,11 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 - The first upload of an ARC to DataHUB asks whether the repository goes to your own account or to one of your groups. The question only appears when at least one of your groups accepts new repositories. Groups where you can't create repositories are listed but disabled, with the reason next to them. #1404 (by @caroott)
+- Add search options for DOI and Europe PMC for publications. #387, #1400 (by @Freymaurer)
+- Add search options for ORCID as well as name for authors. #501, #763 (by @Freymaurer)
+- Enable the creation of a missing README.md file in the root of an ARC, and in any folder where you can create files. Once created, a README.md can't be renamed or deleted in Swate. #1396, #1406 (by @Etschbeijer)
+- Added that right-clicking the studies, assays, workflows or runs folder offers "New File". Also, files there need a file extension now, for example "notes.md", so Swate can't mistake them for a study, assay, workflow or run. #1396, #1406 (by @Etschbeijer)
 
 ### 🐛 Fixed
 
+- Files placed directly in the studies, assays, workflows or runs folder, such as "studies/notes.md", can be renamed and deleted like any other file. Hidden files such as ".DS_Store" in these folders can be renamed too. #1406 (by @Etschbeijer)
+- The right-click menu no longer offers Rename or Delete for files that can't be renamed or deleted there, such as a stray "isa.study.xlsx" directly in the studies folder. #1406 (by @Etschbeijer)
+
 - When DataHUB refuses a new repository because of missing permissions, Swate says so and no longer asks for a different name. #1404 (by @caroott)
 - The tabs on the "Download ARC from DataHUB" page are shown as tabs again. #1404 (by @caroott)
+- The import mode options in the template import dialog no longer look disabled. #1401 (by @Freymaurer)
+- Swate app installation sometimes showed a startup error. This has been fixed (hopefully 😶). #1398 (by @Freymaurer)
 
 ## 2.5.2 - 2026-10-15
 

@@ -21,7 +21,9 @@ type TextInput =
             ?classes: string,
             ?isJoin: bool,
             ?rmv: MouseEvent -> unit,
-            ?validator: string -> Result<unit, string>
+            ?validator: string -> Result<unit, string>,
+            ?trailingAction: string -> ReactElement,
+            ?onDraftChange: string -> unit
         ) =
         let isArea = defaultArg isArea false
         let disabled = defaultArg disabled false
@@ -52,6 +54,10 @@ type TextInput =
 
         React.useEffect ((fun () -> setTempValue value), [| box value |])
 
+        // setValue only sees the text after the debounce. This reports every draft, including the initial one
+        // and drafts reset from an outside value change, so a parent always holds what the field shows.
+        React.useEffect ((fun () -> onDraftChange |> Option.iter (fun notify -> notify tempValue)), [| box tempValue |])
+
         let handleChange (text: string) =
             setTempValue text
             startedChange.current <- true
@@ -60,6 +66,8 @@ type TextInput =
             if isJoin then
                 "swt:join-item"
             "swt:input swt:input-bordered swt:w-full"
+            if trailingAction.IsSome then
+                "swt:min-w-0"
             if validationError.IsSome then
                 "swt:input-error"
             if classes.IsSome then
@@ -106,6 +114,8 @@ type TextInput =
                                 if placeholder.IsSome then
                                     prop.placeholder placeholder.Value
                             ]
+                            if trailingAction.IsSome then
+                                trailingAction.Value tempValue
                             if rmv.IsSome then
                                 Helpers.deleteButton rmv.Value
                         ]

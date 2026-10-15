@@ -483,12 +483,38 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "generic file system creation is hidden for ARC collection roots",
+            "ARC collection roots offer new files but not new folders",
             fun () ->
-                let item = createFolderItem "assays" (Some "assays")
-                let menuItems = fileSystemCreateContextMenuItems (fun _ _ -> ()) item
+                [ "studies"; "assays"; "workflows"; "runs" ]
+                |> List.iter (fun zone ->
+                    let item = createFolderItem zone (Some zone)
+                    let menuItems = fileSystemCreateContextMenuItems (fun _ _ -> ()) item
 
-                Vitest.expect(menuItems.Length).toBe (0)
+                    Vitest.expect(menuItems |> List.map _.Label |> Array.ofList).toEqual ([| "New File" |])
+                )
+        )
+
+        Vitest.test (
+            "items directly inside ARC collection roots: generic files and entity folders get rename and delete, canonical and README files don't",
+            fun () ->
+                let labelsFor item = [|
+                    yield! renameContextMenuItems [] ignore item |> List.map _.Label
+                    yield! deleteContextMenuItems [] ignore item |> List.map _.Label
+                |]
+
+                [ "studies", "isa.study.xlsx"; "assays", "isa.assay.xlsx" ]
+                |> List.iter (fun (zone, canonicalFileName) ->
+                    let fileItem name =
+                        createFileItem name (Some $"{zone}/{name}")
+
+                    Vitest.expect(fileItem "overview.md" |> labelsFor).toEqual ([| "Rename"; "Delete" |])
+                    Vitest.expect(fileItem canonicalFileName |> labelsFor).toEqual ([||])
+                    Vitest.expect(fileItem "README.md" |> labelsFor).toEqual ([||])
+
+                    Vitest
+                        .expect(createFolderItem "Entity1" (Some $"{zone}/Entity1") |> labelsFor)
+                        .toEqual ([| "Rename"; "Delete" |])
+                )
         )
 
         Vitest.test (
