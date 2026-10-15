@@ -225,6 +225,7 @@ type PageState =
     | NotesDraftPage
     | NotesSearchPage
     | ProvenanceGroupingPage
+    | ProvenanceGraphPage
     | GitDiffPage of GitDiffPageData
     | GitMergeConflictPage of VersionControlConflictPage
     | GitFileChoiceConflictPage of VersionControlFileChoicePage

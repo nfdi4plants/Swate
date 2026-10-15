@@ -77,6 +77,10 @@ module private LazyComponents =
     let ProvenanceGroupingTarget () =
         Renderer.Components.MainContent.ProvenanceGroupingTarget.ProvenanceGroupingTarget()
 
+    [<ReactLazyComponent>]
+    let ProvenanceGraphTarget () =
+        Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphTarget()
+
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
@@ -134,6 +138,11 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                         React.Suspense(
                             [ LazyComponents.ProvenanceGroupingTarget() ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
+                        )
+                    | Some _, Some PageState.ProvenanceGraphPage ->
+                        React.Suspense(
+                            [ LazyComponents.ProvenanceGraphTarget() ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading provenance graph...")
                         )
                     | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
