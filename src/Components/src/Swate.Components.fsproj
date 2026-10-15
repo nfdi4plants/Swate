@@ -75,6 +75,8 @@
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
+    <Compile Include="JsBindings\Elk.fs" />
+    <Compile Include="JsBindings\Dom.fs" />
     <Compile Include="Util\Download.fs" />
     <Compile Include="Util\SemVer.fs" />
     <Compile Include="Util\SemVer.test.fs" />
@@ -260,6 +262,11 @@
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
+    <Compile Include="Composite\GraphCanvas\Types.fs" />
+    <Compile Include="Composite\GraphCanvas\Pills.fs" />
+    <Compile Include="Composite\GraphCanvas\Pills.test.fs" />
+    <Compile Include="Composite\GraphCanvas\Layout.fs" />
+    <Compile Include="Composite\GraphCanvas\Layout.test.fs" />
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
     <Compile Include="Page\ProvenanceGrouping\ViewSupport.fs" />
@@ -366,6 +373,7 @@
       <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0"
         ResolutionStrategy="Max" />
+      <NpmPackage Name="elkjs" Version="gte 0.9.3 lt 0.10.0" ResolutionStrategy="Max" />
       <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />
