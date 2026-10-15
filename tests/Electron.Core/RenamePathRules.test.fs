@@ -4,6 +4,16 @@ open Swate.Electron.Shared.RenamePathRules
 open Swate.Components.Shared
 open Vitest
 
+let private targetRejectedMessage = "must not target canonical ARC files"
+let private extensionRequiredMessage = "file extension"
+
+let private addZones = [ "studies"; "assays"; "workflows"; "runs" ]
+
+let private expectErrorContaining (expectedMessagePart: string) (result: Result<string, string>) =
+    match result with
+    | Ok targetPath -> failwith $"Expected an error containing '{expectedMessagePart}', but got '{targetPath}'."
+    | Error errorMessage -> Vitest.expect(errorMessage).toContain (expectedMessagePart)
+
 Vitest.describe (
     "RenamePathRules",
     fun () ->
@@ -125,24 +135,20 @@ Vitest.describe (
                 | Error errorMessage -> failwith errorMessage
 
                 let rejectedRootTargets = [
-                    "studies"
-                    "assays"
-                    "workflows"
-                    "runs"
-                    "isa.investigation.xlsx"
-                    ".git"
-                    ".gitattributes"
-                    ".gitkeep"
-                    "../escape"
+                    yield! addZones |> List.map (fun zone -> zone, targetRejectedMessage)
+                    "isa.investigation.xlsx", targetRejectedMessage
+                    ".git", targetRejectedMessage
+                    ".gitattributes", targetRejectedMessage
+                    ".gitkeep", targetRejectedMessage
+                    "../escape", "path separators"
                 ]
 
                 rejectedRootTargets
-                |> List.iter (fun name ->
+                |> List.iter (fun (name, expectedMessagePart) ->
                     [ true; false ]
                     |> List.iter (fun isFile ->
-                        match tryBuildGenericFileSystemChildPath isFile "" name with
-                        | Ok targetPath -> failwith $"Expected root target '{targetPath}' to be rejected."
-                        | Error _ -> ()
+                        tryBuildGenericFileSystemChildPath isFile "" name
+                        |> expectErrorContaining expectedMessagePart
                     )
                 )
         )
@@ -169,9 +175,8 @@ Vitest.describe (
                     )
                 )
 
-                match tryBuildGenericFileSystemChildPath false "" "README.md" with
-                | Ok targetPath -> failwith $"Expected README folder '{targetPath}' to be rejected."
-                | Error _ -> ()
+                tryBuildGenericFileSystemChildPath false "" "README.md"
+                |> expectErrorContaining targetRejectedMessage
 
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "README.md").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/AssayA/README.md").toBe (false)
@@ -180,7 +185,7 @@ Vitest.describe (
         Vitest.test (
             "add zone roots accept new files but not new folders",
             fun () ->
-                [ "studies"; "assays"; "workflows"; "runs" ]
+                addZones
                 |> List.iter (fun zone ->
                     Vitest.expect(ArcEntityPathRules.isGenericFileSystemCreateParentAllowed true zone).toBe (true)
                     Vitest.expect(ArcEntityPathRules.isGenericFileSystemCreateParentAllowed false zone).toBe (false)
@@ -189,31 +194,41 @@ Vitest.describe (
                     | Ok targetPath -> Vitest.expect(targetPath).toBe ($"{zone}/overview.md")
                     | Error errorMessage -> failwith errorMessage
 
-                    match tryBuildGenericFileSystemChildPath false zone "NewEntity" with
-                    | Ok targetPath -> failwith $"Expected entity-shaped folder '{targetPath}' to be rejected."
-                    | Error _ -> ()
-                )
+                    tryBuildGenericFileSystemChildPath false zone "NewEntity"
+                    |> expectErrorContaining "only allowed inside safe ARC directories"
 
-                match tryBuildGenericFileSystemChildPath true "studies" ".gitkeep" with
-                | Ok targetPath -> failwith $"Expected protected file '{targetPath}' to be rejected."
-                | Error _ -> ()
+                    tryBuildGenericFileSystemChildPath true zone ".gitkeep"
+                    |> expectErrorContaining targetRejectedMessage
+                )
         )
 
         Vitest.test (
             "item-aware delete and rename checks treat files directly inside add zones as generic files",
             fun () ->
                 [
-                    "studies/overview.md", true
-                    "studies/isa.study.xlsx", false
-                    "studies/readme.md", false
+                    "studies", "isa.study.xlsx"
+                    "assays", "isa.assay.xlsx"
+                    "workflows", "isa.workflow.xlsx"
+                    "runs", "isa.run.xlsx"
                 ]
-                |> List.iter (fun (path, expected) ->
-                    Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true path).toBe (expected)
-                    Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed true path).toBe (expected)
+                |> List.iter (fun (zone, canonicalFileName) ->
+                    [
+                        $"{zone}/overview.md", true
+                        $"{zone}/LICENSE", true
+                        $"{zone}/.DS_Store", true
+                        $"{zone}/{canonicalFileName}", false
+                        $"{zone}/isa.datamap.xlsx", false
+                        $"{zone}/readme.md", false
+                    ]
+                    |> List.iter (fun (path, expected) ->
+                        Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true path).toBe (expected)
+                        Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed true path).toBe (expected)
+                    )
+
+                    Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed false $"{zone}/Entity1").toBe (true)
+                    Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed false $"{zone}/Entity1").toBe (true)
                 )
 
-                Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed false "studies/StudyA").toBe (true)
-                Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed false "studies/StudyA").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true "assays/AssayA/protocol.md").toBe (true)
         )
 
@@ -224,28 +239,24 @@ Vitest.describe (
                 | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/summary.md")
                 | Error errorMessage -> failwith errorMessage
 
-                match tryBuildGenericFileSystemRenameTargetPath false "studies/StudyA" "StudyB" with
-                | Ok targetPath -> failwith $"Expected entity folder rename '{targetPath}' to be rejected."
-                | Error _ -> ()
+                tryBuildGenericFileSystemRenameTargetPath false "studies/StudyA" "StudyB"
+                |> expectErrorContaining "rename is only allowed for safe non-canonical paths"
 
-                match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "README.md" with
-                | Ok targetPath -> failwith $"Expected rename to protected '{targetPath}' to be rejected."
-                | Error _ -> ()
+                tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "README.md"
+                |> expectErrorContaining targetRejectedMessage
         )
 
         Vitest.test (
             "new files directly inside add zones need an extension so they cannot shadow entity identifiers",
             fun () ->
-                [ "studies"; "assays"; "workflows"; "runs" ]
+                addZones
                 |> List.iter (fun zone ->
-                    match tryBuildGenericFileSystemChildPath true zone "Entity1" with
-                    | Ok targetPath -> failwith $"Expected extensionless file '{targetPath}' to be rejected."
-                    | Error errorMessage -> Vitest.expect(errorMessage).toContain ("file extension")
-                )
+                    tryBuildGenericFileSystemChildPath true zone "Entity1"
+                    |> expectErrorContaining extensionRequiredMessage
 
-                match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "StudyB" with
-                | Ok targetPath -> failwith $"Expected extensionless rename target '{targetPath}' to be rejected."
-                | Error errorMessage -> Vitest.expect(errorMessage).toContain ("file extension")
+                    tryBuildGenericFileSystemRenameTargetPath true $"{zone}/overview.md" "Entity1"
+                    |> expectErrorContaining extensionRequiredMessage
+                )
 
                 // Existing extensionless files stay deletable and renamable to a name with an extension.
                 Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true "studies/LICENSE").toBe (true)
@@ -267,12 +278,20 @@ Vitest.describe (
         Vitest.test (
             "dot files directly inside add zones are renamed with the file rules",
             fun () ->
-                Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath "studies/.DS_Store").toBe (true)
-                Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath "studies/StudyA/notes.md").toBe (false)
+                addZones
+                |> List.iter (fun zone ->
+                    Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath $"{zone}/.DS_Store").toBe (true)
+                    Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath $"{zone}/Entity1/notes.md").toBe (false)
 
-                match tryBuildGenericFileSystemRenameTargetPath true "studies/.DS_Store" "notes.md" with
-                | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/notes.md")
-                | Error errorMessage -> failwith errorMessage
+                    match tryBuildGenericFileSystemRenameTargetPath true $"{zone}/.DS_Store" "notes.md" with
+                    | Ok targetPath -> Vitest.expect(targetPath).toBe ($"{zone}/notes.md")
+                    | Error errorMessage -> failwith errorMessage
+
+                    // The file rules let a dot file become an entity-shaped path, so the extension rule
+                    // is what keeps it from shadowing an entity identifier.
+                    tryBuildGenericFileSystemRenameTargetPath true $"{zone}/.DS_Store" "Entity1"
+                    |> expectErrorContaining extensionRequiredMessage
+                )
         )
 )
 

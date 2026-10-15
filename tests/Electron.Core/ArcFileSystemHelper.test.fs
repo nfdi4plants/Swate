@@ -673,6 +673,66 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "handles files directly inside every add zone on disk",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    for zone in [ "studies"; "assays"; "workflows"; "runs" ] do
+                        do! createRelativeDirectoryAsync arcPath zone
+
+                        // New files need an extension and then use the generic operations.
+                        let! extensionlessResult =
+                            ArcFileSystemHelper.createFileSystemItemOnDisk
+                                arcPath
+                                (createItemRequest zone "Entity1" FileSystemItemKind.File)
+
+                        expectErrorContaining "file extension" extensionlessResult
+                        do! expectRelativePathExists arcPath $"{zone}/Entity1" false
+
+                        let! overviewPath =
+                            createItemOrFail arcPath (createItemRequest zone "overview.md" FileSystemItemKind.File)
+
+                        do!
+                            expectDeleteRoute
+                                arcPath
+                                overviewPath
+                                (ArcFileSystemHelper.DeletePathRoute.GenericItem overviewPath)
+
+                        do! expectGenericRename arcPath overviewPath true
+                        do! renameItemOrFail arcPath (renameRequest overviewPath "summary.md")
+                        do! deleteItemOrFail arcPath $"{zone}/summary.md"
+                        do! expectRelativePathExists arcPath $"{zone}/summary.md" false
+
+                        // An existing extensionless file can still be cleaned up.
+                        do! writeRelativeFileAsync arcPath $"{zone}/LICENSE" "license"
+
+                        do!
+                            expectDeleteRoute
+                                arcPath
+                                $"{zone}/LICENSE"
+                                (ArcFileSystemHelper.DeletePathRoute.GenericItem $"{zone}/LICENSE")
+
+                        do! renameItemOrFail arcPath (renameRequest $"{zone}/LICENSE" "LICENSE.md")
+                        do! deleteItemOrFail arcPath $"{zone}/LICENSE.md"
+                        do! expectRelativePathExists arcPath $"{zone}/LICENSE.md" false
+
+                        // A dot file can become a regular file but not an entity-shaped path.
+                        do! writeRelativeFileAsync arcPath $"{zone}/.DS_Store" ""
+
+                        let! entityShapedRenameResult =
+                            ArcFileSystemHelper.renameGenericFileSystemItemOnDisk
+                                arcPath
+                                (renameRequest $"{zone}/.DS_Store" "Entity1")
+
+                        expectErrorContaining "file extension" entityShapedRenameResult
+                        do! expectRelativePathExists arcPath $"{zone}/.DS_Store" true
+                        do! expectRelativePathExists arcPath $"{zone}/Entity1" false
+
+                        do! renameItemOrFail arcPath (renameRequest $"{zone}/.DS_Store" "notes.md")
+                        do! expectRelativePathExists arcPath $"{zone}/notes.md" true
+                })
+        )
+
+        Vitest.test (
             "renames generic files and rejects destination conflicts",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
