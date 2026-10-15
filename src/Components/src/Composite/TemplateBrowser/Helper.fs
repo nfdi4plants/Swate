@@ -145,7 +145,8 @@ let updateTables
                             | CompositeHeader.Factor _
                             | CompositeHeader.Component _
                             | CompositeHeader.Parameter _
-                            | CompositeHeader.Characteristic _ ->
+                            | CompositeHeader.Characteristic _
+                            | CompositeHeader.ProtocolType ->
                                 match importConfig.ImportType with
                                 | TableJoinOptions.WithUnit -> CompositeCell.Unitized("", OntologyAnnotation.empty ())
                                 | _ -> CompositeCell.Term(OntologyAnnotation.empty ())
