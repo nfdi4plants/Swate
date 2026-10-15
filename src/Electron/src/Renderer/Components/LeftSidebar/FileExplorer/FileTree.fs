@@ -137,6 +137,11 @@ type FileTree =
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
+        // Prevent overlapping page requests for the same directory.
+        let directoriesLoadingPage = React.useRef Set.empty<string>
+
+        React.useEffect ((fun () -> directoriesLoadingPage.current <- Set.empty), [| box arcScopeId |])
+
         let reconciledMaterializedState =
             reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
 
@@ -293,11 +298,31 @@ type FileTree =
             [| box fileStateCtx.state.FileTree |]
         )
 
+        let loadNextDirectoryPage (path: string) =
+            let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
+
+            if not (directoriesLoadingPage.current.Contains normalizedPath) then
+                directoriesLoadingPage.current <- directoriesLoadingPage.current.Add normalizedPath
+
+                promise {
+                    try
+                        match! Api.ipcArcVaultApi.loadNextFileTreeDirectoryPage normalizedPath with
+                        | Ok _ -> ()
+                        | Error error -> console.error ($"Unable to load File Explorer directory page: {error.Message}")
+                    finally
+                        directoriesLoadingPage.current <- directoriesLoadingPage.current.Remove normalizedPath
+                }
+                |> Promise.start
+
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
-            if willExpand then
-                match item.Path with
-                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
-                | None -> ()
+            match item.Path with
+            | Some path when willExpand ->
+                setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+
+                if shouldLoadNextDirectoryPage path fileStateCtx.state.FileTreeDirectoryHasMore then
+                    loadNextDirectoryPage path
+            | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
+            | None -> ()
 
         let openDialog dialog =
             setIsDialogBusy false
@@ -617,7 +642,6 @@ type FileTree =
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
-                            directoryChevronToggleOnlyForItem = isArcEntityDirectory,
                             onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,
@@ -636,7 +660,22 @@ type FileTree =
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,
                             delegateHorizontalScrollToParent = true,
-                            truncateOverflowingItemNames = true
+                            truncateOverflowingItemNames = true,
+                            hasMoreChildren =
+                                (fun item ->
+                                    item.Path
+                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                    |> Option.bind (fun path ->
+                                        Map.tryFind path fileStateCtx.state.FileTreeDirectoryHasMore
+                                    )
+                                    |> Option.defaultValue false
+                                ),
+                            onLoadMoreChildren = (fun item -> item.Path |> Option.iter loadNextDirectoryPage),
+                            hasMoreRootItems =
+                                (fileStateCtx.state.FileTreeDirectoryHasMore
+                                 |> Map.tryFind ""
+                                 |> Option.defaultValue false),
+                            onLoadMoreRootItems = (fun () -> loadNextDirectoryPage "")
                         )
                     ]
                 ]

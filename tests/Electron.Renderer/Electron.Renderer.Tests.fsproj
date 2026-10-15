@@ -20,6 +20,7 @@
     <Compile Include="GitWorkflowUnitResult.test.fs" />
     <Compile Include="LfsActivityContext.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
+    <Compile Include="NotesDraftTarget.test.rtl.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Renderer\Renderer.fsproj" />

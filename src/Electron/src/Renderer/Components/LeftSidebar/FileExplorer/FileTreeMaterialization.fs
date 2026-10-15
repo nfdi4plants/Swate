@@ -16,6 +16,16 @@ let materialize path state = {
         Paths = state.Paths.Add(PathHelpers.normalizePath path)
 }
 
+let dematerialize path state = {
+    state with
+        Paths = state.Paths.Remove(PathHelpers.normalizePath path)
+}
+
+let shouldLoadNextDirectoryPage path (directoryHasMore: Map<string, bool>) =
+    directoryHasMore
+    |> Map.tryFind (PathHelpers.normalizeCanonicalRelativePath path)
+    |> Option.defaultValue true
+
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then
         node.children.Values
@@ -99,8 +109,6 @@ let rec toMaterializedFileItemTree
                 |> List.ofSeq
                 |> Some
 
-            elif parent.children.Count = 0 then
-                Some []
             else
                 None
 

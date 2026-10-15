@@ -4,10 +4,10 @@ open System
 open Fable.Core
 open Swate.Components.Composite.Notes.Editor
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
 open Swate.Components.Composite.Notes.Types
 open Swate.Components.Shared
 open Main.Bindings.Filesystem
+open Main.Bindings.Path
 open Main.Notes.NoteConstants
 
 let private isNoteMarkdownPath (relativePath: string) =
@@ -31,19 +31,43 @@ let private parseNote (relativePath: string) (content: string) =
       }
     | None -> failwith $"Note file '{relativePath}' does not contain YAML frontmatter."
 
-let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<Note[]> = promise {
-    let noteEntries =
-        fileEntries
-        |> Array.filter (fun entry -> not entry.isDirectory)
-        |> Array.choose (fun entry ->
-            tryGetRepoRelativePath arcPath entry.path
-            |> Option.filter isNoteMarkdownPath
-            |> Option.map (fun relativePath -> entry.path, relativePath)
-        )
+let private discoverNoteFiles (arcPath: string) : JS.Promise<(string * string)[]> = promise {
+    let notesRoot = join [| arcPath; NotesRootFolderName |]
+
+    if not (existsSync notesRoot) then
+        return [||]
+    else
+        let directories = ResizeArray<string>()
+        let noteFiles = ResizeArray<string * string>()
+        directories.Add(notesRoot)
+
+        while directories.Count > 0 do
+            let directoryPath = directories.[directories.Count - 1]
+            directories.RemoveAt(directories.Count - 1)
+
+            let! dirents = readdirWithTypesAsync directoryPath (ReaddirOptions(withFileTypes = true))
+
+            dirents
+            |> Array.iter (fun dirent ->
+                let absolutePath = join [| directoryPath; dirent.name |]
+
+                if dirent.isDirectory () then
+                    directories.Add(absolutePath)
+                elif dirent.isFile () then
+                    tryGetRepoRelativePath arcPath absolutePath
+                    |> Option.filter isNoteMarkdownPath
+                    |> Option.iter (fun relativePath -> noteFiles.Add(absolutePath, relativePath))
+            )
+
+        return noteFiles.ToArray()
+}
+
+let readNotes (arcPath: string) : JS.Promise<Note[]> = promise {
+    let! noteFiles = discoverNoteFiles arcPath
 
     // Process all note files in parallel, preserving per-file error handling
     let notePromises =
-        noteEntries
+        noteFiles
         |> Array.map (fun (absolutePath, relativePath) -> promise {
             try
                 let! content = readUtf8FileAsync absolutePath

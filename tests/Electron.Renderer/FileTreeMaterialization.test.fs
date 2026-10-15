@@ -50,6 +50,30 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "dematerializing a directory keeps other known materialized paths",
+            fun () ->
+                let state = {
+                    ArcScopeId = Some "C:/arc"
+                    Paths = Set.ofList [ "arc"; "arc/notes" ]
+                }
+
+                let collapsed = dematerialize "arc\\notes" state
+
+                Vitest.expect(collapsed.ArcScopeId).toEqual (Some "C:/arc")
+                Vitest.expect(collapsed.Paths |> Set.toList).toEqual ([ "arc" ])
+        )
+
+        Vitest.test (
+            "loads directory pages only for new or incomplete directories",
+            fun () ->
+                let paging = Map.ofList [ "assays/complete", false; "assays/incomplete", true ]
+
+                Vitest.expect(shouldLoadNextDirectoryPage "assays/new" paging).toBe true
+                Vitest.expect(shouldLoadNextDirectoryPage "assays\\incomplete" paging).toBe true
+                Vitest.expect(shouldLoadNextDirectoryPage "assays/complete" paging).toBe false
+        )
+
+        Vitest.test (
             "maps an unmaterialized non-empty directory without children or expansion state",
             fun () ->
                 let directory =
@@ -59,6 +83,16 @@ Vitest.describe (
 
                 Vitest.expect(item.Children.IsNone).toBe (true)
                 Vitest.expect(item.IsExpanded).toBe (false)
+        )
+
+        Vitest.test (
+            "maps an unmaterialized directory with no known children as expandable",
+            fun () ->
+                let directory = directoryNode "dataset" "arc/dataset" []
+                let item = toFileItemTree Set.empty directory
+
+                Vitest.expect(item.Children.IsNone).toBe (true)
+                Vitest.expect(item.IsDirectory).toBe (true)
         )
 
         Vitest.test (

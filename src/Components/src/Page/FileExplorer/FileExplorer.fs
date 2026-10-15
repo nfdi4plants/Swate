@@ -104,6 +104,32 @@ module private FileExplorerHelper =
 [<Mangle(false); Erase>]
 type FileExplorer =
 
+    [<ReactComponent>]
+    static member private LoadMoreControl(testId: string, onLoadMore: unit -> unit) =
+        Html.li [
+            prop.key testId
+            prop.testId testId
+            prop.className "swt:list-none swt:py-1 swt:pl-1"
+            prop.children [
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-7 swt:gap-1 swt:px-2 swt:text-base-content/70"
+                    prop.onClick (fun event ->
+                        event.stopPropagation ()
+                        onLoadMore ()
+                    )
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:iconify swt:fluent--chevron-down-20-regular swt:size-4"
+                            prop.ariaHidden true
+                        ]
+                        Html.span "Load more"
+                    ]
+                ]
+            ]
+        ]
+
     [<ReactComponent(true)>]
     static member FileExplorer
         (
@@ -128,7 +154,11 @@ type FileExplorer =
             ?getItemIconClass: FileItem -> string option,
             ?getCopyPath: FileItem -> string option,
             ?getCopyRelativePath: FileItem -> string option,
-            ?includeDefaultContextMenuItems: bool
+            ?includeDefaultContextMenuItems: bool,
+            ?hasMoreChildren: FileItem -> bool,
+            ?onLoadMoreChildren: FileItem -> unit,
+            ?hasMoreRootItems: bool,
+            ?onLoadMoreRootItems: unit -> unit
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
@@ -151,6 +181,7 @@ type FileExplorer =
         let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
         let getCopyRelativePath = defaultArg getCopyRelativePath (fun _ -> None)
         let includeDefaultContextMenuItems = defaultArg includeDefaultContextMenuItems true
+        let hasMoreChildren = defaultArg hasMoreChildren (fun _ -> false)
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
         let getItemStatusAction = defaultArg getItemStatusAction (fun (_: FileItem) -> None)
@@ -308,7 +339,17 @@ type FileExplorer =
                             Some(
                                 Html.ul [
                                     prop.className "swt:ml-4"
-                                    prop.children (children |> List.map renderItem)
+                                    prop.children [
+                                        yield! children |> List.map renderItem
+
+                                        if hasMoreChildren item then
+                                            FileExplorer.LoadMoreControl(
+                                                $"file-explorer-load-more-{item.Id}",
+                                                (fun () ->
+                                                    onLoadMoreChildren |> Option.iter (fun loadMore -> loadMore item)
+                                                )
+                                            )
+                                    ]
                                 ]
                             )
                         | None -> None
@@ -361,7 +402,15 @@ type FileExplorer =
                         Html.ul [
                             prop.testId "file-explorer-container"
                             prop.className listClassName
-                            prop.children (model.Items |> List.map renderItem)
+                            prop.children [
+                                yield! model.Items |> List.map renderItem
+
+                                if defaultArg hasMoreRootItems false then
+                                    FileExplorer.LoadMoreControl(
+                                        "file-explorer-root-load-more",
+                                        (fun () -> onLoadMoreRootItems |> Option.iter (fun loadMore -> loadMore ()))
+                                    )
+                            ]
                         ]
                     ]
                 ]
