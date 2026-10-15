@@ -66,7 +66,7 @@
     "@uiw/react-md-editor": "^4.0.11",
     "elkjs": "^0.9.3",
     "fuse.js": "^7.1.0",
-    "mermaid": "^11.12.3",
+    "mermaid": "^11.16.1",
     "rehype-rewrite": "^4.0.4",
     "rehype-sanitize": "^6.0.0"
   },
