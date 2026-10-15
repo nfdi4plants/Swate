@@ -22,7 +22,8 @@ type TextInput =
             ?isJoin: bool,
             ?rmv: MouseEvent -> unit,
             ?validator: string -> Result<unit, string>,
-            ?trailingAction: string -> ReactElement
+            ?trailingAction: string -> ReactElement,
+            ?onDraftChange: string -> unit
         ) =
         let isArea = defaultArg isArea false
         let disabled = defaultArg disabled false
@@ -52,6 +53,13 @@ type TextInput =
         )
 
         React.useEffect ((fun () -> setTempValue value), [| box value |])
+
+        // setValue only sees the text after the debounce. This reports every draft, including the initial one
+        // and drafts reset from an outside value change, so a parent always holds what the field shows.
+        React.useEffect (
+            (fun () -> onDraftChange |> Option.iter (fun notify -> notify tempValue)),
+            [| box tempValue |]
+        )
 
         let handleChange (text: string) =
             setTempValue text

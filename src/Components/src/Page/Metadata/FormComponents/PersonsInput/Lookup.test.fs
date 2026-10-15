@@ -33,10 +33,6 @@ Vitest.describe (
                     Vitest.expect(normalizeOrcid query).toEqual (Ok "0000-0002-1825-0097")
 
                 Vitest.expect(normalizeOrcid "0000-0002-1694-233x").toEqual (Ok "0000-0002-1694-233X")
-
-                Vitest
-                    .expect(recordUrl "https://orcid.org/0000-0002-1825-0097/")
-                    .toEqual (Ok "https://pub.orcid.org/v3.0/0000-0002-1825-0097/record")
         )
 
         Vitest.test (
@@ -73,25 +69,32 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "maps only returned public record names, email and employment affiliations",
+            "maps only returned public names, email and current employment affiliations",
             fun () ->
-                let response =
-                    json<OrcidRecord>
-                        """{"person":{"name":{"given-names":{"value":" Ada "},"family-name":{"value":"Lovelace"},"credit-name":{"value":"A. Lovelace"}},"emails":{"email":[{"email":""},{"email":"ada@example.org"}]}},"activities-summary":{"employments":{"affiliation-group":[{"summaries":[{"employment-summary":{"organization":{"name":"Example University"},"department-name":"Computing"}}]}]}}}"""
+                let person =
+                    json<OrcidPerson>
+                        """{"name":{"given-names":{"value":" Ada "},"family-name":{"value":"Lovelace"},"credit-name":{"value":"A. Lovelace"}},"emails":{"email":[{"email":""},{"email":"ada@example.org"}]}}"""
 
-                let result = mapRecord emptyResult.orcid response
+                let employments =
+                    json<OrcidEmployments>
+                        """{"affiliation-group":[{"summaries":[{"employment-summary":{"organization":{"name":"Example University"},"department-name":"Computing","end-date":null}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Old College"},"department-name":"Computing","end-date":{"year":{"value":"2010"}}}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Institute"}}}]}]}"""
+
+                let result = mapOrcidPerson emptyResult.orcid (Some person) (Some employments)
                 Vitest.expect(result.orcid).toBe emptyResult.orcid
                 Vitest.expect(result.firstName).toEqual (Some "Ada")
                 Vitest.expect(result.lastName).toEqual (Some "Lovelace")
                 Vitest.expect(result.email).toEqual (Some "ada@example.org")
-                Vitest.expect(result.affiliation).toEqual (Some "Example University; Computing")
-                Vitest.expect(fullName result).toBe "A. Lovelace"
+                Vitest.expect(result.affiliation).toEqual (Some "Computing, Example University; Institute")
+                Vitest.expect(fullName result).toBe "Ada Lovelace"
         )
 
         Vitest.test (
             "handles private or missing record fields without inferring metadata",
             fun () ->
-                let result = json<OrcidRecord> "{}" |> mapRecord emptyResult.orcid
+                let result =
+                    mapOrcidPerson emptyResult.orcid (Some(json<OrcidPerson> "{}")) (Some(json<OrcidEmployments> "{}"))
+
+                Vitest.expect((mapOrcidPerson emptyResult.orcid None None).affiliation.IsNone).toBe true
                 Vitest.expect(result.firstName.IsNone).toBe true
                 Vitest.expect(result.lastName.IsNone).toBe true
                 Vitest.expect(result.email.IsNone).toBe true
@@ -108,6 +111,8 @@ Vitest.describe (
                     )
                     .toBe
                     "Ada Lovelace"
+
+                Vitest.expect(fullName { result with displayName = Some "A. Lovelace" }).toBe "A. Lovelace"
         )
 
         Vitest.test (

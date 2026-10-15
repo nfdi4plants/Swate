@@ -96,6 +96,8 @@ type PublicationsInput =
             | None -> ()
             Html.div [
                 prop.key (string fieldRevision)
+                // Collapse spaces only its direct children, so this wrapper spaces the fields itself.
+                prop.className "swt:space-y-4"
                 prop.children [
                     createFieldTextInput (publication.Title, "Title", fun value -> publication.Title <- value)
                     Helpers.cardFormGroup [

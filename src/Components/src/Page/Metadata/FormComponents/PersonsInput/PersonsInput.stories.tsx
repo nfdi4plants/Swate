@@ -30,16 +30,15 @@ function installPersonSearch() {
         'num-found': 1,
       });
     }
-    if (url.pathname === `/v3.0/${orcid}/record`) {
+    if (url.pathname === `/v3.0/${orcid}/person`) {
       return Response.json({
-        'orcid-identifier': { path: orcid },
-        person: {
-          name: { 'given-names': { value: 'Jane' }, 'family-name': { value: 'Smith' } },
-          emails: { email: [{ email: 'jane@example.org', visibility: 'PUBLIC' }] },
-        },
-        'activities-summary': {
-          employments: { 'affiliation-group': [{ summaries: [{ 'employment-summary': { organization: { name: 'Plant Research Institute' } } }] }] },
-        },
+        name: { 'given-names': { value: 'Jane' }, 'family-name': { value: 'Smith' } },
+        emails: { email: [{ email: 'jane@example.org', visibility: 'PUBLIC' }] },
+      });
+    }
+    if (url.pathname === `/v3.0/${orcid}/employments`) {
+      return Response.json({
+        'affiliation-group': [{ summaries: [{ 'employment-summary': { organization: { name: 'Plant Research Institute' }, 'end-date': null } }] }],
       });
     }
     throw new Error(`Unexpected ORCID endpoint: ${url}`);

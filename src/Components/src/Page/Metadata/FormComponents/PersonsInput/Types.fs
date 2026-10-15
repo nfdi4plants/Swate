@@ -27,9 +27,6 @@ type SearchPage = {
 type OrcidValue =
     abstract value: string option
 
-type OrcidIdentifier =
-    abstract path: string option
-
 type OrcidName =
     abstract ``given-names``: OrcidValue option
     abstract ``family-name``: OrcidValue option
@@ -51,6 +48,7 @@ type OrcidOrganization =
 type OrcidEmploymentSummary =
     abstract organization: OrcidOrganization option
     abstract ``department-name``: string option
+    abstract ``end-date``: obj option
 
 type OrcidEmployment =
     abstract ``employment-summary``: OrcidEmploymentSummary option
@@ -60,14 +58,6 @@ type OrcidAffiliationGroup =
 
 type OrcidEmployments =
     abstract ``affiliation-group``: OrcidAffiliationGroup[] option
-
-type OrcidActivities =
-    abstract employments: OrcidEmployments option
-
-type OrcidRecord =
-    abstract ``orcid-identifier``: OrcidIdentifier option
-    abstract person: OrcidPerson option
-    abstract ``activities-summary``: OrcidActivities option
 
 type OrcidExpandedResult =
     abstract ``orcid-id``: string option

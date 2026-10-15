@@ -5,6 +5,7 @@ open Browser.Types
 open Fable.Core
 open Feliz
 open Vitest
+open Swate.Components.Page.Metadata.FormComponents.PersonsInput.Types
 
 module private Helpers =
     let orcid = "0000-0002-1825-0097"
@@ -41,21 +42,15 @@ module private Helpers =
     [<Emit("new Response(null, {status: 404})")>]
     let notFound () : Fetch.Types.Response = jsNative
 
+    // One body answers both the /person and the /employments request of an ORCID iD lookup.
     let record firstName lastName =
         box {|
-            ``orcid-identifier`` = {| path = orcid |}
-            person = {|
-                name = {|
-                    ``given-names`` = {| value = firstName |}
-                    ``family-name`` = {| value = lastName |}
-                |}
-                emails = {| email = ([||]: obj[]) |}
+            name = {|
+                ``given-names`` = {| value = firstName |}
+                ``family-name`` = {| value = lastName |}
             |}
-            ``activities-summary`` = {|
-                employments = {|
-                    ``affiliation-group`` = ([||]: obj[])
-                |}
-            |}
+            emails = {| email = ([||]: obj[]) |}
+            ``affiliation-group`` = ([||]: obj[])
         |}
 
     let searchResult id first last = {|
@@ -153,11 +148,11 @@ for query in [ Helpers.orcid; "https://orcid.org/" + Helpers.orcid ] do
     Vitest.test (
         $"ORCID lookup accepts {query} and waits for confirmation",
         fun () -> promise {
-            let mutable request = ""
+            let requests = ResizeArray<string>()
             let mutable calls = 0
 
             Helpers.stubFetch (fun (url: string) -> promise {
-                request <- url
+                requests.Add url
                 return Helpers.response (Helpers.record "Jane" "Smith") 200
             })
 
@@ -165,7 +160,14 @@ for query in [ Helpers.orcid; "https://orcid.org/" + Helpers.orcid ] do
             Helpers.openSearch ()
             Helpers.searchOrcid query
             do! Helpers.singlePreview "Jane Smith"
-            Vitest.expect(request).toBe $"https://pub.orcid.org/v3.0/{Helpers.orcid}/record"
+
+            Vitest
+                .expect(requests |> Seq.sort |> Array.ofSeq)
+                .toEqual [|
+                    $"https://pub.orcid.org/v3.0/{Helpers.orcid}/employments"
+                    $"https://pub.orcid.org/v3.0/{Helpers.orcid}/person"
+                |]
+
             Vitest.expect(calls).toBe 0
             Helpers.click "Cancel"
             do! Helpers.expectClosed ()
@@ -415,7 +417,8 @@ for status, mode in
             Vitest.expect((Helpers.button "Search" :?> HTMLButtonElement).disabled).toBe true
             Vitest.expect((Helpers.button "Apply person" :?> HTMLButtonElement).disabled).toBe true
             Helpers.click "Search"
-            Vitest.expect(requests).toBe 1
+            // An ORCID iD lookup loads /person and /employments together.
+            Vitest.expect(requests).toBe (if mode = "ORCID" then 2 else 1)
             Vitest.expect(details.Value.credentials).toBe "omit"
             Vitest.expect(details.Value.hasAuthorization).toBe false
             Vitest.expect(calls).toBe 0
@@ -440,12 +443,13 @@ Vitest.test (
 Vitest.test (
     "an ORCID HTTP 503 error leaves search enabled for an explicit successful retry",
     fun () -> promise {
-        let mutable requests = 0
+        let mutable lookups = 0
 
-        Helpers.stubFetch (fun (_: string) -> promise {
-            requests <- requests + 1
+        Helpers.stubFetch (fun (url: string) -> promise {
+            if url.EndsWith "/person" then
+                lookups <- lookups + 1
 
-            if requests = 1 then
+            if lookups = 1 then
                 return Helpers.response (box {| message = "Unavailable" |}) 503
             else
                 return Helpers.response (Helpers.record "Recovered" "Person") 200
@@ -459,7 +463,7 @@ Vitest.test (
         Vitest.expect((Helpers.button "Search" :?> HTMLButtonElement).disabled).toBe false
         Helpers.click "Search"
         do! Helpers.singlePreview "Recovered Person"
-        Vitest.expect(requests).toBe 2
+        Vitest.expect(lookups).toBe 2
         Vitest.expect(RTL.screen.queryByRole("alert").IsNone).toBe true
     }
 )
@@ -470,10 +474,10 @@ Vitest.test (
         let pending = Helpers.deferred ()
         let mutable requests = 0
 
-        Helpers.stubFetch (fun (_: string) ->
+        Helpers.stubFetch (fun (url: string) ->
             requests <- requests + 1
 
-            if requests = 1 then
+            if url.Contains Helpers.orcid then
                 pending.promise
             else
                 promise { return Helpers.response (Helpers.record "Current" "Person") 200 }
@@ -483,7 +487,7 @@ Vitest.test (
         Helpers.openSearch ()
         Helpers.searchOrcid Helpers.orcid
         Helpers.changeQuery "ORCID iD or URL" "0000-0001-5109-3700"
-        Vitest.expect(requests).toBe 1
+        Vitest.expect(requests).toBe 2
         Helpers.click "Search"
         do! Helpers.singlePreview "Current Person"
         do! RTL.act (fun () -> promise { pending.resolve (Helpers.response (Helpers.record "Stale" "Person") 200) })
@@ -493,10 +497,18 @@ Vitest.test (
 )
 
 Vitest.test (
-    "mode changes and dismissal invalidate pending responses",
+    "switching modes invalidates a pending response and reopening after cancel shows a fresh dialog",
     fun () -> promise {
         let pending = Helpers.deferred ()
-        Helpers.stubFetch (fun (_: string) -> pending.promise)
+
+        // Only /person waits, so each request reads its own response body.
+        Helpers.stubFetch (fun (url: string) ->
+            if url.EndsWith "/person" then
+                pending.promise
+            else
+                promise { return Helpers.response (Helpers.record "Stale" "Person") 200 }
+        )
+
         let mutable calls = 0
         render [ Person() ] (fun _ -> calls <- calls + 1)
         Helpers.openSearch ()
@@ -513,6 +525,7 @@ Vitest.test (
         Helpers.click "Cancel"
         do! Helpers.expectClosed ()
         Helpers.openSearch ()
+        Vitest.expect(RTL.screen.queryByText("Searching people…").IsNone).toBe true
         do! RTL.act (fun () -> promise { closed.resolve (Helpers.response (Helpers.record "Closed" "Person") 200) })
         Vitest.expect(RTL.screen.queryByText("Closed Person").IsNone).toBe true
         Vitest.expect(calls).toBe 0
@@ -538,5 +551,110 @@ Vitest.test (
         Vitest.expect(saved.Count).toBe 2
         Vitest.expect(saved.[0].FirstName).toEqual (Some "Existing")
         Vitest.expect(saved.[1].FirstName).toEqual (Some "Imported")
+    }
+)
+
+Vitest.test (
+    "dismissing the dialog stops its pending lookup while a host still keeps it mounted",
+    fun () -> promise {
+        let pending = Helpers.deferred ()
+        let mutable lookups = 0
+        let mutable applied = 0
+        let mutable closed = 0
+
+        Helpers.stubFetch (fun (url: string) ->
+            if url.EndsWith "/person" then
+                lookups <- lookups + 1
+
+            if lookups = 2 && url.EndsWith "/person" then
+                pending.promise
+            else
+                promise { return Helpers.response (Helpers.record "First" "Person") 200 }
+        )
+
+        // A host with an exit transition calls close but unmounts the dialog later.
+        RTL.render (
+            PersonSearchDialog.PersonSearchDialog(
+                Helpers.orcid,
+                "",
+                SearchMode.Orcid,
+                (fun _ -> applied <- applied + 1),
+                (fun () -> closed <- closed + 1)
+            )
+        )
+        |> ignore
+
+        Helpers.click "Search"
+        do! Helpers.singlePreview "First Person"
+        Helpers.click "Search"
+        RTL.screen.getByText "Searching people…" |> ignore
+        Helpers.click "Cancel"
+        Vitest.expect(closed).toBe 1
+
+        do! RTL.act (fun () -> promise {
+            pending.resolve (Helpers.response (Helpers.record "Closed" "Person") 200)
+            do! Helpers.delay 50
+        })
+
+        Vitest.expect(RTL.screen.queryByText("Closed Person").IsNone).toBe true
+        Vitest.expect(applied).toBe 0
+    }
+)
+
+Vitest.test (
+    "Load more keeps the selected person",
+    fun () -> promise {
+        Helpers.stubFetch (fun (url: string) -> promise {
+            let results =
+                if Helpers.queryParameter url "start" = "10" then
+                    [| Helpers.searchResult Helpers.orcid "Final" "Author" |]
+                else
+                    Array.init
+                        10
+                        (fun index -> Helpers.searchResult (Helpers.fixtureOrcid (index + 1)) "Jane" $"Smith {index}")
+
+            return Helpers.response (Helpers.searchPage results 11) 200
+        })
+
+        render [ Person() ] ignore
+        Helpers.click "Search by name"
+        Helpers.searchName "Jane Smith"
+        let! first = RTL.screen.findByRole ("button", ByRoleOptions(name = Text "Preview Jane Smith 0"))
+        RTL.fireEvent.click first
+        Helpers.click "Load more"
+        let! _ = RTL.screen.findByRole ("button", ByRoleOptions(name = Text "Preview Final Author"))
+
+        RTL.screen.getByRole ("button", ByRoleOptions(name = Text "Preview Jane Smith 0", pressed = true))
+        |> ignore
+
+        Vitest.expect((Helpers.button "Apply person" :?> HTMLButtonElement).disabled).toBe false
+    }
+)
+
+Vitest.test (
+    "name search prefills both pending name drafts before the field debounce",
+    fun () -> promise {
+        let mutable requests = 0
+
+        Helpers.stubFetch (fun (_: string) -> promise {
+            requests <- requests + 1
+            return Helpers.response (Helpers.record "Jane" "Smith") 200
+        })
+
+        render [ Person(firstName = "Manual", lastName = "Stored") ] ignore
+        RTL.fireEvent.change (RTL.screen.getByDisplayValue "Manual", {| target = {| value = "Ada" |} |})
+        RTL.fireEvent.change (RTL.screen.getByDisplayValue "Stored", {| target = {| value = "Lovelace" |} |})
+        Helpers.click "Search by name"
+
+        let nameQuery () =
+            (RTL.screen.getByRole ("textbox", ByRoleOptions(name = Text "Person name")) :?> HTMLInputElement).value
+
+        Vitest.expect(nameQuery ()).toBe "Ada Lovelace"
+        Helpers.click "Cancel"
+        do! Helpers.expectClosed ()
+        Helpers.openSearch ()
+        Helpers.click "Name"
+        Vitest.expect(nameQuery ()).toBe "Ada Lovelace"
+        Vitest.expect(requests).toBe 0
     }
 )

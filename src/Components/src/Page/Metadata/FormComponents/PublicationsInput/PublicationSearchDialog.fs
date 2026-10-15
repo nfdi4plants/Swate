@@ -10,26 +10,38 @@ open Swate.Components.Page.Metadata.FormComponents.PublicationsInput.Types
 [<Erase; Mangle(false)>]
 type PublicationSearchDialog =
 
+    static member private Fields(result: SearchResult) =
+        [
+            "Title", result.title
+            "Authors", result.authors
+            "DOI", result.doi
+            "PubMed ID", result.pubMedId
+            "PMC ID", result.pmcId
+            "Journal", result.journal
+            "Year", result.year
+        ]
+        |> List.choose (fun (label, value) -> value |> Option.map (fun text -> label, text))
+
     [<ReactComponent>]
     static member private Details(result: SearchResult) =
         Html.dl [
             prop.className "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-1 swt:text-sm swt:break-words"
             prop.children [
-                for label, value in
-                    [
-                        "Title", result.title
-                        "Authors", result.authors
-                        "DOI", result.doi
-                        "PubMed ID", result.pubMedId
-                        "PMC ID", result.pmcId
-                        "Journal", result.journal
-                        "Year", result.year
-                    ] do
-                    match value with
-                    | Some text ->
-                        Html.dt [ prop.className "swt:font-semibold"; prop.text label ]
-                        Html.dd [ prop.text text ]
-                    | None -> ()
+                for label, text in PublicationSearchDialog.Fields result do
+                    Html.dt [ prop.className "swt:font-semibold"; prop.text label ]
+                    Html.dd [ prop.text text ]
+            ]
+        ]
+
+    /// A button may only contain phrasing content, so result buttons use spans in place of a description list.
+    [<ReactComponent>]
+    static member private Summary(result: SearchResult) =
+        Html.span [
+            prop.className "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-1 swt:text-sm swt:break-words"
+            prop.children [
+                for label, text in PublicationSearchDialog.Fields result do
+                    Html.span [ prop.className "swt:font-semibold"; prop.text label ]
+                    Html.span [ prop.text text ]
             ]
         ]
 
@@ -89,9 +101,10 @@ type PublicationSearchDialog =
                 let version = requestVersion.current
                 setLoading true
                 setError None
-                setSelected None
 
+                // Load more keeps the current selection.
                 if cursor.IsNone then
+                    setSelected None
                     setResults [||]
                     setNextCursor None
                     setSearched false
@@ -223,7 +236,7 @@ type PublicationSearchDialog =
                                             prop.className
                                                 "swt:w-full swt:text-left swt:border swt:border-base-300 swt:rounded swt:p-3 swt:hover:bg-base-200"
                                             prop.onClick (fun _ -> setSelected (Some result))
-                                            prop.children [ PublicationSearchDialog.Details result ]
+                                            prop.children [ PublicationSearchDialog.Summary result ]
                                         ]
                                     ]
                                 ]

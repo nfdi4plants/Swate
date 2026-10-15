@@ -51,10 +51,15 @@ type PersonsInput =
 
     [<ReactComponent>]
     static member private PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
+        // Mode plus the ORCID and name queries, taken from the live field drafts when a search opens.
         let searchRequest, setSearchRequest =
-            React.useState<(SearchMode * string) option> None
+            React.useState<(SearchMode * string * string) option> None
 
         let fieldRevision, setFieldRevision = React.useState 0
+        let firstNameDraft = React.useRef (defaultArg input.FirstName "")
+        let lastNameDraft = React.useRef (defaultArg input.LastName "")
+        let orcidDraft = React.useRef (defaultArg input.ORCID "")
+        let trackDraft (draft: IRefValue<string>) = fun (value: string) -> draft.current <- value
 
         let nameText =
             let firstName = Option.defaultValue "" input.FirstName
@@ -80,12 +85,18 @@ type PersonsInput =
             )
 
         let createSearchableField
-            (field: string option, label: string, personSetter: Person -> string option -> unit, mode: SearchMode)
-            =
+            (
+                field: string option,
+                label: string,
+                personSetter: Person -> string option -> unit,
+                mode: SearchMode,
+                draft: IRefValue<string>
+            ) =
             TextInput.TextInput(
                 defaultArg field "",
                 (fun value -> updatePersonField value personSetter),
                 label,
+                onDraftChange = trackDraft draft,
                 trailingAction =
                     (fun value ->
                         let actionLabel =
@@ -100,13 +111,14 @@ type PersonsInput =
                             prop.ariaLabel actionLabel
                             prop.title actionLabel
                             prop.onClick (fun _ ->
-                                let query =
+                                // value is this field's own draft. The other fields come from their tracked drafts.
+                                let orcidQuery, nameQuery =
                                     if mode = SearchMode.Orcid then
-                                        value
+                                        value, PersonsInputHelper.nameQuery firstNameDraft.current lastNameDraft.current
                                     else
-                                        PersonsInputHelper.nameQuery (defaultArg input.FirstName "") value
+                                        orcidDraft.current, PersonsInputHelper.nameQuery firstNameDraft.current value
 
-                                setSearchRequest (Some(mode, query))
+                                setSearchRequest (Some(mode, orcidQuery, nameQuery))
                             )
                             prop.children [
                                 Html.span [
@@ -122,16 +134,10 @@ type PersonsInput =
             LayoutComponents.CollapseTitle(nameText, orcid, PersonsInputHelper.countFilledFieldsString input)
         ] [
             match searchRequest with
-            | Some(mode, query) ->
+            | Some(mode, orcidQuery, nameQuery) ->
                 PersonSearchDialog.PersonSearchDialog(
-                    (if mode = SearchMode.Orcid then
-                         query
-                     else
-                         defaultArg input.ORCID ""),
-                    (if mode = SearchMode.Name then
-                         query
-                     else
-                         PersonsInputHelper.nameQuery (defaultArg input.FirstName "") (defaultArg input.LastName "")),
+                    orcidQuery,
+                    nameQuery,
                     mode,
                     (fun result ->
                         setter (Lookup.mergePerson input result)
@@ -142,18 +148,22 @@ type PersonsInput =
             | None -> ()
             Html.div [
                 prop.key fieldRevision
+                // Collapse spaces only its direct children, so this wrapper spaces the fields itself.
+                prop.className "swt:space-y-4"
                 prop.children [
                     Helpers.cardFormGroup [
-                        createPersonFieldTextInput (
-                            input.FirstName,
+                        TextInput.TextInput(
+                            defaultArg input.FirstName "",
+                            (fun value -> updatePersonField value (fun person value -> person.FirstName <- value)),
                             "First Name",
-                            fun person value -> person.FirstName <- value
+                            onDraftChange = trackDraft firstNameDraft
                         )
                         createSearchableField (
                             input.LastName,
                             "Last Name",
                             (fun person value -> person.LastName <- value),
-                            SearchMode.Name
+                            SearchMode.Name,
+                            lastNameDraft
                         )
                     ]
                     Helpers.cardFormGroup [
@@ -166,7 +176,8 @@ type PersonsInput =
                             input.ORCID,
                             "ORCID",
                             (fun person value -> person.ORCID <- value),
-                            SearchMode.Orcid
+                            SearchMode.Orcid,
+                            orcidDraft
                         )
                     ]
                     Helpers.cardFormGroup [

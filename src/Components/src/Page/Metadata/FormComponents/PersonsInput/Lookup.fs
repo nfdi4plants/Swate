@@ -5,24 +5,14 @@ open System.Text.RegularExpressions
 open ARCtrl
 open Fable.Core
 open Fetch
+open Swate.Components.Page.Metadata.FormComponents.Helpers
 open Swate.Components.Page.Metadata.FormComponents.PersonsInput.Types
 
-let private nonblank (value: string option) =
-    value
-    |> Option.bind (fun text ->
-        if String.IsNullOrWhiteSpace text then
-            None
-        else
-            Some(text.Trim())
-    )
-
-let private optionalArray (value: 'T[] option) = value |> Option.defaultValue [||]
-
-let private joined (values: string option[]) =
+let private joinWith (separator: string) (values: string option[]) =
     values
     |> Array.choose nonblank
     |> Array.distinct
-    |> String.concat "; "
+    |> String.concat separator
     |> Some
     |> nonblank
 
@@ -52,10 +42,6 @@ let normalizeOrcid (query: string) : Result<string, string> =
         else
             Error "This ORCID iD has an invalid checksum. Check the identifier and try again."
 
-let recordUrl query =
-    normalizeOrcid query
-    |> Result.map (fun orcid -> "https://pub.orcid.org/v3.0/" + JS.encodeURIComponent orcid + "/record")
-
 /// Quote every token so name input cannot introduce Solr fields or boolean operators.
 let nameQuery (query: string) =
     let tokens =
@@ -75,20 +61,18 @@ let nameSearchUrl query start =
     + "&rows=10&start="
     + string (max 0 start)
 
+/// Apply writes the given and family names, so the preview shows those before the credit name.
 let fullName (result: PersonResult) =
-    let names =
-        [ result.firstName; result.lastName ]
-        |> List.choose nonblank
-        |> String.concat " "
-        |> Some
-        |> nonblank
-
-    nonblank result.displayName
-    |> Option.orElse names
+    [ result.firstName; result.lastName ]
+    |> List.choose nonblank
+    |> String.concat " "
+    |> Some
+    |> nonblank
+    |> Option.orElse (nonblank result.displayName)
     |> Option.defaultValue result.orcid
 
-let mapRecord orcid (record: OrcidRecord) : PersonResult =
-    let name = record.person |> Option.bind (fun person -> person.name)
+let mapOrcidPerson orcid (person: OrcidPerson option) (employments: OrcidEmployments option) : PersonResult =
+    let name = person |> Option.bind (fun person -> person.name)
 
     let nameValue (selector: OrcidName -> OrcidValue option) =
         name
@@ -97,26 +81,27 @@ let mapRecord orcid (record: OrcidRecord) : PersonResult =
         |> nonblank
 
     let emails =
-        record.person
+        person
         |> Option.bind (fun person -> person.emails)
         |> Option.bind (fun emails -> emails.email)
-        |> optionalArray
+        |> Option.defaultValue [||]
 
+    // Only current employments describe the affiliation. Each one reads "Department, Organization".
     let affiliation =
-        record.``activities-summary``
-        |> Option.bind (fun activities -> activities.employments)
+        employments
         |> Option.bind (fun employments -> employments.``affiliation-group``)
-        |> optionalArray
-        |> Array.collect (fun group -> group.summaries |> optionalArray)
+        |> Option.defaultValue [||]
+        |> Array.collect (fun group -> group.summaries |> Option.defaultValue [||])
         |> Array.choose (fun summary -> summary.``employment-summary``)
+        |> Array.filter (fun summary -> summary.``end-date``.IsNone)
         |> Array.map (fun summary ->
             [|
-                summary.organization |> Option.bind (fun organization -> organization.name)
                 summary.``department-name``
+                summary.organization |> Option.bind (fun organization -> organization.name)
             |]
-            |> joined
+            |> joinWith ", "
         )
-        |> joined
+        |> joinWith "; "
 
     {
         orcid = orcid
@@ -139,13 +124,17 @@ let mapExpandedResult (result: OrcidExpandedResult) : PersonResult option =
                 firstName = nonblank result.``given-names``
                 lastName = nonblank result.``family-names``
                 displayName = nonblank result.``credit-name``
-                email = result.email |> optionalArray |> Array.tryPick (Some >> nonblank)
-                affiliation = result.``institution-name`` |> optionalArray |> Array.map Some |> joined
+                email = result.email |> Option.defaultValue [||] |> Array.tryPick (Some >> nonblank)
+                affiliation =
+                    result.``institution-name``
+                    |> Option.defaultValue [||]
+                    |> Array.map Some
+                    |> joinWith "; "
             }
     )
 
 let mapExpandedPage start (response: OrcidExpandedResponse) : SearchPage =
-    let rawResults = response.``expanded-result`` |> optionalArray
+    let rawResults = response.``expanded-result`` |> Option.defaultValue [||]
     let next = max 0 start + rawResults.Length
 
     let nextStart =
@@ -175,48 +164,65 @@ let private requestOptions = [
     Credentials RequestCredentials.Omit
 ]
 
-let getRecord query : JS.Promise<SearchPage> = promise {
-    match normalizeOrcid query with
-    | Error error -> return failwith error
-    | Ok orcid ->
-        let url = "https://pub.orcid.org/v3.0/" + JS.encodeURIComponent orcid + "/record"
-        let! response = fetchUnsafe url requestOptions
+let private isBlocked (response: Response) =
+    response.Status = 401 || response.Status = 403
 
-        if response.Status = 404 then
-            return { results = [||]; nextStart = None }
-        elif response.Status = 401 || response.Status = 403 then
-            return raise (LookupBlocked(httpError response.Status))
-        elif not response.Ok then
-            return failwith (httpError response.Status)
-        else
-            let! payload = response.json<OrcidRecord> ()
+/// Expects an ORCID iD that normalizeOrcid already accepted.
+/// The full /record also lists every work and can be several megabytes, so this loads only the two sections it needs.
+let getRecord (orcid: string) : JS.Promise<SearchPage> = promise {
+    let recordUrl = "https://pub.orcid.org/v3.0/" + JS.encodeURIComponent orcid
 
-            return {
-                results = [| mapRecord orcid payload |]
-                nextStart = None
-            }
+    let! responses =
+        Promise.all [|
+            fetchUnsafe (recordUrl + "/person") requestOptions
+            fetchUnsafe (recordUrl + "/employments") requestOptions
+        |]
+
+    let person = responses.[0]
+    let employments = responses.[1]
+
+    if person.Status = 404 then
+        return { results = [||]; nextStart = None }
+    elif isBlocked person || isBlocked employments then
+        let status = if isBlocked person then person.Status else employments.Status
+        return raise (LookupBlocked(httpError status))
+    elif not person.Ok then
+        return failwith (httpError person.Status)
+    elif not employments.Ok && employments.Status <> 404 then
+        return failwith (httpError employments.Status)
+    else
+        let! personPayload = person.json<OrcidPerson> ()
+
+        let! employmentsPayload =
+            if employments.Ok then
+                employments.json<OrcidEmployments> () |> Promise.map Some
+            else
+                Promise.lift None
+
+        return {
+            results = [| mapOrcidPerson orcid (Some personPayload) employmentsPayload |]
+            nextStart = None
+        }
 }
 
+/// Expects a non-blank query.
 let searchByName query start : JS.Promise<SearchPage> = promise {
-    if String.IsNullOrWhiteSpace query then
-        return failwith "Enter a person's name."
-    else
-        let! response = fetchUnsafe (nameSearchUrl query start) requestOptions
+    let! response = fetchUnsafe (nameSearchUrl query start) requestOptions
 
-        if response.Status = 404 then
-            return { results = [||]; nextStart = None }
-        elif response.Status = 401 || response.Status = 403 then
-            return raise (LookupBlocked(httpError response.Status))
-        elif not response.Ok then
-            return failwith (httpError response.Status)
-        else
-            let! payload = response.json<OrcidExpandedResponse> ()
-            return mapExpandedPage start payload
+    if response.Status = 404 then
+        return { results = [||]; nextStart = None }
+    elif isBlocked response then
+        return raise (LookupBlocked(httpError response.Status))
+    elif not response.Ok then
+        return failwith (httpError response.Status)
+    else
+        let! payload = response.json<OrcidExpandedResponse> ()
+        return mapExpandedPage start payload
 }
 
 let mergePerson (person: Person) (result: PersonResult) =
     let merged = person.Copy()
-    merged.ORCID <- nonblank (Some result.orcid) |> Option.orElse person.ORCID
+    merged.ORCID <- Some result.orcid
     merged.FirstName <- nonblank result.firstName |> Option.orElse person.FirstName
     merged.LastName <- nonblank result.lastName |> Option.orElse person.LastName
     merged.EMail <- nonblank result.email |> Option.orElse person.EMail

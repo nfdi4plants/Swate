@@ -463,7 +463,7 @@ Vitest.test (
 )
 
 Vitest.test (
-    "closing a pending lookup prevents its response from populating a reopened dialog",
+    "reopening after cancelling a pending lookup shows a fresh dialog without the old response",
     fun () -> promise {
         let pending = Helpers.deferred ()
         let mutable calls = 0
@@ -474,6 +474,7 @@ Vitest.test (
         Helpers.click "Cancel"
         do! Helpers.expectClosed ()
         Helpers.openSearch ()
+        Vitest.expect(RTL.screen.queryByText("Searching publications…").IsNone).toBe true
         do! RTL.act (fun () -> promise { pending.resolve (Helpers.response (Helpers.crossref "Closed result") 200) })
 
         Vitest.expect(RTL.screen.queryByText("Closed result").IsNone).toBe true
@@ -514,5 +515,78 @@ Vitest.test (
 
         RTL.screen.getByRole ("heading", ByRoleOptions(name = Text "Second row replacement"))
         |> ignore
+    }
+)
+
+Vitest.test (
+    "dismissing the dialog stops its pending lookup while a host still keeps it mounted",
+    fun () -> promise {
+        let pending = Helpers.deferred ()
+        let mutable fetches = 0
+        let mutable applied = 0
+        let mutable closed = 0
+
+        Helpers.stubFetch (fun (_: string) ->
+            fetches <- fetches + 1
+
+            if fetches = 1 then
+                promise { return Helpers.response (Helpers.crossref "First result") 200 }
+            else
+                pending.promise
+        )
+
+        // A host with an exit transition calls close but unmounts the dialog later.
+        RTL.render (
+            PublicationSearchDialog.PublicationSearchDialog(
+                "10.1234/plant.1",
+                "",
+                true,
+                (fun _ -> applied <- applied + 1),
+                (fun () -> closed <- closed + 1)
+            )
+        )
+        |> ignore
+
+        Helpers.click "Search"
+        do! Helpers.singlePreview "First result"
+        Helpers.click "Search"
+        RTL.screen.getByText "Searching publications…" |> ignore
+        Helpers.click "Cancel"
+        Vitest.expect(closed).toBe 1
+
+        do! RTL.act (fun () -> promise {
+            pending.resolve (Helpers.response (Helpers.crossref "Closed result") 200)
+            do! Helpers.delay 50
+        })
+
+        Vitest.expect(RTL.screen.queryByText("Closed result").IsNone).toBe true
+        Vitest.expect(applied).toBe 0
+    }
+)
+
+Vitest.test (
+    "Load more keeps the selected publication",
+    fun () -> promise {
+        Helpers.stubFetch (fun (url: string) -> promise {
+            if Helpers.queryParameter url "cursorMark" = "*" then
+                let results = Array.init 10 (fun index -> Helpers.europe $"Result {index}" (string (index + 1)))
+                return Helpers.response (Helpers.europePage results "next" 11) 200
+            else
+                return Helpers.response (Helpers.europePage [| Helpers.europe "Final result" "11" |] "next" 11) 200
+        })
+
+        render [ Publication() ] ignore
+        Helpers.openSearch ()
+        Helpers.click "Europe PMC"
+        Helpers.searchEurope "plant"
+        let! first = RTL.screen.findByRole ("button", ByRoleOptions(name = Text "Preview Result 0"))
+        RTL.fireEvent.click first
+        Helpers.click "Load more"
+        let! _ = RTL.screen.findByRole ("button", ByRoleOptions(name = Text "Preview Final result"))
+
+        RTL.screen.getByRole ("button", ByRoleOptions(name = Text "Preview Result 0", pressed = true))
+        |> ignore
+
+        Vitest.expect((Helpers.button "Apply publication" :?> HTMLButtonElement).disabled).toBe false
     }
 )
