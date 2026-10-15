@@ -161,12 +161,10 @@ for query in [ Helpers.orcid; "https://orcid.org/" + Helpers.orcid ] do
             Helpers.searchOrcid query
             do! Helpers.singlePreview "Jane Smith"
 
-            Vitest
-                .expect(requests |> Seq.sort |> Array.ofSeq)
-                .toEqual [|
-                    $"https://pub.orcid.org/v3.0/{Helpers.orcid}/employments"
-                    $"https://pub.orcid.org/v3.0/{Helpers.orcid}/person"
-                |]
+            Vitest.expect(requests |> Seq.sort |> Array.ofSeq).toEqual [|
+                $"https://pub.orcid.org/v3.0/{Helpers.orcid}/employments"
+                $"https://pub.orcid.org/v3.0/{Helpers.orcid}/person"
+            |]
 
             Vitest.expect(calls).toBe 0
             Helpers.click "Cancel"
@@ -522,6 +520,7 @@ Vitest.test (
         Vitest.expect(RTL.screen.queryByText("Stale Person").IsNone).toBe true
         Helpers.click "Cancel"
         do! Helpers.expectClosed ()
+        // This lookup never answers. The dismiss guard itself is covered by the direct-mount test.
         let closed = Helpers.deferred ()
         Helpers.stubFetch (fun (_: string) -> closed.promise)
         Helpers.openSearch ()
@@ -530,8 +529,6 @@ Vitest.test (
         do! Helpers.expectClosed ()
         Helpers.openSearch ()
         Vitest.expect(RTL.screen.queryByText("Searching people…").IsNone).toBe true
-        do! RTL.act (fun () -> promise { closed.resolve (Helpers.response (Helpers.record "Closed" "Person") 200) })
-        Vitest.expect(RTL.screen.queryByText("Closed Person").IsNone).toBe true
         Vitest.expect(calls).toBe 0
     }
 )
@@ -595,10 +592,11 @@ Vitest.test (
         Helpers.click "Cancel"
         Vitest.expect(closed).toBe 1
 
-        do! RTL.act (fun () -> promise {
-            pending.resolve (Helpers.response (Helpers.record "Closed" "Person") 200)
-            do! Helpers.delay 50
-        })
+        do!
+            RTL.act (fun () -> promise {
+                pending.resolve (Helpers.response (Helpers.record "Closed" "Person") 200)
+                do! Helpers.delay 50
+            })
 
         Vitest.expect(RTL.screen.queryByText("Closed Person").IsNone).toBe true
         Vitest.expect(applied).toBe 0
@@ -645,10 +643,22 @@ Vitest.test (
             return Helpers.response (Helpers.record "Jane" "Smith") 200
         })
 
-        render [ Person(firstName = "Manual", lastName = "Stored", orcid = "0000-0001-5109-3700") ] ignore
+        render
+            [
+                Person(firstName = "Manual", lastName = "Stored", orcid = "0000-0001-5109-3700")
+            ]
+            ignore
+
         RTL.fireEvent.change (RTL.screen.getByDisplayValue "Manual", {| target = {| value = "Ada" |} |})
         RTL.fireEvent.change (RTL.screen.getByDisplayValue "Stored", {| target = {| value = "Lovelace" |} |})
-        RTL.fireEvent.change (RTL.screen.getByDisplayValue "0000-0001-5109-3700", {| target = {| value = Helpers.orcid |} |})
+
+        RTL.fireEvent.change (
+            RTL.screen.getByDisplayValue "0000-0001-5109-3700",
+            {|
+                target = {| value = Helpers.orcid |}
+            |}
+        )
+
         Helpers.click "Search by name"
 
         let queryValue label =
@@ -688,5 +698,45 @@ Vitest.test (
         RTL.screen.getByText "A. Lovelace" |> ignore
         // The only "Name" left is the search mode tab.
         Vitest.expect(RTL.screen.getAllByText("Name").Count).toBe 1
+    }
+)
+
+Vitest.test (
+    "a blank person name never fetches",
+    fun () -> promise {
+        let mutable calls = 0
+
+        Helpers.stubFetch (fun (_: string) -> promise {
+            calls <- calls + 1
+            return Helpers.response (Helpers.searchPage [||] 0) 200
+        })
+
+        render [ Person() ] ignore
+        Helpers.click "Search by name"
+        Helpers.searchName "   "
+        let! alert = RTL.screen.findByRole "alert"
+        Vitest.expect(alert.textContent).toBe "Enter a person's name."
+        Vitest.expect(calls).toBe 0
+    }
+)
+
+Vitest.test (
+    "the preview hides a credit name that repeats the applied name",
+    fun () -> promise {
+        Helpers.stubFetch (fun (_: string) -> promise {
+            let result = {|
+                Helpers.searchResult Helpers.orcid "Ada" "Lovelace" with
+                    ``credit-name`` = "Ada Lovelace"
+            |}
+
+            return Helpers.response (Helpers.searchPage [| result |] 1) 200
+        })
+
+        render [ Person() ] ignore
+        Helpers.click "Search by name"
+        Helpers.searchName "Ada Lovelace"
+        let! _ = RTL.screen.findByRole ("heading", ByRoleOptions(name = Text "Autofill preview"))
+        Vitest.expect(RTL.screen.queryByText("Credit name").IsNone).toBe true
+        Vitest.expect(RTL.screen.getAllByText("Ada Lovelace").Count).toBe 1
     }
 )

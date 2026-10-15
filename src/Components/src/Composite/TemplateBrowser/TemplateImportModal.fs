@@ -109,8 +109,7 @@ type TemplateImportModal =
                                     let isChecked = importType = importMode
 
                                     Html.label [
-                                        prop.className
-                                            "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
+                                        prop.className "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
                                         prop.children [
                                             Html.input [
                                                 prop.type'.radio

@@ -106,7 +106,9 @@ let private decodeEntity (entity: Match) =
     match codePoint with
     | Some value when value > 0 && value <= 0x10FFFF && (value < 0xD800 || value > 0xDFFF) -> fromCodePoint value
     | Some _ -> entity.Value
-    | None -> Map.tryFind entity.Groups.[3].Value namedEntities |> Option.defaultValue entity.Value
+    | None ->
+        Map.tryFind entity.Groups.[3].Value namedEntities
+        |> Option.defaultValue entity.Value
 
 let private lineBreakTag = Regex(@"<br\s*\/?>", RegexOptions.IgnoreCase)
 
@@ -267,6 +269,7 @@ let searchEuropePmc query cursor : JS.Promise<SearchPage> = promise {
         let! payload =
             response.json<EuropePmcResponse> ()
             |> Promise.catch (fun _ -> failwith (unreadable "Europe PMC"))
+
         return mapEuropePmcPage cursor payload
 }
 

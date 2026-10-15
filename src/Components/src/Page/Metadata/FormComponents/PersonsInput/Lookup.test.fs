@@ -77,14 +77,18 @@ Vitest.describe (
 
                 let employments =
                     json<OrcidEmployments>
-                        """{"affiliation-group":[{"summaries":[{"employment-summary":{"organization":{"name":"Example University"},"department-name":"Computing","end-date":null}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Old College"},"department-name":"Computing","end-date":{"year":{"value":"2010"}}}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Institute"}}},{"employment-summary":{"organization":{"name":"Institute"},"department-name":"Other source"}}]}]}"""
+                        """{"affiliation-group":[{"summaries":[{"employment-summary":{"organization":{"name":"Example University"},"department-name":"Computing","end-date":null}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Old College"},"department-name":"Computing","end-date":{"year":{"value":"2010"}}}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Fixed Term Lab"},"end-date":{"year":{"value":"2999"},"month":{"value":"06"},"day":{"value":"30"}}}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Institute"}}},{"employment-summary":{"organization":{"name":"Institute"},"department-name":"Other source"}}]}]}"""
 
                 let result = mapOrcidPerson emptyResult.orcid (Some person) (Some employments)
                 Vitest.expect(result.orcid).toBe emptyResult.orcid
                 Vitest.expect(result.firstName).toEqual (Some "Ada")
                 Vitest.expect(result.lastName).toEqual (Some "Lovelace")
                 Vitest.expect(result.email).toEqual (Some "ada@example.org")
-                Vitest.expect(result.affiliation).toEqual (Some "Computing, Example University; Institute")
+
+                Vitest
+                    .expect(result.affiliation)
+                    .toEqual (Some "Computing, Example University; Fixed Term Lab; Institute")
+
                 Vitest.expect(fullName result).toBe "Ada Lovelace"
         )
 
@@ -112,7 +116,15 @@ Vitest.describe (
                     .toBe
                     "Ada Lovelace"
 
-                Vitest.expect(fullName { result with displayName = Some "A. Lovelace" }).toBe "A. Lovelace"
+                Vitest
+                    .expect(
+                        fullName {
+                            result with
+                                displayName = Some "A. Lovelace"
+                        }
+                    )
+                    .toBe
+                    "A. Lovelace"
         )
 
         Vitest.test (
@@ -206,5 +218,47 @@ Vitest.describe (
 
                 Vitest.expect((httpError 429).Contains("try again later")).toBe true
                 Vitest.expect((httpError 500).Contains("HTTP 500")).toBe true
+        )
+)
+
+Vitest.describe (
+    "ORCID employment end dates",
+    fun () ->
+        Vitest.test (
+            "an employment is current until its end date has passed",
+            fun () ->
+                let today = System.DateTime(2026, 10, 15)
+
+                let endDate (text: string) = json<OrcidDate> text |> Some
+
+                Vitest.expect(isCurrentEmployment today None).toBe true
+                Vitest.expect(isCurrentEmployment today (endDate "{}")).toBe true
+
+                Vitest
+                    .expect(
+                        isCurrentEmployment
+                            today
+                            (endDate """{"year":{"value":"2026"},"month":{"value":"10"},"day":{"value":"15"}}""")
+                    )
+                    .toBe
+                    true
+
+                Vitest
+                    .expect(isCurrentEmployment today (endDate """{"year":{"value":"2026"},"month":{"value":"10"}}"""))
+                    .toBe
+                    true
+
+                Vitest.expect(isCurrentEmployment today (endDate """{"year":{"value":"2026"}}""")).toBe true
+
+                Vitest
+                    .expect(
+                        isCurrentEmployment
+                            today
+                            (endDate """{"year":{"value":"2026"},"month":{"value":"09"},"day":{"value":"30"}}""")
+                    )
+                    .toBe
+                    false
+
+                Vitest.expect(isCurrentEmployment today (endDate """{"year":{"value":"2025"}}""")).toBe false
         )
 )

@@ -398,9 +398,8 @@ Vitest.test (
         Helpers.click "Search"
         let! alert = RTL.screen.findByRole "alert"
 
-        Vitest
-            .expect(alert.textContent)
-            .toBe "Publication search failed: Crossref could not load this publication (HTTP 500). Please try again."
+        Vitest.expect(alert.textContent).toBe
+            "Publication search failed: Crossref could not load this publication (HTTP 500). Please try again."
 
         status <- 200
         Helpers.click "Search"
@@ -476,7 +475,7 @@ Vitest.test (
 )
 
 Vitest.test (
-    "reopening after cancelling a pending lookup shows a fresh dialog without the old response",
+    "reopening after cancelling a pending lookup shows a fresh dialog",
     fun () -> promise {
         let pending = Helpers.deferred ()
         let mutable calls = 0
@@ -488,10 +487,6 @@ Vitest.test (
         do! Helpers.expectClosed ()
         Helpers.openSearch ()
         Vitest.expect(RTL.screen.queryByText("Searching publications…").IsNone).toBe true
-        do! RTL.act (fun () -> promise { pending.resolve (Helpers.response (Helpers.crossref "Closed result") 200) })
-
-        Vitest.expect(RTL.screen.queryByText("Closed result").IsNone).toBe true
-
         Vitest.expect(calls).toBe 0
     }
 )
@@ -567,10 +562,11 @@ Vitest.test (
         Helpers.click "Cancel"
         Vitest.expect(closed).toBe 1
 
-        do! RTL.act (fun () -> promise {
-            pending.resolve (Helpers.response (Helpers.crossref "Closed result") 200)
-            do! Helpers.delay 50
-        })
+        do!
+            RTL.act (fun () -> promise {
+                pending.resolve (Helpers.response (Helpers.crossref "Closed result") 200)
+                do! Helpers.delay 50
+            })
 
         Vitest.expect(RTL.screen.queryByText("Closed result").IsNone).toBe true
         Vitest.expect(applied).toBe 0
@@ -582,7 +578,9 @@ Vitest.test (
     fun () -> promise {
         Helpers.stubFetch (fun (url: string) -> promise {
             if Helpers.queryParameter url "cursorMark" = "*" then
-                let results = Array.init 10 (fun index -> Helpers.europe $"Result {index}" (string (index + 1)))
+                let results =
+                    Array.init 10 (fun index -> Helpers.europe $"Result {index}" (string (index + 1)))
+
                 return Helpers.response (Helpers.europePage results "next" 11) 200
             else
                 return Helpers.response (Helpers.europePage [| Helpers.europe "Final result" "11" |] "next" 11) 200
@@ -618,14 +616,16 @@ Vitest.test (
         Helpers.openSearch ()
         Helpers.searchDoi "10.1234/plant.1"
         let! alert = RTL.screen.findByRole "alert"
-        Vitest.expect(alert.textContent).toBe "Publication search failed: Crossref could not be reached. Please try again."
+
+        Vitest.expect(alert.textContent).toBe
+            "Publication search failed: Crossref could not be reached. Please try again."
+
         Helpers.click "Europe PMC"
         Helpers.searchEurope "plant"
         let! alert = RTL.screen.findByRole "alert"
 
-        Vitest
-            .expect(alert.textContent)
-            .toBe "Publication search failed: Europe PMC could not search publications (HTTP 500). Please try again."
+        Vitest.expect(alert.textContent).toBe
+            "Publication search failed: Europe PMC could not search publications (HTTP 500). Please try again."
     }
 )
 

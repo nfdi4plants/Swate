@@ -56,10 +56,7 @@ type TextInput =
 
         // setValue only sees the text after the debounce. This reports every draft, including the initial one
         // and drafts reset from an outside value change, so a parent always holds what the field shows.
-        React.useEffect (
-            (fun () -> onDraftChange |> Option.iter (fun notify -> notify tempValue)),
-            [| box tempValue |]
-        )
+        React.useEffect ((fun () -> onDraftChange |> Option.iter (fun notify -> notify tempValue)), [| box tempValue |])
 
         let handleChange (text: string) =
             setTempValue text

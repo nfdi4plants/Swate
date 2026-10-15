@@ -47,9 +47,7 @@ Vitest.describe (
         Vitest.test (
             "encodes DOI and Europe PMC query and cursor values",
             fun () ->
-                Vitest
-                    .expect(crossrefUrl "10.1000/a&b")
-                    .toBe "https://api.crossref.org/works/10.1000%2Fa%26b"
+                Vitest.expect(crossrefUrl "10.1000/a&b").toBe "https://api.crossref.org/works/10.1000%2Fa%26b"
 
                 Vitest
                     .expect(europePmcUrl "plant & cell" (Some "next+=/"))
@@ -107,8 +105,7 @@ Vitest.describe (
                 Vitest.expect(undated.year.IsNone).toBe true
 
                 let nullFallback =
-                    json<CrossrefWork>
-                        """{"published":{"date-parts":[[null]]},"issued":{"date-parts":[[2022]]}}"""
+                    json<CrossrefWork> """{"published":{"date-parts":[[null]]},"issued":{"date-parts":[[2022]]}}"""
                     |> mapCrossrefWork
 
                 Vitest.expect(nullFallback.year).toEqual (Some "2022")

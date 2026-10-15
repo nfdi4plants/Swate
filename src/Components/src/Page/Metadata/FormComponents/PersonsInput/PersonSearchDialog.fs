@@ -21,7 +21,7 @@ type PersonSearchDialog =
 
         [
             "Name", appliedName
-            "Credit name", result.displayName
+            "Credit name", result.displayName |> Option.filter (fun credit -> Some credit <> appliedName)
             "ORCID", Some result.orcid
             "Affiliation", result.affiliation
             "Email", result.email

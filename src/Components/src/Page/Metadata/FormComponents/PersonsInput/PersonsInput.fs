@@ -59,7 +59,9 @@ type PersonsInput =
         let firstNameDraft = React.useRef (defaultArg input.FirstName "")
         let lastNameDraft = React.useRef (defaultArg input.LastName "")
         let orcidDraft = React.useRef (defaultArg input.ORCID "")
-        let trackDraft (draft: IRefValue<string>) = fun (value: string) -> draft.current <- value
+
+        let trackDraft (draft: IRefValue<string>) =
+            fun (value: string) -> draft.current <- value
 
         let nameText =
             let firstName = Option.defaultValue "" input.FirstName
@@ -114,7 +116,8 @@ type PersonsInput =
                                 // value is this field's own draft. The other fields come from their tracked drafts.
                                 let orcidQuery, nameQuery =
                                     if mode = SearchMode.Orcid then
-                                        value, PersonsInputHelper.nameQuery firstNameDraft.current lastNameDraft.current
+                                        value,
+                                        PersonsInputHelper.nameQuery firstNameDraft.current lastNameDraft.current
                                     else
                                         orcidDraft.current, PersonsInputHelper.nameQuery firstNameDraft.current value
 

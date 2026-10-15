@@ -71,6 +71,37 @@ let fullName (result: PersonResult) =
     |> Option.orElse (nonblank result.displayName)
     |> Option.defaultValue result.orcid
 
+/// ORCID accepts end dates in the future, so an employment that ends today or later is still current.
+/// A missing month or day counts as the end of that year or month.
+let isCurrentEmployment (today: DateTime) (endDate: OrcidDate option) =
+    let part (value: OrcidValue option) =
+        value
+        |> Option.bind (fun field -> field.value)
+        |> Option.bind (fun text ->
+            match Int32.TryParse text with
+            | true, number -> Some number
+            | _ -> None
+        )
+
+    match endDate |> Option.bind (fun date -> part date.year) with
+    | None -> true
+    | Some year ->
+        let month =
+            endDate
+            |> Option.bind (fun date -> part date.month)
+            |> Option.filter (fun month -> month >= 1 && month <= 12)
+            |> Option.defaultValue 12
+
+        let lastDay = DateTime.DaysInMonth(year, month)
+
+        let day =
+            endDate
+            |> Option.bind (fun date -> part date.day)
+            |> Option.filter (fun day -> day >= 1 && day <= lastDay)
+            |> Option.defaultValue lastDay
+
+        DateTime(year, month, day) >= today.Date
+
 let mapOrcidPerson orcid (person: OrcidPerson option) (employments: OrcidEmployments option) : PersonResult =
     let name = person |> Option.bind (fun person -> person.name)
 
@@ -94,7 +125,7 @@ let mapOrcidPerson orcid (person: OrcidPerson option) (employments: OrcidEmploym
         |> Option.defaultValue [||]
         |> Array.choose (fun group -> group.summaries |> Option.bind Array.tryHead)
         |> Array.choose (fun summary -> summary.``employment-summary``)
-        |> Array.filter (fun summary -> summary.``end-date``.IsNone)
+        |> Array.filter (fun summary -> isCurrentEmployment DateTime.Today summary.``end-date``)
         |> Array.map (fun summary ->
             [|
                 summary.``department-name``
@@ -185,7 +216,12 @@ let getRecord (orcid: string) : JS.Promise<SearchPage> = promise {
     if person.Status = 404 then
         return { results = [||]; nextStart = None }
     elif isBlocked person || isBlocked employments then
-        let status = if isBlocked person then person.Status else employments.Status
+        let status =
+            if isBlocked person then
+                person.Status
+            else
+                employments.Status
+
         return raise (LookupBlocked(httpError status))
     elif not person.Ok then
         return failwith (httpError person.Status)
@@ -201,7 +237,9 @@ let getRecord (orcid: string) : JS.Promise<SearchPage> = promise {
                 Promise.lift None
 
         return {
-            results = [| mapOrcidPerson orcid (Some personPayload) employmentsPayload |]
+            results = [|
+                mapOrcidPerson orcid (Some personPayload) employmentsPayload
+            |]
             nextStart = None
         }
 }

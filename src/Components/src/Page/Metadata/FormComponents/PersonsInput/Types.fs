@@ -42,13 +42,18 @@ type OrcidPerson =
     abstract name: OrcidName option
     abstract emails: OrcidEmails option
 
+type OrcidDate =
+    abstract year: OrcidValue option
+    abstract month: OrcidValue option
+    abstract day: OrcidValue option
+
 type OrcidOrganization =
     abstract name: string option
 
 type OrcidEmploymentSummary =
     abstract organization: OrcidOrganization option
     abstract ``department-name``: string option
-    abstract ``end-date``: obj option
+    abstract ``end-date``: OrcidDate option
 
 type OrcidEmployment =
     abstract ``employment-summary``: OrcidEmploymentSummary option
