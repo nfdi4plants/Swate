@@ -10,6 +10,9 @@ module private Helpers =
     [<Emit("new Response(JSON.stringify($0), {status: $1, headers: {'Content-Type': 'application/json'}})")>]
     let response (_body: obj) (_status: int) : Fetch.Types.Response = jsNative
 
+    [<Emit("new Response($0, {status: $1, headers: {'Content-Type': 'text/plain'}})")>]
+    let textResponse (_body: string) (_status: int) : Fetch.Types.Response = jsNative
+
     [<Emit("new Promise(resolve => setTimeout(resolve, $0))")>]
     let delay (_milliseconds: int) : JS.Promise<unit> = jsNative
 
@@ -383,7 +386,8 @@ Vitest.test (
     fun () -> promise {
         let mutable status = 404
 
-        Helpers.stubFetch (fun (_: string) -> promise { return Helpers.response (box {| status = "error" |}) status })
+        // Crossref answers an unknown DOI with a plain-text body.
+        Helpers.stubFetch (fun (_: string) -> promise { return Helpers.textResponse "Resource not found." status })
 
         render [ Publication() ] ignore
         Helpers.openSearch ()
@@ -588,5 +592,50 @@ Vitest.test (
         |> ignore
 
         Vitest.expect((Helpers.button "Apply publication" :?> HTMLButtonElement).disabled).toBe false
+    }
+)
+
+Vitest.test (
+    "network failures and Europe PMC HTTP errors show a message naming the provider",
+    fun () -> promise {
+        Helpers.stubFetch (fun (url: string) -> promise {
+            if url.Contains "europepmc" then
+                return Helpers.response (box {| error = "unavailable" |}) 500
+            else
+                return (failwith "Failed to fetch": Fetch.Types.Response)
+        })
+
+        render [ Publication() ] ignore
+        Helpers.openSearch ()
+        Helpers.searchDoi "10.1234/plant.1"
+        let! alert = RTL.screen.findByRole "alert"
+        Vitest.expect(alert.textContent).toBe "Publication search failed: Crossref could not be reached. Please try again."
+        Helpers.click "Europe PMC"
+        Helpers.searchEurope "plant"
+        let! alert = RTL.screen.findByRole "alert"
+
+        Vitest
+            .expect(alert.textContent)
+            .toBe "Publication search failed: Europe PMC could not search publications (HTTP 500). Please try again."
+    }
+)
+
+Vitest.test (
+    "a blank Europe PMC query never fetches",
+    fun () -> promise {
+        let mutable calls = 0
+
+        Helpers.stubFetch (fun (_: string) -> promise {
+            calls <- calls + 1
+            return Helpers.response (Helpers.europePage [||] "*" 0) 200
+        })
+
+        render [ Publication() ] ignore
+        Helpers.openSearch ()
+        Helpers.click "Europe PMC"
+        Helpers.searchEurope "   "
+        let! alert = RTL.screen.findByRole "alert"
+        Vitest.expect(alert.textContent).toBe "Enter a title, author, PubMed ID, or PMC ID."
+        Vitest.expect(calls).toBe 0
     }
 )

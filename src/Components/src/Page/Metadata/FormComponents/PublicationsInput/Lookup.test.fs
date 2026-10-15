@@ -126,8 +126,12 @@ Vitest.describe (
                         "H<sub>2</sub>O<sub>2</sub> signalling &amp; CO<sub>2</sub> uptake",
                         "H2O2 signalling & CO2 uptake"
                         "Effect of&#160;TNF-&#x3b1; on cells&#8217; survival", "Effect of TNF-α on cells’ survival"
-                        "  Significance\twhen p < 0.05 and n>3 ", "Significance when p < 0.05 and n>3"
+                        "  Significance\twhen p < 0.05 and\u00A0n>3 ", "Significance when p < 0.05 and n>3"
                         "Study &lt;in vivo&gt; of &unknown; markers <br/>", "Study <in vivo> of &unknown; markers"
+                        "Title<br/>Subtitle", "Title Subtitle"
+                        "<B>Bold</B> and <span class=\"x\">span</span>", "Bold and span"
+                        "if a<b and c>d", "if a<b and c>d"
+                        "Vec<T> layout", "Vec<T> layout"
                     ] do
                     Vitest.expect(cleanTitle input).toBe expected
 
