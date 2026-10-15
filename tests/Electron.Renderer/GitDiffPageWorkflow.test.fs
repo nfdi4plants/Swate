@@ -116,6 +116,7 @@ type private FakeDiffClient() =
         initializeWorkspace = fun _ -> never "initializeWorkspace"
         bindWorkspace = fun _ -> never "bindWorkspace"
         createRemoteProject = fun _ -> never "createRemoteProject"
+        loadPublishOwners = fun () -> never "loadPublishOwners"
         renameOpenArcRoot = fun _ -> never "renameOpenArcRoot"
         checkDependencies = fun _ -> never "checkDependencies"
         installDependency = fun _ -> never "installDependency"

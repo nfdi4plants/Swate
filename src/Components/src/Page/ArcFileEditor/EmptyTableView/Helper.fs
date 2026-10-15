@@ -18,7 +18,10 @@ let createMinimalTable (arcFile: ArcFiles) (activeTableIndex: int option) (setAr
 
         activeTable.AddColumns(newColumns)
         activeTable.AddRowsEmpty(3)
-        setArcFile (ArcFiles.refreshRef arcFile)
+
+        let nextArcFile = ArcFiles.refreshRef arcFile
+
+        setArcFile nextArcFile
     | None -> ()
 
 let getOutputTables (arcFile: ArcFiles) =

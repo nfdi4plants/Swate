@@ -219,6 +219,7 @@
     <Compile Include="Composite\Layout\Layout.fs" />
     <Compile Include="Composite\TemplateBrowser\Types.fs" />
     <Compile Include="Composite\TemplateBrowser\Helper.fs" />
+    <Compile Include="Composite\TemplateBrowser\Helper.test.fs" />
     <Compile Include="Composite\TemplateBrowser\Context.fs" />
     <Compile Include="Composite\TemplateBrowser\TemplateCacheContext.fs" />
     <Compile Include="Composite\TemplateBrowser\TemplateCacheProvider.fs" />

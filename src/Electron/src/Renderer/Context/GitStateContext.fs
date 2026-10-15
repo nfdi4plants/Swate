@@ -31,7 +31,7 @@ type GitStateController = {
     discardSelection: string[] -> unit
     confirmPendingRemoteAction: unit -> unit
     cancelPendingRemoteAction: unit -> unit
-    submitPublishRename: string -> unit
+    submitPublishRename: GitSidebarPublishSubmit -> unit
     cancelPublishRename: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
     saveDiffIndexingLimit: int -> unit
@@ -74,6 +74,7 @@ module private Helper =
             initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
             bindWorkspace = Renderer.VersionControlApiClient.bindWorkspace
             createRemoteProject = Api.ipcGitLabApi.createProject
+            loadPublishOwners = Api.ipcGitLabApi.loadPublishOwners
             renameOpenArcRoot =
                 fun newName -> promise {
                     let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
@@ -229,8 +230,8 @@ let GitStateCtxProvider (children: ReactElement) =
     let cancelPendingRemoteAction () =
         dispatch CancelPendingRemoteActionRequested
 
-    let submitPublishRename newName =
-        dispatch (SubmitPublishRenameRequested newName)
+    let submitPublishRename (submit: GitSidebarPublishSubmit) =
+        dispatch (SubmitPublishRenameRequested submit)
 
     let cancelPublishRename () = dispatch CancelPublishRenameRequested
 

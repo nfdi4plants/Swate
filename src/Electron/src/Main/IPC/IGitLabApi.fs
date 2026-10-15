@@ -109,9 +109,15 @@ let api: IGitLabApi = {
                     )
         }
     createProject =
-        fun (projectName: string) -> promise {
+        fun (request: CreateProjectRequest) -> promise {
+            match tryGetActiveGitLabContext () with
+            | Error err -> return Error(CreateProjectError.Failed err)
+            | Ok(baseUrl, token) -> return! GitLabApi.CreateProject(baseUrl, token, request)
+        }
+    loadPublishOwners =
+        fun () -> promise {
             match tryGetActiveGitLabContext () with
             | Error err -> return Error err
-            | Ok(baseUrl, token) -> return! GitLabApi.CreateProject(baseUrl, token, projectName)
+            | Ok(baseUrl, token) -> return! GitLabApi.ListPublishOwners(baseUrl, token)
         }
 }

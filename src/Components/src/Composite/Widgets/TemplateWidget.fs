@@ -81,7 +81,8 @@ type TemplateWidget =
                     let nextArcFileState =
                         Helper.updateTables importTables importConfig (tryGetActiveTableIndex arcFile) (Some arcFile)
 
-                    setArcFile (ArcFiles.refreshRef nextArcFileState)
+                    let nextArcFile = ArcFiles.refreshRef nextArcFileState
+                    setArcFile nextArcFile
                     setSelectedTemplateIds (fun _ -> Set.empty<System.Guid>)
                     true
                 else
