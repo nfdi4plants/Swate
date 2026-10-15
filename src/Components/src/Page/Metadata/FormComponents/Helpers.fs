@@ -1,7 +1,18 @@
 module Swate.Components.Page.Metadata.FormComponents.Helpers
 
+open System
 open Browser.Types
 open Feliz
+
+/// Lookup APIs send blank strings for missing values, so treat them like None and trim the rest.
+let nonblank (value: string option) =
+    value
+    |> Option.bind (fun text ->
+        if String.IsNullOrWhiteSpace text then
+            None
+        else
+            Some(text.Trim())
+    )
 
 let addButton (clickEvent: MouseEvent -> unit) =
     Html.button [
