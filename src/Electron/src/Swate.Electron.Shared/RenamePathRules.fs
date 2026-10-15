@@ -71,11 +71,11 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
                 Error
                     "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
 
-let tryBuildGenericFileSystemRenameTargetPath (isFile: bool) (sourcePath: string) (newName: string) =
+let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
 
     let isTargetAllowed =
-        if isFile then
+        if isAddZoneRootFile then
             ArcEntityPathRules.isGenericFileSystemFileTargetAllowed
         else
             ArcEntityPathRules.isGenericFileSystemTargetAllowed

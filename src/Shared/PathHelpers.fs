@@ -517,10 +517,10 @@ module ArcEntityPathRules =
     /// Folders directly inside an add zone are ARC entities, but files may be created there.
     let isGenericFileSystemCreateParentAllowed (isFile: bool) (relativePath: string) =
         isGenericFileSystemParentAllowed relativePath
-        || isFile
-           && (normalizeRelativePath relativePath
-               |> splitPathSegments
-               |> classifyStructuralArcPath) = StructuralArcPath.AddZoneRoot
+        || (isFile
+            && (normalizeRelativePath relativePath
+                |> splitPathSegments
+                |> classifyStructuralArcPath) = StructuralArcPath.AddZoneRoot)
 
     let resolveRenameSourcePath (relativePath: string) =
         match classifyRenameTarget relativePath with

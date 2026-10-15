@@ -798,9 +798,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             let arcPath = vault.path.Value
 
                             match! ArcFileSystemHelper.resolveDeletePathRouteAsync arcPath relativePath with
-                            | ArcFileSystemHelper.DeletePathRoute.GenericItem normalizedGenericPath ->
-                                return!
-                                    ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath normalizedGenericPath
+                            | ArcFileSystemHelper.DeletePathRoute.GenericItem _ as route ->
+                                return! ArcFileSystemHelper.deleteGenericRouteOnDisk arcPath route
                             | ArcFileSystemHelper.DeletePathRoute.ArcEntity normalizedRelativePath ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
