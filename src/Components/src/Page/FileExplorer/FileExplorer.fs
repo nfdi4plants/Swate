@@ -39,11 +39,12 @@ module private FileExplorerHelper =
         (selectItem: FileItem -> unit)
         (getCopyPath: FileItem -> string option)
         (getCopyRelativePath: FileItem -> string option)
+        (canRequestDirectoryRefresh: bool)
         (setExpanded: FileItem -> bool -> unit)
         : Swate.Components.Page.FileExplorer.Types.ContextMenuItem list =
         let canExpandDirectory =
             match item.Children with
-            | Some children -> not (List.isEmpty children)
+            | Some children -> not (List.isEmpty children) || canRequestDirectoryRefresh
             | None -> true
 
         [
@@ -87,11 +88,19 @@ module private FileExplorerHelper =
         (getCopyPath: FileItem -> string option)
         (getCopyRelativePath: FileItem -> string option)
         (includeDefaultContextMenuItems: bool)
+        (canRequestDirectoryRefresh: bool)
         (setExpanded: FileItem -> bool -> unit)
         =
         let defaultItems =
             if includeDefaultContextMenuItems then
-                defaultContextMenuItems item isExpanded selectItem getCopyPath getCopyRelativePath setExpanded
+                defaultContextMenuItems
+                    item
+                    isExpanded
+                    selectItem
+                    getCopyPath
+                    getCopyRelativePath
+                    canRequestDirectoryRefresh
+                    setExpanded
             else
                 []
 
@@ -236,6 +245,7 @@ type FileExplorer =
                         getCopyPath
                         getCopyRelativePath
                         includeDefaultContextMenuItems
+                        onDirectoryExpansionChange.IsSome
                         setExpanded
                     |> List.map (fun x -> x.ToPrimitiveContextMenuItem())
                 ),
@@ -263,6 +273,7 @@ type FileExplorer =
                                         getCopyPath
                                         getCopyRelativePath
                                         includeDefaultContextMenuItems
+                                        onDirectoryExpansionChange.IsSome
                                         setExpanded
 
                                 if List.isEmpty menuItems then None else Some(box item)
@@ -294,7 +305,7 @@ type FileExplorer =
 
             let canExpand =
                 match item.Children with
-                | Some children -> not (List.isEmpty children)
+                | Some children -> not (List.isEmpty children) || onDirectoryExpansionChange.IsSome
                 | None -> true
 
             let itemActions = getItemActions item

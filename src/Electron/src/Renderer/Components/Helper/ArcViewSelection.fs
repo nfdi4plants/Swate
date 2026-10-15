@@ -7,7 +7,7 @@ open Swate.Electron.Shared.FileIOHelper
 // every Electron IPC proxy through Api.fs. The preferred follow-up is an injected `openViewWith openFile path`
 // core function with `openView` as a thin Electron adapter; Api.fs can then be split by domain separately.
 let applyRequestedPathView (requestedPath: string) (pageState: Renderer.Types.PageState) =
-    match PathHelpers.getNameFromPath requestedPath, pageState with
+    match PathHelpers.getFileName requestedPath, pageState with
     | requestedFileName, Renderer.Types.PageState.ArcFilePage(arcFile, _) when
         PathHelpers.pathsEqual requestedFileName ARCtrl.ArcPathHelper.DataMapFileName
         ->

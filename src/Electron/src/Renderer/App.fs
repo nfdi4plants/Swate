@@ -134,6 +134,15 @@ let private subscribe (_model: Model) : Sub<Msg> = [
         }
 ]
 
+let private loadFileTreeSnapshot () = Api.ipcArcVaultApi.getFileTree ()
+
+let private fileImportApi: Renderer.Context.FileStateContext.FileImportApi = {
+    loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
+    pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()
+    runImport = Api.ipcArcVaultApi.tryImportExternalFiles
+    cancelImport = Api.ipcArcVaultApi.cancelImportExternalFiles
+}
+
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSidebarTarget =
     let leftSidebarCtx =
@@ -210,8 +219,8 @@ let Main () =
     let children =
         Renderer.Components.MainContent.Main.Main(model.ArcRootPath, model.PageState)
 
-    let setLeftSidebarTarget =
-        React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
+    let setLeftSidebarTarget leftSidebarTarget =
+        dispatch (SetLeftSidebarTarget leftSidebarTarget)
 
     let isInitializedArcVault = Option.isSome model.ArcRootPath
 
@@ -242,13 +251,8 @@ let Main () =
             Context.AppStateContext.AppStateCtx.Provider(
                 model.ArcRootPath,
                 Renderer.Context.FileStateContext.FileStateCtxProviderWithSnapshots(
-                    (fun () -> Api.ipcArcVaultApi.getFileTree ()),
-                    {
-                        loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
-                        pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()
-                        runImport = Api.ipcArcVaultApi.tryImportExternalFiles
-                        cancelImport = Api.ipcArcVaultApi.cancelImportExternalFiles
-                    },
+                    loadFileTreeSnapshot,
+                    fileImportApi,
                     Renderer.Context.PageStateContext.PageStateCtx.Provider(
                         pageCtx,
                         Renderer.Context.PageStateContext.PageStateUpdateCtx.Provider(

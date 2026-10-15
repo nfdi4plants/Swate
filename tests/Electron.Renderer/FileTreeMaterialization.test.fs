@@ -30,7 +30,6 @@ let private toFileItemTree materializedDirectoryPaths node =
         )
         materializedDirectoryPaths
         node
-        true
 
 Vitest.describe (
     "Electron file-tree materialization",
@@ -80,28 +79,35 @@ Vitest.describe (
             fun () ->
                 let root =
                     directoryNode "arc" "arc" [
-                        fileNode "unrelated.txt" "arc/unrelated.txt"
-                        directoryNode "runs" "arc/runs" []
-                        directoryNode "assays" "arc/assays" []
+                        fileNode "zebra.txt" "arc/zebra.txt"
                         directoryNode "studies" "arc/studies" []
-                        fileNode "isa.investigation.xlsx" "arc/isa.investigation.xlsx"
-                        fileNode "README.md" "arc/README.md"
                         directoryNode "notes" "arc/notes" []
+                        directoryNode "runs" "arc/runs" []
+                        fileNode "alpha.txt" "arc/alpha.txt"
+                        fileNode "README.md" "arc/README.md"
                         directoryNode "workflows" "arc/workflows" []
+                        fileNode "isa.investigation.xlsx" "arc/isa.investigation.xlsx"
+                        directoryNode "assays" "arc/assays" []
                     ]
 
                 let item = toFileItemTree (Set.singleton "arc") root
+                let childNames = item.Children.Value |> List.map _.Name
 
-                Vitest.expect(item.Children.Value |> List.map _.Name).toEqual [
-                    "notes"
-                    "README.md"
-                    "isa.investigation.xlsx"
-                    "studies"
-                    "assays"
-                    "workflows"
-                    "runs"
-                    "unrelated.txt"
-                ]
+                Vitest
+                    .expect(childNames)
+                    .toEqual (
+                        [
+                            "notes"
+                            "README.md"
+                            "isa.investigation.xlsx"
+                            "studies"
+                            "assays"
+                            "workflows"
+                            "runs"
+                            "alpha.txt"
+                            "zebra.txt"
+                        ]
+                    )
         )
 
         Vitest.test (
@@ -120,10 +126,16 @@ Vitest.describe (
                     ]
 
                 let item = toFileItemTree (Set.ofList [ "arc"; "arc/notes" ]) root
-                let notesItem = item.Children.Value |> List.find (fun child -> child.Name = "notes")
+                let childNames = item.Children.Value |> List.map _.Name
 
-                Vitest.expect(item.Children.Value |> List.map _.Name).toEqual [ "notes"; "another-file.txt" ]
-                Vitest.expect(notesItem.Children.Value |> List.map _.Name).toEqual [ "zebra.md"; "apple.md" ]
+                Vitest.expect(childNames).toEqual ([ "notes"; "another-file.txt" ])
+
+                let materializedNotes =
+                    item.Children.Value |> List.find (fun child -> child.Name = "notes")
+
+                let noteNames = materializedNotes.Children.Value |> List.map _.Name
+
+                Vitest.expect(noteNames).toEqual ([ "zebra.md"; "apple.md" ])
         )
 
         Vitest.test (
@@ -142,8 +154,15 @@ Vitest.describe (
                     Paths = Set.ofList [ "arc"; "arc/kept"; "arc/removed" ]
                 }
 
+                let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept"; "arc/selected" ])
+
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
+                    reconcileMaterializedState
+                        (Some "C:/arc")
+                        (Some "arc/selected/selected.txt")
+                        (Some root)
+                        knownDirectoryPaths.Contains
+                        current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
         )
@@ -161,8 +180,10 @@ Vitest.describe (
                     Paths = Set.ofList [ "arc"; "arc/kept" ]
                 }
 
+                let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept" ])
+
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) current
+                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) knownDirectoryPaths.Contains current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])

@@ -1,21 +1,27 @@
 module Renderer.Context.FileStateContext
 
-open System.Collections.Generic
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Renderer
+open Renderer.Context.FileTreeState
 
 type FileState = {
-    FileTree: FileEntry[]
+    FileTree: seq<FileEntry>
+    FileTreeRoot: FileTreeNode option
+    TryFindFileTreeEntry: string -> FileEntry option
+    IsFileTreeDirectory: string -> bool
     Selection: ArcSelection
 } with
 
     static member init() : FileState = {
         FileTree = [||]
+        FileTreeRoot = None
+        TryFindFileTreeEntry = fun _ -> None
+        IsFileTreeDirectory = fun _ -> false
         Selection = ArcSelection.empty
     }
 
@@ -49,7 +55,6 @@ let FileStateCtx =
 [<Hook>]
 let useFileStateCtx () = React.useContext FileStateCtx
 
-type FileTreeSnapshotLoader = unit -> JS.Promise<Result<Dictionary<string, FileEntry>, exn>>
 type ActiveFileImportLoader = unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
 
 type FileImportApi = {
@@ -59,8 +64,6 @@ type FileImportApi = {
     cancelImport: string -> JS.Promise<Result<unit, exn>>
 }
 
-let private fileTreeFromDictionary (fileTreeDict: Dictionary<string, FileEntry>) = fileTreeDict.Values |> Seq.toArray
-
 [<ReactComponent>]
 let FileStateCtxProviderWithSnapshots
     (loadFileTreeSnapshot: FileTreeSnapshotLoader, fileImportApi: FileImportApi, children: ReactElement)
@@ -69,32 +72,15 @@ let FileStateCtxProviderWithSnapshots
     let isFilePickerOpenRef = React.useRef false
     let isCancellingFileImport, setIsCancellingFileImport = React.useState false
 
-    let fileTree =
-        Renderer.MainSyncedState.useMainSyncedState {
-            initial = [||]
-            load =
-                fun () -> promise {
-                    match! loadFileTreeSnapshot () with
-                    | Ok fileTreeDict -> return fileTreeFromDictionary fileTreeDict
-                    | Error ex -> return raise ex
-                }
-            subscribe =
-                fun setFileTree ->
-                    Renderer.IpcReceiver.subscribeProxyReceiver<IFileTreeRendererApi> {
-                        fileTreeUpdate = fileTreeFromDictionary >> setFileTree
-                    }
-            onError = fun ex -> console.error ("Failed to load file tree snapshot.", ex.Message)
-            dependencies = [||]
-        }
+    let fileTree = useFileTreeState loadFileTreeSnapshot
 
-    let fileState =
-        React.useMemo (
-            (fun _ -> {
-                FileTree = fileTree.state
-                Selection = selection
-            }),
-            [| box fileTree.state; box selection |]
-        )
+    let fileState = {
+        FileTree = fileTree.entries
+        FileTreeRoot = fileTree.root
+        TryFindFileTreeEntry = fileTree.tryFind
+        IsFileTreeDirectory = fun path -> fileTree.tryFind path |> Option.exists _.isDirectory
+        Selection = selection
+    }
 
     let activeFileImport =
         Renderer.MainSyncedState.useMainSyncedState {
@@ -163,27 +149,17 @@ let FileStateCtxProviderWithSnapshots
                 return Error ex
     }
 
-    let fileStateCtx: FileStateController =
-        React.useMemo (
-            (fun _ -> {
-                state = fileState
-                fileTreeIsLoading = fileTree.isLoading
-                refreshFileTree = fileTree.refresh
-                setSelection = fun selection -> setSelectionState (fun _ -> selection |> ArcSelection.normalize)
-                updateSelection =
-                    fun update ->
-                        setSelectionState (fun currentSelection -> update currentSelection |> ArcSelection.normalize)
-                activeFileImport = activeFileImport.state
-                isCancellingFileImport = isCancellingFileImport
-                importExternalFiles = importExternalFiles
-                cancelFileImport = cancelFileImport
-            }),
-            [|
-                box fileState
-                box fileTree.isLoading
-                box activeFileImport.state
-                box isCancellingFileImport
-            |]
-        )
+    let fileStateCtx: FileStateController = {
+        state = fileState
+        fileTreeIsLoading = fileTree.isLoading
+        refreshFileTree = fileTree.refresh
+        setSelection = fun selection -> setSelectionState (fun _ -> selection |> ArcSelection.normalize)
+        updateSelection =
+            fun update -> setSelectionState (fun currentSelection -> update currentSelection |> ArcSelection.normalize)
+        activeFileImport = activeFileImport.state
+        isCancellingFileImport = isCancellingFileImport
+        importExternalFiles = importExternalFiles
+        cancelFileImport = cancelFileImport
+    }
 
     FileStateCtx.Provider(fileStateCtx, children)

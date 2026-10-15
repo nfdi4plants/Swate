@@ -447,7 +447,7 @@ Vitest.describe (
 
                 protectedPaths
                 |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) (Some path)
+                    let item = createFolderItem (PathHelpers.getFileName path) (Some path)
 
                     let menuItemLabels =
                         createComposedContextMenuItems (createContextMenuConfig ()) item

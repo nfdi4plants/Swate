@@ -191,7 +191,7 @@ module ArcRenameHelper =
                         match tryBuildRenameTargetPath sourcePath request.newName with
                         | Error targetPathError -> return Error(exn targetPathError)
                         | Ok targetPath ->
-                            let targetIdentifier = PathHelpers.getNameFromPath targetPath
+                            let targetIdentifier = PathHelpers.getFileName targetPath
 
                             return!
                                 renameResolvedArcEntityAsync

@@ -5,6 +5,7 @@ export default defineConfig({
     resolve: {
         alias: {
             electron: fileURLToPath(new URL("./electron.mock.mts", import.meta.url)),
+            chokidar: fileURLToPath(new URL("../../src/node_modules/chokidar/index.js", import.meta.url)),
         },
     },
     test: {

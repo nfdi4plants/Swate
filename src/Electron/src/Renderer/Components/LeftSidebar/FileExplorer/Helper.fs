@@ -194,7 +194,7 @@ let tryGetInlineArcCreateKind (rootPath: string) (item: FileItem) =
     else
         match item.Path with
         | Some path when getPathDepth path = getPathDepth rootPath + 1 ->
-            let folderName = PathHelpers.getNameFromPath path
+            let folderName = PathHelpers.getFileName path
 
             arcCreateKinds
             |> List.tryFind (fun config ->
