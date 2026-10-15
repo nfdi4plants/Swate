@@ -10,7 +10,6 @@ module Elk =
     type ElkLayoutOptions = obj
 
     // Input shapes. They are created with jsOptions, so the JS object holds exactly the fields that were set.
-    // ELK reads a present but undefined field differently from an absent one for some options.
 
     [<AllowNullLiteral>]
     type ElkLabel =
@@ -102,7 +101,7 @@ module Elk =
 
     /// An edge from one source to one target. The labels field is only present when labels is not empty.
     let edge (id: string) (source: string) (target: string) (labels: ElkLabel[]) : ElkEdge =
-        // jsOptions only compiles plain assignments, so the two shapes are built separately.
+        // An `if` inside the jsOptions lambda was dropped from the generated code, so the two shapes are built separately.
         if labels.Length = 0 then
             jsOptions<ElkEdge> (fun e ->
                 e.id <- id

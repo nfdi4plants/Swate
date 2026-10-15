@@ -2,8 +2,8 @@ module Swate.Components.Composite.GraphCanvas.Types
 
 open Fable.Core
 
-// Input of the graph canvas and the result of its layout. Colors name the kind of a provenance dataset,
-// pill categories name the kind of an annotation. Everything else is plain data.
+// Input of the graph canvas and the result of its layout. A color picks the palette entry of a node or
+// edge, a pill category picks the color of a pill. Everything else is plain data.
 
 /// Width in px of a text: text, font weight, font size in px, monospace. A real measure sets the font on a
 /// canvas, a test measure can ignore the last three arguments.
@@ -176,8 +176,8 @@ type GraphLayout = {
 /// Portrait selects the compact layout.
 type LayoutOptions = { Width: float; Portrait: bool }
 
-/// The position and size of the box, as read from the DOM. Portrait is offsetHeight > offsetWidth of the
-/// border box, so a scrollbar does not change it.
+/// The size of the box, as read from the DOM. Portrait is the result of Layout.isPortrait, so it is false
+/// while the box is unmeasured. It follows the border box, so a scrollbar does not change it.
 type MeasuredBox = {
     ClientWidth: float
     ClientHeight: float
@@ -236,12 +236,25 @@ let palette: (string * string) list = [
     "--prov-other", "color-mix(in oklch, var(--color-base-content) 60%, transparent)"
 ]
 
+/// Border of neutral nodes, pills, the pill list and the zoom controls. Base content at 50 percent reaches
+/// a contrast of 3 to 1 on base-100 and base-200 in the sunrise and finster themes.
+let neutralBorder =
+    "color-mix(in oklch, var(--color-base-content) 50%, transparent)"
+
+/// Stroke and border of selected nodes, highlighted edges, the accent arrow and highlighted process pills.
+/// Primary mixed with base content reaches more contrast than primary alone on a light background.
+let accentColor =
+    "color-mix(in oklch, var(--color-primary) 70%, var(--color-base-content))"
+
+/// Stroke of neutral edges and their arrows. Text stays at full base content.
+let neutralEdge = "color-mix(in oklch, var(--color-base-content) 55%, transparent)"
+
 let colorVar (color: CanvasColor) : string =
     match color with
     | CanvasColor.Study -> "var(--prov-study)"
     | CanvasColor.Assay -> "var(--prov-assay)"
     | CanvasColor.Run -> "var(--prov-run)"
-    | CanvasColor.Neutral -> "var(--color-base-content)"
+    | CanvasColor.Neutral -> neutralEdge
 
 let categoryVar (category: PillCategory) : string =
     match category with

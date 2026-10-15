@@ -77,6 +77,7 @@
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Elk.fs" />
     <Compile Include="JsBindings\Dom.fs" />
+    <Compile Include="JsBindings\ReactHooks.fs" />
     <Compile Include="Util\Download.fs" />
     <Compile Include="Util\SemVer.fs" />
     <Compile Include="Util\SemVer.test.fs" />
@@ -267,6 +268,8 @@
     <Compile Include="Composite\GraphCanvas\Pills.test.fs" />
     <Compile Include="Composite\GraphCanvas\Layout.fs" />
     <Compile Include="Composite\GraphCanvas\Layout.test.fs" />
+    <Compile Include="Composite\GraphCanvas\GraphCanvas.fs" />
+    <Compile Include="Composite\GraphCanvas\GraphCanvas.test.rtl.fs" />
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
     <Compile Include="Page\ProvenanceGrouping\ViewSupport.fs" />

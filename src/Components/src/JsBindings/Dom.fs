@@ -42,7 +42,9 @@ module Dom =
     /// Width of a text without a canvas. Every character counts 7 px, which keeps layouts deterministic.
     let estimateTextWidth (text: string) : float = float text.Length * 7.0
 
-    let private monoFamily =
+    /// The monospace font stack of createTextMeasure. Elements that draw mono text use it too, so the
+    /// drawn text has the width that was measured.
+    let monoFamily =
         "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
 
     /// Creates a text measure: text, font weight, font size in px and monospace, to the width in px.
@@ -61,6 +63,13 @@ module Dom =
 
     [<Emit("getComputedStyle($0).fontFamily")>]
     let computedFontFamily (el: Element) : string = jsNative
+
+    [<Emit("$0.isConnected")>]
+    let isConnected (el: Element) : bool = jsNative
+
+    /// Sets one inline style property by its CSS name, such as "max-width".
+    [<Emit("$0.style.setProperty($1, $2)")>]
+    let setStyleProperty (el: HTMLElement) (name: string) (value: string) : unit = jsNative
 
     [<Emit("$0.focus({ preventScroll: true })")>]
     let focusWithoutScroll (el: HTMLElement) : unit = jsNative
