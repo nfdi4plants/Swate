@@ -61,7 +61,7 @@ let nameSearchUrl query start =
     + "&rows=10&start="
     + string (max 0 start)
 
-/// Apply writes the given and family names, so the preview shows those before the credit name.
+/// Labels a result button. It prefers the given and family names, then the credit name, then the iD.
 let fullName (result: PersonResult) =
     [ result.firstName; result.lastName ]
     |> List.choose nonblank
@@ -86,7 +86,7 @@ let mapOrcidPerson orcid (person: OrcidPerson option) (employments: OrcidEmploym
         |> Option.bind (fun emails -> emails.email)
         |> Option.defaultValue [||]
 
-    // A group holds the same employment as reported by different sources, and ORCID lists the preferred one first.
+    // A group holds the same employment as reported by different sources. Using its first summary keeps each employer once.
     // Only current employments describe the affiliation. Each one reads "Department, Organization".
     let affiliation =
         employments
