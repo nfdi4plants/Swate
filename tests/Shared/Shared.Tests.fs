@@ -18,4 +18,6 @@ let shared =
         GitLfsRulesTests.tests
         ProvenanceGroupingTests.tests
         ProvenanceGroupingARCtrlConverterTests.tests
+        ProvenanceGraphBuildIndexTests.tests
+        ProvenanceGraphQueriesTests.tests
     ]

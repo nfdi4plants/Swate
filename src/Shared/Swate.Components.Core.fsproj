@@ -35,6 +35,9 @@
     <Compile Include="ProvenanceGrouping\Session.fs" />
     <Compile Include="ProvenanceGrouping\ARCtrlConverter.fs" />
     <Compile Include="ProvenanceGrouping\Fixtures.fs" />
+    <Compile Include="ProvenanceGraph\Types.fs" />
+    <Compile Include="ProvenanceGraph\BuildIndex.fs" />
+    <Compile Include="ProvenanceGraph\Queries.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
 
