@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.6.0 - 2026-10-15
+
 ### ✨ Added
 
 - The first upload of an ARC to DataHUB asks whether the repository goes to your own account or to one of your groups. The question only appears when at least one of your groups accepts new repositories. Groups where you can't create repositories are listed but disabled, with the reason next to them. #1404 (by @caroott)
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add search options for ORCID as well as name for authors. #501, #763 (by @Freymaurer)
 - Enable the creation of a missing README.md file in the root of an ARC, and in any folder where you can create files. Once created, a README.md can't be renamed or deleted in Swate. #1396, #1406 (by @Etschbeijer)
 - Added that right-clicking the studies, assays, workflows or runs folder offers "New File". Also, files there need a file extension now, for example "notes.md", so Swate can't mistake them for a study, assay, workflow or run. #1396, #1406 (by @Etschbeijer)
+- The new "Provenance Graph" button in the left sidebar shows how samples and data flow through the studies, assays and runs of the open ARC, down to the lineage of a single sample. #1412 (by @caroott)
 
 ### 🐛 Fixed
 
