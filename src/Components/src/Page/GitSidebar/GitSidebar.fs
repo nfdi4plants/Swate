@@ -1824,6 +1824,8 @@ type GitSidebar =
                             props.IsBusy
                             || String.IsNullOrWhiteSpace normalizedInput
                             || (hasOwners && not selectedOwnerIsEnabled)
+                            // Without an owner to change, the same name would only be refused again.
+                            || (not hasOwners && keepsName)
                         )
                         prop.text (
                             if hasOwners && keepsName then

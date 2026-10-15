@@ -828,7 +828,7 @@ export const PublishOwnerPrompt: Story = {
   },
 };
 
-export const PublishOwnerPromptWithoutPersonalOwner: Story = {
+export const PublishOwnerPromptWithDisabledPersonalOwner: Story = {
   args: {
     ...PublishOwnerPrompt.args,
     publishRenamePrompt: {

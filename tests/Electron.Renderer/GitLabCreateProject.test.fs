@@ -103,10 +103,10 @@ Vitest.describe (
             "reports a namespace error as not allowed whatever the status is",
             fun () ->
                 classifyCreateProjectFailure 400 """{"message":{"namespace":["is not valid"]}}"""
-                |> expectNotAllowed (Some "is not valid")
+                |> expectNotAllowed None
 
                 classifyCreateProjectFailure 404 """{"message":{"namespace":["is not valid","is missing"]}}"""
-                |> expectNotAllowed (Some "is not valid; is missing")
+                |> expectNotAllowed None
         )
 
         Vitest.test (

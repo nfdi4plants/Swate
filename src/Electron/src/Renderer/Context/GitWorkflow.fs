@@ -158,7 +158,8 @@ type GitState = {
     PendingConfirmation: GitSidebarConfirmationDialog option
     PendingRemoteAction: GitPendingRemoteAction
     PendingPublishRename: GitPublishRenamePrompt option
-    /// The owners of the open upload dialog. None when no dialog asked for an owner.
+    /// The owners the upload dialog offered, kept until the publish it started completes. None
+    /// when no dialog asked for an owner.
     PublishOwners: GitPublishOwner[] option
     /// The owner the next project creation uses, set when the upload dialog is submitted.
     PublishOwnerChoice: GitPublishOwner option
@@ -3727,8 +3728,8 @@ let private runPublishAsync
                     | Error(CreateProjectError.NameRefused _) ->
                         return Error(PublishFailure.ProjectNameRefused projectNameRefusedMessage)
                     | Error(CreateProjectError.NotAllowed details) ->
-                        // GitLab's text for a group only says the namespace is not valid. Its text for the
-                        // personal namespace can name a project limit, which the user can act on.
+                        // GitLab's 403 text for the personal namespace can name a project limit, which the
+                        // user can act on. A group refusal carries no text worth showing.
                         let message =
                             match owner, details with
                             | Some { NamespaceId = Some _; Label = label }, _ ->
@@ -6086,7 +6087,8 @@ let update
     : GitState * Cmd<Msg> =
     let next, cmd = updateCore deps setPageState msg model
 
-    // A publish consumes the owner choice. Only the reprompt keeps the owners for the next try.
+    // A publish consumes the owner choice. A write that opens the upload dialog again keeps the
+    // owners for the next try.
     // A completion of an outdated write is dropped by updateCore and leaves the owners alone.
     let next =
         match msg with

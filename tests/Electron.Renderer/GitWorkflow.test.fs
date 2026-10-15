@@ -10593,12 +10593,16 @@ Vitest.describe (
 
                 Vitest.expect(input.value).toBe ("Existing ARC")
 
-                setInputValue input "Renamed ARC"
-                do! Promise.sleep 0
-
                 let submitButton =
                     document.body.querySelector ("[data-testid='GitSidebarPublishRenameSubmit']") :?> HTMLButtonElement
 
+                // The refused name can't be sent again unchanged.
+                Vitest.expect(submitButton.disabled).toBe (true)
+
+                setInputValue input "Renamed ARC"
+                do! Promise.sleep 0
+
+                Vitest.expect(submitButton.disabled).toBe (false)
                 submitButton.click ()
                 do! Promise.sleep 0
 

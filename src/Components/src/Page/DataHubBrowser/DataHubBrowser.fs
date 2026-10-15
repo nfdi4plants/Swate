@@ -161,6 +161,8 @@ type DataHubBrowser =
 
     [<ReactComponent>]
     static member private Tabs(tab, setTab, isAuthenticated) =
+        let tooltipIdPrefix = React.useId ()
+
         Html.div [
             prop.testId "GitLabExploreTabs"
             prop.role.tabList
@@ -178,13 +180,18 @@ type DataHubBrowser =
                         (not isAuthenticated)
                         && (mode = ExploreTab.YourRepos || mode = ExploreTab.YourOrganisations)
 
+                    let tooltipId = $"{tooltipIdPrefix}-{tid}-tooltip"
+
                     // daisyUI styles a tab only when it is a direct child of the tabs container,
                     // so the tooltip classes go on the tab itself.
                     Html.a [
                         prop.testId ("GitLabExploreTab-" + tid)
                         prop.tabIndex 0
                         // The label keeps the tooltip text out of the accessible name of the tab.
+                        // A restricted tab gets the tooltip as its description instead.
                         prop.ariaLabel label
+                        if isRestricted then
+                            prop.ariaDescribedBy tooltipId
                         prop.custom ("aria-disabled", if isRestricted then "true" else "false")
                         prop.className [
                             "swt:tab"
@@ -201,6 +208,7 @@ type DataHubBrowser =
                         prop.children [
                             if isRestricted then
                                 Html.div [
+                                    prop.id tooltipId
                                     prop.className "swt:tooltip-content"
                                     prop.text "Log in to access this tab"
                                 ]
