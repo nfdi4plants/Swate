@@ -14,12 +14,12 @@ type private LoadState =
     | Failed of string
     | Loaded of ProvenanceIndex
 
-/// An alert with an icon, what failed and a hint. The page shows the ARC as it was when it opened, so the hint
-/// sends the user to open the graph again after a fix.
+/// An alert with an icon, what failed and a hint. A page open shows the ARC as it was at that time, so the hint
+/// sends the user to close the graph and open it again after a fix.
 [<ReactComponent>]
 let private ErrorAlert (message: string) =
     Html.div [
-        prop.className "swt:p-3"
+        prop.className "swt:w-full swt:min-w-0 swt:p-3"
         prop.testId "provenance-graph-error"
         prop.children [
             Html.div [
@@ -33,8 +33,7 @@ let private ErrorAlert (message: string) =
                         Html.p [ prop.className "swt:m-0"; prop.text message ]
                         Html.p [
                             prop.className "swt:m-0 swt:text-xs"
-                            prop.text
-                                "The graph shows the ARC as it was when this page opened. After you fix the ARC, open the graph again."
+                            prop.text "After you fix the ARC, close and open the graph again."
                         ]
                     ]
                 ]
@@ -42,10 +41,8 @@ let private ErrorAlert (message: string) =
         ]
     ]
 
-/// Loads the provenance data once per page open and shows the graph. A failure stays in the page: a load error
-/// and an error while the page renders show their message. The app around the page keeps working. Opening the
-/// page again mounts it new (see the request id of the page state), so every open starts with a fresh load, a
-/// fresh index and a fresh error state.
+/// Loads the provenance data once per page open and shows the graph. A load error shows its message in the page.
+/// The page catches the errors of its views itself. The app around the page keeps working.
 [<ReactComponent(true)>]
 let ProvenanceGraphTarget () =
     let state, setState = React.useState LoadState.Loading
@@ -93,10 +90,19 @@ let ProvenanceGraphTarget () =
     Html.div [
         prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
         prop.testId "provenance-graph-page"
-        prop.children [
+        prop.children [ content ]
+    ]
+
+/// The main content area of the provenance graph page. The request id changes with every open of the page, and a
+/// new id mounts everything inside again, so every open starts from scratch. The boundary catches what the
+/// target cannot catch itself, such as a chunk of the lazy target that fails to load, and shows what failed.
+let ProvenanceGraphArea (requestId: string) (content: ReactElement) : ReactElement =
+    React.KeyedFragment(
+        requestId,
+        [
             ErrorBoundary.ErrorBoundary(
                 content,
-                (fun error _ -> ErrorAlert $"The provenance graph could not be shown: {error.Message}")
+                (fun error -> ErrorAlert $"The provenance graph could not be shown: {error.Message}")
             )
         ]
-    ]
+    )

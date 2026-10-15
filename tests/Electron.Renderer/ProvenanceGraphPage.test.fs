@@ -8,7 +8,9 @@ module ElectronRenderer.ProvenanceGraphPageTests
 // gets it over IPC. A second test checks that the page leaves a focus that the user set alone when the parent
 // renders again, which needs a ref callback with a stable identity. A third test renders the target of the
 // renderer with a stub for the IPC call and checks that a failed load shows its message. A fourth test does
-// the same for a page that cannot show the loaded data.
+// the same for a page that cannot show the loaded data. A fifth test opens the page again with a new request
+// id after a failed load, like the sidebar button does, and expects a new load that succeeds. A sixth test
+// checks the boundary of the area around a content that throws.
 
 open Browser.Dom
 open Browser.Types
@@ -187,6 +189,33 @@ let private crumbCount (container: HTMLElement) : int =
 
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
 
+[<Emit("""(() => {
+    globalThis.__provenancePageOriginalError = console.error;
+    console.error = () => {};
+})()""")>]
+let private silenceConsoleError () : unit = jsNative
+
+[<Emit("(globalThis.__provenancePageOriginalError && (console.error = globalThis.__provenancePageOriginalError), delete globalThis.__provenancePageOriginalError)")>]
+let private restoreConsoleError () : unit = jsNative
+
+/// The area of the page for the request id of the state. The button opens the page again with the next id.
+[<ReactComponent>]
+let private Reopen () =
+    let requestId, setRequestId = React.useState "1"
+
+    Html.div [
+        Html.button [
+            prop.testId "reopen"
+            prop.onClick (fun _ -> setRequestId "2")
+        ]
+        Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphArea
+            requestId
+            (Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphTarget())
+    ]
+
+[<ReactComponent>]
+let private Throws () : ReactElement = failwith "The content failed."
+
 Vitest.describe (
     "ProvenanceGraph page without the React compiler",
     fun () ->
@@ -339,4 +368,60 @@ Vitest.describe (
                     cleanup ()
             }
         )
+
+        Vitest.test (
+            "loads again and shows the data when the page is opened again after a failed load",
+            TestOptions(timeout = 60000),
+            fun () -> promise {
+                // The first load fails. The new request id of the next open mounts the target again.
+                let data = buildData ()
+                loadCalls <- 0
+
+                loadAnswer <-
+                    fun call ->
+                        if call = 1 then
+                            promise { return failwith "The bridge is down." }
+                        else
+                            promise { return Ok data }
+
+                let! container, cleanup = renderToBody (Reopen())
+
+                try
+                    do! waitUntil "the load error" (fun () -> present container "provenance-graph-error") 500
+                    Vitest.expect(loadCalls).toBe 1
+
+                    dispatchClick (find container "reopen")
+                    do! waitUntil "the datasets" (fun () -> present container "graph-node-assays/Empty/") 500
+
+                    Vitest.expect(loadCalls).toBe 2
+                    Vitest.expect(present container "provenance-graph-error").toBe false
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "shows the message of a content that throws inside the area",
+            TestOptions(timeout = 60000),
+            fun () -> promise {
+                silenceConsoleError ()
+
+                let! container, cleanup =
+                    renderToBody (
+                        Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphArea "1" (Throws())
+                    )
+
+                try
+                    do! waitUntil "the alert" (fun () -> present container "provenance-graph-error") 500
+
+                    Vitest
+                        .expect((find container "provenance-graph-error").textContent.Contains "The content failed.")
+                        .toBe
+                        true
+                finally
+                    cleanup ()
+                    restoreConsoleError ()
+            }
+        )
+
 )

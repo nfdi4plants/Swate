@@ -140,16 +140,13 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
                     | Some _, Some(PageState.ProvenanceGraphPage requestId) ->
-                        // A new request id mounts the page again, so every open of the page starts from scratch.
-                        React.KeyedFragment(
-                            requestId,
-                            [
-                                React.Suspense(
-                                    [ LazyComponents.ProvenanceGraphTarget() ],
-                                    fallback = LazyComponents.FullPageLoadingSpinner("Loading provenance graph...")
-                                )
-                            ]
-                        )
+                        // The boundary also covers the lazy import, which fails outside of the target.
+                        ProvenanceGraphTarget.ProvenanceGraphArea
+                            requestId
+                            (React.Suspense(
+                                [ LazyComponents.ProvenanceGraphTarget() ],
+                                fallback = LazyComponents.FullPageLoadingSpinner("Loading provenance graph...")
+                            ))
                     | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
