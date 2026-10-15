@@ -775,7 +775,7 @@ Vitest.describe (
 
                 // The detail view holds the inputs of the unfinished rows next to the finished row.
                 do! open' (extractionOfDraft + "#in0") "leaf-2"
-                Vitest.expect(counts ()).toEqual ("2", "1")
+                Vitest.expect(counts ()).toEqual ("2", "0")
                 Vitest.expect(present (maybeTestId "graph-node-leaf-3")).toBe true
                 Vitest.expect(present (maybeTestId "graph-node-extract-1")).toBe true
 
@@ -919,6 +919,9 @@ Vitest.describe (
                 Vitest.expect(present (maybeTestId "graph-canvas")).toBe false
                 Vitest.expect(crumbCount ()).toBe 4
 
+                // The clicked node is gone, so the alert has the focus.
+                Vitest.expect(isFocused (byTestId "provenance-error")).toBe true
+
                 // The crumb before it leads back to a view that works.
                 click (byTestId "provenance-crumb-2")
                 do! waitNode inputGroup
@@ -944,6 +947,9 @@ Vitest.describe (
 
                 Vitest.expect((byTestId "provenance-error-message").textContent <> "").toBe true
                 Vitest.expect(crumbCount ()).toBe 4
+
+                // The alert of the boundary has the focus as well.
+                Vitest.expect(isFocused (byTestId "provenance-error")).toBe true
 
                 // A new view clears the error, and the canvas works again.
                 click (byTestId "provenance-crumb-2")

@@ -499,10 +499,45 @@ let countIncomplete (rows: seq<ProvenanceRow>) : IncompleteRows =
         MissingInputs = missingInputs
     }
 
+/// The rows that the lineage walk of a node reaches. Upstream it follows the rows that produce a node and then
+/// the inputs of those rows. Downstream it follows the rows that consume a node and then their outputs. A row
+/// that only shares a node with the walk, such as another consumer of an upstream node, is not part of it.
+let private walkedRows (index: ProvenanceIndex) (startId: string) : ProvenanceRow[] =
+    let walk (rowIdsByNode: Dictionary<string, string[]>) (farIds: ProvenanceRow -> string[]) : ProvenanceRow[] =
+        let queue = ResizeArray<string>()
+        let visited = HashSet<string>()
+        let rows = ResizeArray<ProvenanceRow>()
+        queue.Add startId
+        visited.Add startId |> ignore
+        let mutable position = 0
+
+        // The queue grows while the loop runs.
+        while position < queue.Count do
+            match rowIdsByNode.TryGetValue queue.[position] with
+            | true, rowIds ->
+                for rowId in rowIds do
+                    match index.RowById.TryGetValue rowId with
+                    | true, row ->
+                        rows.Add row
+
+                        for id in farIds row do
+                            if visited.Add id then
+                                queue.Add id
+                    | _ -> ()
+            | _ -> ()
+
+            position <- position + 1
+
+        rows.ToArray()
+
+    Array.append (walk index.ProducedBy (fun row -> row.Inputs)) (walk index.ConsumedBy (fun row -> row.Outputs))
+    |> Array.distinctBy (fun row -> row.Id)
+
 /// The incomplete rows that belong to a view: all rows in the datasets view, the rows of the dataset in the
-/// processes view, the rows of the process in the groups view, the rows of the signatures of the selected group
-/// in the detail view, and the rows that touch a node of the lineage graph in the lineage view. The lineage view
-/// needs its graph, which the caller has after the cut. An id that the index does not know counts no row.
+/// processes view, and the rows of the process in the groups view. The detail view counts the rows that the
+/// detail graph shows, the rows of the process that have a member of the selected group on the side of the group.
+/// The lineage view counts the rows of the walk from the node of the lineage graph that touch a node of that
+/// graph. The caller has the graph after the cut. An id that the index does not know counts no row.
 let incompleteRows
     (index: ProvenanceIndex)
     (view: ProvenanceView)
@@ -512,11 +547,6 @@ let incompleteRows
         match index.RowById.TryGetValue rowId with
         | true, row -> Some row
         | _ -> None
-
-    let rowsOfNode (lookup: Dictionary<string, string[]>) (nodeId: string) : string[] =
-        match lookup.TryGetValue nodeId with
-        | true, rowIds -> rowIds
-        | _ -> [||]
 
     match view with
     | ProvenanceView.Datasets -> countIncomplete index.Rows
@@ -531,30 +561,30 @@ let incompleteRows
     | ProvenanceView.Detail(_, processKey, groupId) ->
         match index.ProcessByKey.TryGetValue processKey, index.GroupById.TryGetValue groupId with
         | (true, p), (true, group) ->
-            let signatureIds = HashSet<string>(group.SignatureIds)
+            let members = HashSet<string>(group.NodeIds)
 
-            p.Signatures
-            |> Array.filter (fun signature -> signatureIds.Contains signature.Id)
-            |> Array.collect (fun signature -> signature.RowIds)
+            let idsOnSide (row: ProvenanceRow) =
+                match group.Side with
+                | IoSide.Inputs -> row.Inputs
+                | IoSide.Outputs -> row.Outputs
+
+            p.RowIds
             |> Array.choose rowOf
+            |> Array.filter (fun row -> idsOnSide row |> Array.exists members.Contains)
             |> countIncomplete
         | _ -> countIncomplete []
     | ProvenanceView.Lineage _ ->
         match lineageGraph with
         | None -> countIncomplete []
         | Some graph ->
-            // An unfinished row hangs on the node it has. The same row can touch several nodes of the graph.
-            let seen = HashSet<string>()
-            let rows = ResizeArray<ProvenanceRow>()
+            let shown = HashSet<string>(graph.Nodes |> Array.map (fun node -> node.Id))
 
-            for node in graph.Nodes do
-                for rowId in Array.append (rowsOfNode index.ProducedBy node.Id) (rowsOfNode index.ConsumedBy node.Id) do
-                    if seen.Add rowId then
-                        match rowOf rowId with
-                        | Some row -> rows.Add row
-                        | None -> ()
-
-            countIncomplete rows
+            walkedRows index graph.NodeId
+            |> Array.filter (fun row ->
+                Array.exists shown.Contains row.Inputs
+                || Array.exists shown.Contains row.Outputs
+            )
+            |> countIncomplete
 
 /// The note for unfinished rows, such as "3 rows have no output yet". Empty when no row is unfinished.
 let incompleteNote (counts: IncompleteRows) : string =

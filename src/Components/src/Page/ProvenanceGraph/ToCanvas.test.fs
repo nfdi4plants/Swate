@@ -1067,17 +1067,26 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "counts the rows of the process in the groups and detail views",
+            "counts the rows of the process in the groups view and the rows of the group in the detail view",
             fun () ->
                 let groups = ProvenanceView.Groups(draft, extractionOfDraft)
 
                 let detail =
                     ProvenanceView.Detail(draft, extractionOfDraft, extractionOfDraft + "#in0")
 
+                let outputDetail =
+                    ProvenanceView.Detail(draft, extractionOfDraft, extractionOfDraft + "#out0")
+
                 let planned = ProvenanceView.Groups(draft, plannedOfDraft)
 
                 Vitest.expect(counts (incompleteRows wip groups None)).toEqual (2, 1)
-                Vitest.expect(counts (incompleteRows wip detail None)).toEqual (2, 1)
+
+                // The input group holds leaf-1 to leaf-3, so its detail shows the rows of those inputs. The row
+                // without an input is not among them, and no shown row lacks an input.
+                Vitest.expect(counts (incompleteRows wip detail None)).toEqual (2, 0)
+
+                // The output group holds extract-1 and extract-4. The rows without an output are not shown.
+                Vitest.expect(counts (incompleteRows wip outputDetail None)).toEqual (0, 1)
                 Vitest.expect(counts (incompleteRows wip planned None)).toEqual (2, 2)
                 Vitest.expect(counts (incompleteRows wip (ProvenanceView.Groups(draft, "nope")) None)).toEqual (0, 0)
         )
@@ -1148,6 +1157,51 @@ Vitest.describe (
                 // The finished row connects leaf-1 and extract-1 and counts nothing.
                 let finished = (lineage wip "leaf-1").Value
                 Vitest.expect(counts (incompleteRows wip view (Some finished))).toEqual (0, 0)
+        )
+
+        Vitest.test (
+            "counts only the rows that the lineage walk reaches",
+            fun () ->
+                let dataset = "assays/Extraction/"
+                let extractionProcess = "assays/Extraction/::Extraction"
+
+                // Another row consumes leaf-1 and has no output. The lineage of extract-1 passes leaf-1 upstream.
+                let sibling: ProvenanceRow = {
+                    Id = "sibling"
+                    Name = "sibling"
+                    ProcessKey = extractionProcess
+                    DatasetId = dataset
+                    Inputs = [| "leaf-1" |]
+                    Outputs = [||]
+                    Annotations = [||]
+                }
+
+                let rowById =
+                    System.Collections.Generic.Dictionary<string, ProvenanceRow>(Sample.index.RowById)
+
+                rowById.[sibling.Id] <- sibling
+
+                let consumedBy =
+                    System.Collections.Generic.Dictionary<string, string[]>(Sample.index.ConsumedBy)
+
+                consumedBy.["leaf-1"] <- Array.append consumedBy.["leaf-1"] [| sibling.Id |]
+
+                let unfinished = {
+                    Sample.index with
+                        RowById = rowById
+                        ConsumedBy = consumedBy
+                }
+
+                let viewOf (nodeId: string) =
+                    ProvenanceView.Lineage(dataset, extractionProcess, extractionProcess + "#in0", nodeId)
+
+                // The walk upstream follows the rows that produce a node, so the sibling is not part of it.
+                let upstream = (lineage unfinished "extract-1").Value
+                Vitest.expect(counts (incompleteRows unfinished (viewOf "extract-1") (Some upstream))).toEqual (0, 0)
+
+                // The walk downstream from leaf-1 follows the rows that consume it, and the sibling is one of them.
+                let downstream = (lineage unfinished "leaf-1").Value
+                Vitest.expect(counts (incompleteRows unfinished (viewOf "leaf-1") (Some downstream))).toEqual (1, 0)
         )
 
         Vitest.test (

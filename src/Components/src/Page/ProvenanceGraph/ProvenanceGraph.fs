@@ -4,8 +4,8 @@ open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components
 open Swate.Components.JsBindings
-open Swate.Components.JsBindings.ReactHooks
 open Swate.Components.Primitive.ErrorBoundary
 open Swate.Components.Composite.GraphCanvas
 open Swate.Components.Composite.GraphCanvas.Types
@@ -192,13 +192,20 @@ type ProvenanceGraph =
         ]
 
     /// The alert of a view that could not be shown. The message comes from the error. The page shows the ARC as it
-    /// was when it opened, so the hint sends the user to open the graph again after a fix.
+    /// was when it opened, so the hint sends the user to close the graph and open it again after a fix. After a
+    /// navigation the alert takes the focus, because the clicked node or crumb is gone.
     [<ReactComponent>]
-    static member private ErrorAlert(message: string) =
+    static member private ErrorAlert(message: string, ?focusRef: Element -> unit) =
         Html.div [
             prop.testId "provenance-error"
             prop.role.alert
             prop.className "swt:alert swt:alert-error swt:m-3 swt:flex-none"
+            prop.tabIndex -1
+
+            match focusRef with
+            | Some focus -> prop.ref focus
+            | None -> ()
+
             prop.children [
                 Html.i [
                     prop.className "swt:iconify swt:fluent--error-circle-24-regular swt:size-5"
@@ -216,7 +223,7 @@ type ProvenanceGraph =
                     Html.p [
                         prop.className "swt:m-0 swt:text-xs"
                         prop.text
-                            "The graph shows the ARC as it was when this page opened. After you fix the ARC, open the graph again."
+                            "The graph shows the ARC as it was when this page opened. After you fix the ARC, close and open the graph again."
                     ]
                 ]
             ]
@@ -288,7 +295,7 @@ type ProvenanceGraph =
         let fullRef = React.useRef<HTMLElement option> None
         let narrow, setNarrow = React.useState false
 
-        useLayoutEffectWithCleanup (
+        ReactHooks.useLayoutEffectWithCleanup (
             (fun () ->
                 match boxRef.current, fullRef.current with
                 | Some measuredBox, Some full when Dom.ResizeObserver.isAvailable ->
@@ -539,6 +546,9 @@ type ProvenanceGraph =
                 [||]
             )
 
+        // The alert of a failed view takes the focus after a navigation, like the empty message does.
+        let alertFocus = if navigated then Some focusRef else None
+
         // The children carry keys, so the canvas keeps its place when a note or the hint comes and goes. Without
         // them the position of the canvas shifts, React mounts it again and the zoom is lost.
         let body =
@@ -558,7 +568,13 @@ type ProvenanceGraph =
                     | _ -> ()
 
                     match empty, content with
-                    | _, Content.Failed message -> React.KeyedFragment("error", [ ProvenanceGraph.ErrorAlert message ])
+                    | _, Content.Failed message ->
+                        React.KeyedFragment(
+                            "error",
+                            [
+                                ProvenanceGraph.ErrorAlert(message, ?focusRef = alertFocus)
+                            ]
+                        )
                     | None, Content.Graph shown ->
                         Html.div [
                             prop.key "canvas"
@@ -630,7 +646,7 @@ type ProvenanceGraph =
                 // view clears the error.
                 ErrorBoundary.ErrorBoundary(
                     body,
-                    (fun error _ -> ProvenanceGraph.ErrorAlert error.Message),
+                    (fun error -> ProvenanceGraph.ErrorAlert(error.Message, ?focusRef = alertFocus)),
                     resetKey = viewKey
                 )
                 Html.div [
