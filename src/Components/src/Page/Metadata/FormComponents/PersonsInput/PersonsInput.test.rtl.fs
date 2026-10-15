@@ -474,11 +474,14 @@ Vitest.test (
         let pending = Helpers.deferred ()
         let mutable requests = 0
 
+        // Only the stale /person waits, so each request reads its own response body.
         Helpers.stubFetch (fun (url: string) ->
             requests <- requests + 1
 
-            if url.Contains Helpers.orcid then
+            if url.EndsWith $"{Helpers.orcid}/person" then
                 pending.promise
+            elif url.Contains Helpers.orcid then
+                promise { return Helpers.response (Helpers.record "Stale" "Person") 200 }
             else
                 promise { return Helpers.response (Helpers.record "Current" "Person") 200 }
         )
@@ -492,6 +495,7 @@ Vitest.test (
         do! Helpers.singlePreview "Current Person"
         do! RTL.act (fun () -> promise { pending.resolve (Helpers.response (Helpers.record "Stale" "Person") 200) })
         Vitest.expect(RTL.screen.queryByText("Stale Person").IsNone).toBe true
+        Vitest.expect(RTL.screen.queryByRole("alert").IsNone).toBe true
         RTL.screen.getByText "Current Person" |> ignore
     }
 )
@@ -632,7 +636,7 @@ Vitest.test (
 )
 
 Vitest.test (
-    "name search prefills both pending name drafts before the field debounce",
+    "both search actions prefill every pending draft before the field debounce",
     fun () -> promise {
         let mutable requests = 0
 
@@ -641,20 +645,48 @@ Vitest.test (
             return Helpers.response (Helpers.record "Jane" "Smith") 200
         })
 
-        render [ Person(firstName = "Manual", lastName = "Stored") ] ignore
+        render [ Person(firstName = "Manual", lastName = "Stored", orcid = "0000-0001-5109-3700") ] ignore
         RTL.fireEvent.change (RTL.screen.getByDisplayValue "Manual", {| target = {| value = "Ada" |} |})
         RTL.fireEvent.change (RTL.screen.getByDisplayValue "Stored", {| target = {| value = "Lovelace" |} |})
+        RTL.fireEvent.change (RTL.screen.getByDisplayValue "0000-0001-5109-3700", {| target = {| value = Helpers.orcid |} |})
         Helpers.click "Search by name"
 
-        let nameQuery () =
-            (RTL.screen.getByRole ("textbox", ByRoleOptions(name = Text "Person name")) :?> HTMLInputElement).value
+        let queryValue label =
+            (RTL.screen.getByRole ("textbox", ByRoleOptions(name = Text label)) :?> HTMLInputElement).value
+
+        let nameQuery () = queryValue "Person name"
 
         Vitest.expect(nameQuery ()).toBe "Ada Lovelace"
+        Helpers.click "ORCID"
+        Vitest.expect(queryValue "ORCID iD or URL").toBe Helpers.orcid
         Helpers.click "Cancel"
         do! Helpers.expectClosed ()
         Helpers.openSearch ()
         Helpers.click "Name"
         Vitest.expect(nameQuery ()).toBe "Ada Lovelace"
         Vitest.expect(requests).toBe 0
+    }
+)
+
+Vitest.test (
+    "the preview shows a credit name apart from the names Apply writes",
+    fun () -> promise {
+        Helpers.stubFetch (fun (_: string) -> promise {
+            let result = {|
+                Helpers.searchResult Helpers.orcid "" "" with
+                    ``credit-name`` = "A. Lovelace"
+            |}
+
+            return Helpers.response (Helpers.searchPage [| result |] 1) 200
+        })
+
+        render [ Person() ] ignore
+        Helpers.click "Search by name"
+        Helpers.searchName "Lovelace"
+        let! _ = RTL.screen.findByRole ("heading", ByRoleOptions(name = Text "Autofill preview"))
+        RTL.screen.getByText "Credit name" |> ignore
+        RTL.screen.getByText "A. Lovelace" |> ignore
+        // The only "Name" left is the search mode tab.
+        Vitest.expect(RTL.screen.getAllByText("Name").Count).toBe 1
     }
 )

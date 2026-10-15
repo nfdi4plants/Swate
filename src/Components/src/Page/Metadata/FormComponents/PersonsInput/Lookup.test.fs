@@ -77,7 +77,7 @@ Vitest.describe (
 
                 let employments =
                     json<OrcidEmployments>
-                        """{"affiliation-group":[{"summaries":[{"employment-summary":{"organization":{"name":"Example University"},"department-name":"Computing","end-date":null}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Old College"},"department-name":"Computing","end-date":{"year":{"value":"2010"}}}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Institute"}}}]}]}"""
+                        """{"affiliation-group":[{"summaries":[{"employment-summary":{"organization":{"name":"Example University"},"department-name":"Computing","end-date":null}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Old College"},"department-name":"Computing","end-date":{"year":{"value":"2010"}}}}]},{"summaries":[{"employment-summary":{"organization":{"name":"Institute"}}},{"employment-summary":{"organization":{"name":"Institute"},"department-name":"Other source"}}]}]}"""
 
                 let result = mapOrcidPerson emptyResult.orcid (Some person) (Some employments)
                 Vitest.expect(result.orcid).toBe emptyResult.orcid

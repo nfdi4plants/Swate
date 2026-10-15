@@ -11,8 +11,17 @@ open Swate.Components.Page.Metadata.FormComponents.PersonsInput.Types
 type PersonSearchDialog =
 
     static member private Fields(result: PersonResult) =
+        // Apply writes only the given and family names, so the credit name gets its own row.
+        let appliedName =
+            [ result.firstName; result.lastName ]
+            |> List.choose id
+            |> String.concat " "
+            |> Some
+            |> Option.filter (fun name -> name <> "")
+
         [
-            "Name", Some(Lookup.fullName result)
+            "Name", appliedName
+            "Credit name", result.displayName
             "ORCID", Some result.orcid
             "Affiliation", result.affiliation
             "Email", result.email

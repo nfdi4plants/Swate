@@ -86,12 +86,13 @@ let mapOrcidPerson orcid (person: OrcidPerson option) (employments: OrcidEmploym
         |> Option.bind (fun emails -> emails.email)
         |> Option.defaultValue [||]
 
+    // A group holds the same employment as reported by different sources, and ORCID lists the preferred one first.
     // Only current employments describe the affiliation. Each one reads "Department, Organization".
     let affiliation =
         employments
         |> Option.bind (fun employments -> employments.``affiliation-group``)
         |> Option.defaultValue [||]
-        |> Array.collect (fun group -> group.summaries |> Option.defaultValue [||])
+        |> Array.choose (fun group -> group.summaries |> Option.bind Array.tryHead)
         |> Array.choose (fun summary -> summary.``employment-summary``)
         |> Array.filter (fun summary -> summary.``end-date``.IsNone)
         |> Array.map (fun summary ->
@@ -170,12 +171,12 @@ let private isBlocked (response: Response) =
 /// Expects an ORCID iD that normalizeOrcid already accepted.
 /// The full /record also lists every work and can be several megabytes, so this loads only the two sections it needs.
 let getRecord (orcid: string) : JS.Promise<SearchPage> = promise {
-    let recordUrl = "https://pub.orcid.org/v3.0/" + JS.encodeURIComponent orcid
+    let baseUrl = "https://pub.orcid.org/v3.0/" + JS.encodeURIComponent orcid
 
     let! responses =
         Promise.all [|
-            fetchUnsafe (recordUrl + "/person") requestOptions
-            fetchUnsafe (recordUrl + "/employments") requestOptions
+            fetchUnsafe (baseUrl + "/person") requestOptions
+            fetchUnsafe (baseUrl + "/employments") requestOptions
         |]
 
     let person = responses.[0]
