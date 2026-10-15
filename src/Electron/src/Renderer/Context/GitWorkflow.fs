@@ -87,7 +87,28 @@ type GitPendingRemoteAction =
     /// The dialog offers the recovery stored in PendingRecovery.
     | Recover
 
-type GitPublishRenamePrompt = { CurrentName: string; Message: string }
+/// One owner a first publish can create the DataHUB repository for. NamespaceId None is the
+/// personal namespace. A DisabledReason marks an owner the user cannot pick and says why.
+type GitPublishOwner = {
+    NamespaceId: int option
+    Label: string
+    DisabledReason: string option
+}
+
+/// Owners is empty when the dialog only asks for another name.
+type GitPublishRenamePrompt = {
+    CurrentName: string
+    Message: string
+    Owners: GitPublishOwner[]
+    SelectedNamespaceId: int option
+}
+
+/// The owner list and the owner choice a publish rename carries across its reply. A path
+/// change that arrives before the reply resets the model, so the reply restores both.
+type GitPublishOwnerSelection = {
+    Owners: GitPublishOwner[] option
+    Choice: GitPublishOwner option
+}
 
 /// A canceled update left paths that a killed fast-forward may have partially
 /// rewritten. The user discards exactly those paths, keeps them, or retries the update.
@@ -137,6 +158,10 @@ type GitState = {
     PendingConfirmation: GitSidebarConfirmationDialog option
     PendingRemoteAction: GitPendingRemoteAction
     PendingPublishRename: GitPublishRenamePrompt option
+    /// The owners loaded for the first publish of the current ARC. None until they are loaded.
+    PublishOwners: GitPublishOwner[] option
+    /// The owner the user picked for the first publish. None until picked.
+    PublishOwnerChoice: GitPublishOwner option
     /// A primary save that still has to publish once the update or merge is done.
     PendingPostMergePush: bool
     PendingRecovery: GitPendingRecovery option
@@ -204,6 +229,8 @@ type GitState = {
         PendingConfirmation = None
         PendingRemoteAction = GitPendingRemoteAction.None
         PendingPublishRename = None
+        PublishOwners = None
+        PublishOwnerChoice = None
         PendingPostMergePush = false
         PendingRecovery = None
         ProvisionedRemote = None
@@ -493,7 +520,9 @@ type WriteAttemptOutcome =
     | FinalizedButRefreshFailed of message: string
     | CompletedWithPendingRemoteConfirmation of WriteSuccess * GitSidebarConfirmationDialog * GitPendingRemoteAction
     | CompletedWithPendingRemoteFailure of WriteSuccess * string
-    | RequiresRemoteProjectRename of string
+    /// Opens the upload dialog. owners Some is a freshly loaded owner list to store and None keeps
+    /// the stored one. clearOwnerChoice drops the owner the user picked after DataHUB refused it.
+    | RequiresRemoteProjectRename of message: string * owners: GitPublishOwner[] option * clearOwnerChoice: bool
     | RequiresDependencyInstall of componentName: string * promptMessage: string
     | RequiresRecovery of GitPendingRecovery * message: string
     /// The workspace token was stale while the workspace itself did not change. The
@@ -598,9 +627,9 @@ type Msg =
     | DiscardSelectionRequested of string[]
     | ConfirmPendingRemoteActionRequested
     | CancelPendingRemoteActionRequested
-    | SubmitPublishRenameRequested of newName: string
+    | SubmitPublishRenameRequested of GitSidebarPublishSubmit
     | CancelPublishRenameRequested
-    | PublishRenameCompleted of sessionId: int * result: Result<string, string>
+    | PublishRenameCompleted of sessionId: int * result: Result<string, string> * selection: GitPublishOwnerSelection
     | CreateBranchRequested of GitSidebarCreateBranchRequest
     | SwitchBranchRequested of string
     | SwitchBranchPreflightCompleted of
@@ -945,14 +974,51 @@ let private tryGetPathLeaf (pathValue: string) =
     )
     |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
-let private publishRenamePrompt message model =
+let private publishRenamePrompt message model : GitPublishRenamePrompt =
     let currentName =
         model.CurrentArcPath |> Option.bind tryGetPathLeaf |> Option.defaultValue "ARC"
 
     {
         CurrentName = currentName
         Message = message
+        Owners = model.PublishOwners |> Option.defaultValue [||]
+        SelectedNamespaceId = model.PublishOwnerChoice |> Option.bind _.NamespaceId
     }
+
+/// The owners a first publish offers: the personal namespace, then the groups in the given
+/// order. A group that does not accept new projects is disabled and carries the reason.
+let publishOwnersOf (dto: PublishOwnersDto) : GitPublishOwner[] =
+    let disabledReason (group: PublishGroupDto) =
+        if group.can_create_projects then
+            None
+        else
+            match group.project_creation_level with
+            | Some "noone" -> Some "Nobody can create repositories in this group."
+            | Some "administrator" -> Some "Only administrators can create repositories in this group."
+            | Some "owner" -> Some "Only owners of this group can create repositories in it."
+            | Some "maintainer" -> Some "Only maintainers and owners of this group can create repositories in it."
+            | Some "developer" ->
+                Some "You need at least the Developer role in this group to create repositories in it."
+            | _ -> Some "You can't create repositories in this group."
+
+    [|
+        {
+            NamespaceId = None
+            Label = $"{dto.username} (personal)"
+            DisabledReason = None
+        }
+        yield!
+            dto.groups
+            |> Array.map (fun group -> {
+                NamespaceId = Some group.id
+                Label = group.full_path
+                DisabledReason = disabledReason group
+            })
+    |]
+
+let private hasEnabledGroup (owners: GitPublishOwner[]) =
+    owners
+    |> Array.exists (fun owner -> owner.NamespaceId.IsSome && owner.DisabledReason.IsNone)
 
 let private refreshFailure (refreshResult: GitRefreshResult) : OperationFailureDto option =
     match refreshResult.Session, refreshResult.Status, refreshResult.Refs, refreshResult.LfsSettings with
@@ -3553,6 +3619,10 @@ type private PublishFailure =
     | Routed of RoutedFailure
     | AcceptanceRequired of dialog: GitSidebarConfirmationDialog * observedTarget: string * workspaceVersion: string
     | ProjectNameRefused of string
+    /// The signed-in user can create the repository in a group, so the dialog asks for the owner first.
+    | OwnerChoiceRequired of GitPublishOwner[]
+    /// DataHUB refused the chosen owner.
+    | OwnerNotAllowed of message: string
     | ProvisioningIncomplete of GitProvisionedRemote * string
     | NoUsableAccount
 
@@ -3626,28 +3696,61 @@ let private runPublishAsync
             match model.ProvisionedRemote with
             | Some provisioned -> return! bindAndPublish acceptance provisioned
             | None ->
-                let! created =
-                    deps.createRemoteProject {
-                        Name = projectName
-                        NamespaceId = None
-                    }
-
-                match created with
-                | Error(CreateProjectError.NameRefused _) ->
-                    return Error(PublishFailure.ProjectNameRefused projectNameRefusedMessage)
-                | Error(CreateProjectError.NotAllowed details) ->
-                    let text = details |> Option.defaultValue GitLabError.Forbidden.GitLabErrorToString
-
-                    return Error(PublishFailure.Routed(RoutedFailure.Error text))
-                | Error(CreateProjectError.Failed error) ->
-                    return Error(PublishFailure.Routed(RoutedFailure.Error error.GitLabErrorToString))
-                | Ok project ->
-                    return!
-                        bindAndPublish acceptance {
-                            RemoteUrl = project.http_url_to_repo
-                            ProjectName = projectName
-                            IsBound = false
+                let createFor (owner: GitPublishOwner option) = promise {
+                    let! created =
+                        deps.createRemoteProject {
+                            Name = projectName
+                            NamespaceId = owner |> Option.bind _.NamespaceId
                         }
+
+                    match created with
+                    | Error(CreateProjectError.NameRefused _) ->
+                        return Error(PublishFailure.ProjectNameRefused projectNameRefusedMessage)
+                    | Error(CreateProjectError.NotAllowed details) ->
+                        let refusal =
+                            match owner with
+                            | Some { NamespaceId = Some _; Label = label } ->
+                                $"DataHUB did not allow a new repository in {label}. Choose a different owner."
+                            | _ -> "DataHUB did not allow a new repository in your personal namespace."
+
+                        let message =
+                            match details with
+                            | Some text -> $"{refusal} ({text})"
+                            | None -> refusal
+
+                        return Error(PublishFailure.OwnerNotAllowed message)
+                    | Error(CreateProjectError.Failed error) ->
+                        return Error(PublishFailure.Routed(RoutedFailure.Error error.GitLabErrorToString))
+                    | Ok project ->
+                        return!
+                            bindAndPublish acceptance {
+                                RemoteUrl = project.http_url_to_repo
+                                ProjectName = projectName
+                                IsBound = false
+                            }
+                }
+
+                match model.PublishOwnerChoice with
+                | Some owner -> return! createFor (Some owner)
+                | None ->
+                    let! loaded = deps.loadPublishOwners ()
+
+                    match loaded with
+                    | Error error ->
+                        return
+                            Error(
+                                PublishFailure.Routed(
+                                    RoutedFailure.Error
+                                        $"Could not load your DataHUB groups: {error.GitLabErrorToString}"
+                                )
+                            )
+                    | Ok dto ->
+                        let owners = publishOwnersOf dto
+
+                        if hasEnabledGroup owners then
+                            return Error(PublishFailure.OwnerChoiceRequired owners)
+                        else
+                            return! createFor None
         }
 
         match model.ProvisionedRemote with
@@ -3671,8 +3774,11 @@ let private runPublishAsync
                 | routed -> return Error(PublishFailure.Routed routed)
     }
 
+/// publishOwners is the owner list the model stores. A refused owner reopens the dialog only
+/// when that list offers another group, otherwise the refusal is an error like any other.
 let private publishFailureToOutcome
     (onRouted: RoutedFailure -> JS.Promise<Result<WriteAttemptOutcome, string>>)
+    (publishOwners: GitPublishOwner[] option)
     (failure: PublishFailure)
     =
     promise {
@@ -3681,7 +3787,19 @@ let private publishFailureToOutcome
         | PublishFailure.NoUsableAccount -> return Error missingPublishAccountNotice
         | PublishFailure.AcceptanceRequired _ ->
             return Error "The synchronization needs a decision that this write cannot offer."
-        | PublishFailure.ProjectNameRefused message -> return Ok(RequiresRemoteProjectRename message)
+        | PublishFailure.ProjectNameRefused message -> return Ok(RequiresRemoteProjectRename(message, None, false))
+        | PublishFailure.OwnerChoiceRequired owners ->
+            return
+                Ok(
+                    RequiresRemoteProjectRename(
+                        "Choose where to create the DataHUB repository for this ARC.",
+                        Some owners,
+                        false
+                    )
+                )
+        | PublishFailure.OwnerNotAllowed message when publishOwners |> Option.exists hasEnabledGroup ->
+            return Ok(RequiresRemoteProjectRename(message, None, true))
+        | PublishFailure.OwnerNotAllowed message -> return! onRouted (RoutedFailure.Error message)
         | PublishFailure.ProvisioningIncomplete(provisioned, message) ->
             return Ok(ProvisioningIncomplete(provisioned, message))
     }
@@ -3708,7 +3826,7 @@ let private runPushAttemptAsync (deps: GitDependencies) (state: GitState) (accep
                     dialog
                     (GitPendingRemoteAction.PublishAfterUpdate(GitUpdateAcceptance.Accepted(target, workspaceVersion)))
                     None
-        | Error failure -> return! publishFailureToOutcome (routedToOutcome deps) failure
+        | Error failure -> return! publishFailureToOutcome (routedToOutcome deps) state.PublishOwners failure
 }
 
 let private runFetchAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
@@ -3779,8 +3897,12 @@ let private runPrimarySaveAttemptAsync
                     | Error(PublishFailure.Routed(RoutedFailure.Recovery _)) -> false
                     | Error(PublishFailure.Routed _) -> true
                     | Error(PublishFailure.ProjectNameRefused _)
+                    | Error(PublishFailure.OwnerChoiceRequired _)
                     | Error(PublishFailure.ProvisioningIncomplete _)
                     | Error PublishFailure.NoUsableAccount -> false
+                    // Without another group to offer, the refusal ends in the refresh of the saved-locally outcome.
+                    | Error(PublishFailure.OwnerNotAllowed _) ->
+                        not (refreshedState.PublishOwners |> Option.exists hasEnabledGroup)
 
                 if followsRefresh then
                     reportPhase GitBusyOperation.Refreshing
@@ -3872,6 +3994,7 @@ let private runPrimarySaveAttemptAsync
                                             )
                                     | Error refreshFailure -> return Error(failureMessage refreshFailure)
                             })
+                            refreshedState.PublishOwners
                             failure
             }
 
@@ -4592,6 +4715,17 @@ let private updateCore
                 PageLoadRequestId = nextPageLoadRequestId model
                 PendingPublishAfterRefresh = pendingPublishAfterRefresh
                 PendingPublishForPath = None
+                // The renamed ARC still publishes for the owner the user picked.
+                PublishOwners =
+                    if pendingPublishAfterRefresh then
+                        model.PublishOwners
+                    else
+                        None
+                PublishOwnerChoice =
+                    if pendingPublishAfterRefresh then
+                        model.PublishOwnerChoice
+                    else
+                        None
         }
 
         let cmd =
@@ -5254,15 +5388,18 @@ let private updateCore
         {
             clearBusy model with
                 PendingPublishRename = None
+                // The next upload asks for the owner again.
+                PublishOwners = None
+                PublishOwnerChoice = None
                 ErrorNotice = None
                 WarningNotice = None
                 PendingRefreshWarningNotice = Some pendingPrimarySaveWarning
         },
         Cmd.ofMsg RefreshRequested
     | SubmitPublishRenameRequested _ when model.PendingPublishRename.IsNone -> model, Cmd.none
-    | SubmitPublishRenameRequested newName ->
+    | SubmitPublishRenameRequested submit ->
         let normalizedName =
-            newName
+            submit.Name
             |> Option.ofObj
             |> Option.map _.Trim()
             |> Option.defaultValue String.Empty
@@ -5274,8 +5411,28 @@ let private updateCore
             },
             reportErrorCmd deps "Could not rename ARC" "ARC folder name must not be empty."
         else
+            let choice =
+                model.PublishOwners
+                |> Option.bind (Array.tryFind (fun owner -> owner.NamespaceId = submit.NamespaceId))
+                |> Option.defaultValue {
+                    NamespaceId = submit.NamespaceId
+                    Label =
+                        match submit.NamespaceId with
+                        | None -> "personal"
+                        | Some id -> string id
+                    DisabledReason = None
+                }
+
+            let selection = {
+                Owners = model.PublishOwners
+                Choice = Some choice
+            }
+
             let nextModel =
-                model
+                {
+                    model with
+                        PublishOwnerChoice = Some choice
+                }
                 |> withBusyOperation (Some GitBusyOperation.RenamingRepository)
                 |> fun state -> { state with ErrorNotice = None }
 
@@ -5283,11 +5440,11 @@ let private updateCore
                 Cmd.OfPromise.either
                     deps.renameOpenArcRoot
                     normalizedName
-                    (fun result -> PublishRenameCompleted(model.ArcSessionId, result))
-                    (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err)))
+                    (fun result -> PublishRenameCompleted(model.ArcSessionId, result, selection))
+                    (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err), selection))
 
             nextModel, cmd
-    | PublishRenameCompleted(sessionId, Ok renamedPath) when
+    | PublishRenameCompleted(sessionId, Ok renamedPath, selection) when
         sessionId = model.ArcSessionId
         && not (
             model.CurrentArcPath
@@ -5298,10 +5455,12 @@ let private updateCore
             clearBusy model with
                 PendingPublishRename = None
                 PendingPublishForPath = Some renamedPath
+                PublishOwners = selection.Owners
+                PublishOwnerChoice = selection.Choice
                 ErrorNotice = None
         },
         Cmd.none
-    | PublishRenameCompleted(sessionId, Ok renamedPath) when
+    | PublishRenameCompleted(sessionId, Ok renamedPath, selection) when
         sessionId <> model.ArcSessionId
         && (model.CurrentArcPath
             |> Option.exists (fun currentPath -> Swate.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath))
@@ -5312,21 +5471,25 @@ let private updateCore
         {
             model with
                 PendingPublishRename = None
+                PublishOwners = selection.Owners
+                PublishOwnerChoice = selection.Choice
                 ErrorNotice = None
                 PendingPublishAfterRefresh = true
         },
         Cmd.ofMsg RefreshRequested
-    | PublishRenameCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
-    | PublishRenameCompleted(_, Error message) ->
+    | PublishRenameCompleted(sessionId, _, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
+    | PublishRenameCompleted(_, Error message, _) ->
         {
             clearBusy model with
                 ErrorNotice = Some message
         },
         reportErrorCmd deps "Could not rename ARC" message
-    | PublishRenameCompleted(_, Ok _) ->
+    | PublishRenameCompleted(_, Ok _, selection) ->
         {
             clearBusy model with
                 PendingPublishRename = None
+                PublishOwners = selection.Owners
+                PublishOwnerChoice = selection.Choice
                 ErrorNotice = None
         },
         Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
@@ -5556,11 +5719,17 @@ let private updateCore
             resolveCloneReplyCmd writeRequest (Error message)
             reportWriteErrorCmd deps writeRequest message
         ]
-    | WriteCompleted(_, _, _, Ok(RequiresRemoteProjectRename message)) ->
+    | WriteCompleted(_, _, _, Ok(RequiresRemoteProjectRename(message, owners, clearOwnerChoice))) ->
+        let ownedModel = {
+            model with
+                PublishOwners = owners |> Option.orElse model.PublishOwners
+                PublishOwnerChoice = if clearOwnerChoice then None else model.PublishOwnerChoice
+        }
+
         let nextModel = {
-            clearBusy model with
+            clearBusy ownedModel with
                 ErrorNotice = None
-                PendingPublishRename = Some(publishRenamePrompt message model)
+                PendingPublishRename = Some(publishRenamePrompt message ownedModel)
         }
 
         nextModel, Cmd.none

@@ -72,6 +72,32 @@ let Main () =
     let errorCtx = useErrorModalCtx ()
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
+    // The dialog resets its name and owner state when the prompt object changes. The model keeps
+    // the same prompt object between unrelated updates, so a re-render of the panel keeps them.
+    let publishRenamePrompt =
+        React.useMemo (
+            (fun () ->
+                gitStateCtx.state.PendingPublishRename
+                |> Option.map (fun prompt ->
+                    let mapped: Swate.Components.Page.GitSidebarTypes.GitSidebarPublishRenamePrompt = {
+                        CurrentName = prompt.CurrentName
+                        Message = prompt.Message
+                        Owners =
+                            prompt.Owners
+                            |> Array.map (fun owner -> {
+                                NamespaceId = owner.NamespaceId
+                                Label = owner.Label
+                                DisabledReason = owner.DisabledReason
+                            })
+                        SelectedNamespaceId = prompt.SelectedNamespaceId
+                    }
+
+                    mapped
+                )
+            ),
+            [| box gitStateCtx.state.PendingPublishRename |]
+        )
+
     React.useEffect ((fun () -> fun () -> gitStateCtx.sidebarVisibilityChanged false), [||])
 
     React.useEffect (
@@ -181,14 +207,7 @@ let Main () =
             ?errorNotice = gitStateCtx.state.ErrorNotice,
             ?warningNotice = gitStateCtx.state.WarningNotice,
             ?pendingConfirmation = gitStateCtx.state.PendingConfirmation,
-            ?publishRenamePrompt =
-                (gitStateCtx.state.PendingPublishRename
-                 |> Option.map (fun prompt -> {
-                     CurrentName = prompt.CurrentName
-                     Message = prompt.Message
-                     Owners = [||]
-                     SelectedNamespaceId = None
-                 })),
+            ?publishRenamePrompt = publishRenamePrompt,
             callbacks = {
                 OnRefresh = gitStateCtx.refresh
                 OnFetch = gitStateCtx.fetch
@@ -229,7 +248,7 @@ let Main () =
             remoteActionsEnabled = remoteActionsEnabled,
             canCancelOperation = canCancelOperation,
             canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,
-            onSubmitPublishRename = (fun submit -> gitStateCtx.submitPublishRename submit.Name),
+            onSubmitPublishRename = gitStateCtx.submitPublishRename,
             onCancelPublishRename = gitStateCtx.cancelPublishRename,
             onOpenRemoteRepository =
                 (fun () ->

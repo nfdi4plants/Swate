@@ -31,7 +31,7 @@ type GitStateController = {
     discardSelection: string[] -> unit
     confirmPendingRemoteAction: unit -> unit
     cancelPendingRemoteAction: unit -> unit
-    submitPublishRename: string -> unit
+    submitPublishRename: GitSidebarPublishSubmit -> unit
     cancelPublishRename: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
     saveDiffIndexingLimit: int -> unit
@@ -230,8 +230,8 @@ let GitStateCtxProvider (children: ReactElement) =
     let cancelPendingRemoteAction () =
         dispatch CancelPendingRemoteActionRequested
 
-    let submitPublishRename newName =
-        dispatch (SubmitPublishRenameRequested newName)
+    let submitPublishRename (submit: GitSidebarPublishSubmit) =
+        dispatch (SubmitPublishRenameRequested submit)
 
     let cancelPublishRename () = dispatch CancelPublishRenameRequested
 
