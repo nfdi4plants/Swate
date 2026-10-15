@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When DataHUB refuses a new repository because of missing permissions, Swate says so and no longer asks for a different name. #1404 (by @caroott)
 - The tabs on the "Download ARC from DataHUB" page are shown as tabs again. #1404 (by @caroott)
 
+## 2.5.2 - 2026-10-15
+
+### 🐛 Fixed
+
+- Adding multiple columns at once with the "Only Headers" option now works correctly. Before this fix, users were unable to save any changes done to ARC after for example "Adding a template". [#1397](https://github.com/nfdi4plants/Swate/issues/1397) (by @Freymaurer)
+
 ## 2.5.1 - 2026-10-12
 
 ### 🐛 Fixed
