@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The first upload of an ARC to DataHUB asks whether the repository goes to your own account or to one of your groups. The question only appears when at least one of your groups accepts new repositories. Groups where you can't create repositories are listed but disabled, with the reason next to them. #1404 (by @caroott)
 - Add search options for DOI and Europe PMC for publications. #387, #1400 (by @Freymaurer)
+- Add search options for ORCID as well as name for authors. #501, #763 (by @Freymaurer)
 
 ### 🐛 Fixed
 
