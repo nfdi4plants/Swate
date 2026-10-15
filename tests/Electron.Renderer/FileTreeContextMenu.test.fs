@@ -495,32 +495,26 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "files directly inside ARC collection roots offer rename and delete only for generic files",
+            "items directly inside ARC collection roots: generic files and entity folders get rename and delete, canonical and README files don't",
             fun () ->
-                let labelsFor item = [
+                let labelsFor item = [|
                     yield! renameContextMenuItems [] ignore item |> List.map _.Label
                     yield! deleteContextMenuItems [] ignore item |> List.map _.Label
-                ]
+                |]
 
-                Vitest
-                    .expect(
-                        createFileItem "overview.md" (Some "studies/overview.md")
-                        |> labelsFor
-                        |> Array.ofList
-                    )
-                    .toEqual ([| "Rename"; "Delete" |])
+                [ "studies", "isa.study.xlsx"; "assays", "isa.assay.xlsx" ]
+                |> List.iter (fun (zone, canonicalFileName) ->
+                    let fileItem name =
+                        createFileItem name (Some $"{zone}/{name}")
 
-                Vitest
-                    .expect(
-                        createFileItem "isa.study.xlsx" (Some "studies/isa.study.xlsx")
-                        |> labelsFor
-                        |> Array.ofList
-                    )
-                    .toEqual ([||])
+                    Vitest.expect(fileItem "overview.md" |> labelsFor).toEqual ([| "Rename"; "Delete" |])
+                    Vitest.expect(fileItem canonicalFileName |> labelsFor).toEqual ([||])
+                    Vitest.expect(fileItem "README.md" |> labelsFor).toEqual ([||])
 
-                Vitest
-                    .expect(createFolderItem "StudyA" (Some "studies/StudyA") |> labelsFor |> Array.ofList)
-                    .toEqual ([| "Rename"; "Delete" |])
+                    Vitest
+                        .expect(createFolderItem "Entity1" (Some $"{zone}/Entity1") |> labelsFor)
+                        .toEqual ([| "Rename"; "Delete" |])
+                )
         )
 
         Vitest.test (

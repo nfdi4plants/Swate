@@ -550,15 +550,19 @@ module ArcFileSystemHelper =
                         return Error createError
         }
 
-    /// True when `relativePath` names a file directly inside an add zone (for example `studies/notes.md`).
-    /// Such paths have the shape of entity folders, so the IPC layer routes them to generic file operations.
+    /// True when `relativePath` names a file directly inside an add zone (for example `studies/notes.md`
+    /// or `studies/.DS_Store`). Most such paths have the shape of entity folders, so the IPC layer routes
+    /// them to generic file operations, and renames of them are checked with the file rules.
     let isAddZoneRootFileAsync (arcPath: string) (relativePath: string) : JS.Promise<bool> = promise {
-        match ArcEntityPathRules.classifyDeleteTarget relativePath with
-        | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(_, _, normalizedRelativePath) ->
+        let normalizedRelativePath =
+            relativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+        if ArcEntityPathRules.isAddZoneRootChildPath normalizedRelativePath then
             match tryResolveArcRelativePath arcPath normalizedRelativePath with
             | Ok absolutePath -> return! ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
             | Error _ -> return false
-        | _ -> return false
+        else
+            return false
     }
 
     [<RequireQualifiedAccess>]
@@ -744,23 +748,24 @@ module ArcFileSystemHelper =
                         | false, _ -> return! moveToTargetAsync ()
     }
 
-    /// Removes the item of an already resolved delete route from disk. Only generic items and
-    /// allowed datamap files are removed; every other route is rejected.
-    let deleteGenericRouteOnDisk (arcPath: string) (route: DeletePathRoute) : JS.Promise<Result<unit, exn>> = promise {
+    /// Removes the item of a delete route from disk. Only routes built by `resolveDeletePathRouteAsync`
+    /// are safe here, so this stays private and `deleteGenericFileSystemItemOnDisk` is the entry point.
+    let private deleteGenericRouteOnDisk (arcPath: string) (route: DeletePathRoute) : JS.Promise<Result<unit, exn>> = promise {
         let genericDeletePath =
             match route with
-            | DeletePathRoute.GenericItem normalizedRelativePath -> Some normalizedRelativePath
+            | DeletePathRoute.GenericItem normalizedRelativePath -> Ok normalizedRelativePath
             | DeletePathRoute.DataMap normalizedDataMapPath when
                 ArcEntityPathRules.isDeletePathAllowed normalizedDataMapPath
                 ->
-                Some normalizedDataMapPath
+                Ok normalizedDataMapPath
+            | DeletePathRoute.Rejected message -> Error message
             | DeletePathRoute.DataMap _
-            | DeletePathRoute.ArcEntity _
-            | DeletePathRoute.Rejected _ -> None
+            | DeletePathRoute.ArcEntity _ ->
+                Error "Generic filesystem delete is only supported for safe non-entity paths."
 
         match genericDeletePath with
-        | None -> return Error(exn "Generic filesystem delete is only supported for safe non-entity paths.")
-        | Some normalizedRelativePath ->
+        | Error message -> return Error(exn message)
+        | Ok normalizedRelativePath ->
             match tryResolveArcRelativePath arcPath normalizedRelativePath with
             | Error pathError -> return Error pathError
             | Ok absolutePath -> return! removePathWithRetriesAsync removeGenericFileSystemItemAsync absolutePath

@@ -378,6 +378,25 @@ module ArcEntityPathRules =
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
             && not isBlockedStructuralPath
 
+    /// True when `relativePath` names an item directly inside an add zone (for example `studies/notes.md`
+    /// or `studies/.DS_Store`), whatever its classification.
+    let isAddZoneRootChildPath (relativePath: string) =
+        match normalizeRelativePath relativePath |> splitPathSegments with
+        | [| zoneSegment; _ |] -> isAddZoneSegment zoneSegment
+        | _ -> false
+
+    /// Checks the name of a new file or rename target. ARC identifiers only allow letters, digits,
+    /// `_`, `-` and whitespace, so a file directly inside an add zone must contain a `.` (an extension).
+    /// Otherwise a file such as `assays/Assay1` would block a later "Add Assay" with that identifier.
+    let isNewGenericFileSystemNameAllowed (relativePath: string) =
+        match
+            normalizeRelativePath relativePath
+            |> splitPathSegments
+            |> classifyStructuralArcPath
+        with
+        | StructuralArcPath.EntityFolder -> (PathHelpers.getFileName relativePath).Contains "."
+        | _ -> true
+
     let isGenericFileSystemTargetAllowed (relativePath: string) =
         isGenericFileSystemPathAllowed false false relativePath
 

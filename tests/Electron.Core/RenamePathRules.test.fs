@@ -232,6 +232,48 @@ Vitest.describe (
                 | Ok targetPath -> failwith $"Expected rename to protected '{targetPath}' to be rejected."
                 | Error _ -> ()
         )
+
+        Vitest.test (
+            "new files directly inside add zones need an extension so they cannot shadow entity identifiers",
+            fun () ->
+                [ "studies"; "assays"; "workflows"; "runs" ]
+                |> List.iter (fun zone ->
+                    match tryBuildGenericFileSystemChildPath true zone "Entity1" with
+                    | Ok targetPath -> failwith $"Expected extensionless file '{targetPath}' to be rejected."
+                    | Error errorMessage -> Vitest.expect(errorMessage).toContain ("file extension")
+                )
+
+                match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "StudyB" with
+                | Ok targetPath -> failwith $"Expected extensionless rename target '{targetPath}' to be rejected."
+                | Error errorMessage -> Vitest.expect(errorMessage).toContain ("file extension")
+
+                // Existing extensionless files stay deletable and renamable to a name with an extension.
+                Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true "studies/LICENSE").toBe (true)
+
+                match tryBuildGenericFileSystemRenameTargetPath true "studies/LICENSE" "LICENSE.md" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/LICENSE.md")
+                | Error errorMessage -> failwith errorMessage
+
+                // Deeper paths and the ARC root are unaffected.
+                match tryBuildGenericFileSystemChildPath true "assays/AssayA" "Makefile" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("assays/AssayA/Makefile")
+                | Error errorMessage -> failwith errorMessage
+
+                match tryBuildGenericFileSystemChildPath true "" "LICENSE" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("LICENSE")
+                | Error errorMessage -> failwith errorMessage
+        )
+
+        Vitest.test (
+            "dot files directly inside add zones are renamed with the file rules",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath "studies/.DS_Store").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath "studies/StudyA/notes.md").toBe (false)
+
+                match tryBuildGenericFileSystemRenameTargetPath true "studies/.DS_Store" "notes.md" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/notes.md")
+                | Error errorMessage -> failwith errorMessage
+        )
 )
 
 Vitest.describe (

@@ -65,12 +65,19 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
                 else
                     $"{normalizedParentPath}/{normalizedName}"
 
-            if ArcEntityPathRules.isGenericFileSystemCreateTargetAllowed isFile targetPath then
-                Ok targetPath
-            else
+            if
+                ArcEntityPathRules.isGenericFileSystemCreateTargetAllowed isFile targetPath
+                |> not
+            then
                 Error
                     "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+            elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
+                Error addZoneFileNameError
+            else
+                Ok targetPath
 
+/// `isAddZoneRootFile` marks a file directly inside an add zone (for example `studies/notes.md` or
+/// `studies/.DS_Store`). Pass `false` for every other source.
 let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
 
@@ -86,8 +93,11 @@ let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourceP
         match tryBuildRenameTargetPath normalizedSourcePath newName with
         | Error validationError -> Error validationError
         | Ok targetPath ->
-            if isTargetAllowed targetPath then
-                Ok targetPath
-            else
+            if isTargetAllowed targetPath |> not then
                 Error
                     "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
+            elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
+                Error
+                    "Files directly inside an ARC collection folder need a file extension (for example 'notes.md'), so they cannot be mistaken for an ARC entity."
+            else
+                Ok targetPath

@@ -104,6 +104,11 @@ let private createRelativeDirectoryAsync arcPath relativePath = promise {
 
 let private acceptImportedFiles () = promise { return Ok() }
 
+let private expectErrorContaining (expectedMessagePart: string) (result: Result<'T, exn>) =
+    match result with
+    | Ok value -> failwith $"Expected an error containing '{expectedMessagePart}', but the operation returned {value}."
+    | Error error -> Vitest.expect(error.Message).toContain (expectedMessagePart)
+
 let private expectRoute (relativePath: string) expected actual =
     if actual <> expected then
         failwith $"Expected '{relativePath}' to route to {expected}, but it routed to {actual}."
@@ -503,9 +508,17 @@ Vitest.describe (
                     Vitest.expect(assayReadmePath).toBe ("assays/AssayA/attachments/README.md")
                     do! expectRelativePathExists arcPath assayReadmePath true
 
-                    match! ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath assayReadmePath with
-                    | Ok() -> failwith "Expected README deletion to stay protected."
-                    | Error error -> Vitest.expect(error.Message.Length).toBeGreaterThan (0)
+                    for readmePath in [ rootReadmePath; assayReadmePath ] do
+                        let! deleteResult = ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath readmePath
+                        expectErrorContaining "protected files" deleteResult
+                        do! expectRelativePathExists arcPath readmePath true
+
+                    let! existingReadmeResult =
+                        ArcFileSystemHelper.createFileSystemItemOnDisk
+                            arcPath
+                            (createItemRequest "" "README.md" FileSystemItemKind.File)
+
+                    expectErrorContaining "already exists" existingReadmeResult
                 })
         )
 
@@ -513,14 +526,29 @@ Vitest.describe (
             "creates, renames, and deletes files directly inside an add zone without touching entities",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
-                    match!
+                    let! entityFolderResult =
                         ArcFileSystemHelper.createFileSystemItemOnDisk
                             arcPath
                             (createItemRequest "assays" "NewAssay" FileSystemItemKind.Folder)
-                    with
-                    | Ok createdPath ->
-                        failwith $"Expected entity-shaped folder creation to be rejected: {createdPath}"
-                    | Error error -> Vitest.expect(error.Message.Length).toBeGreaterThan (0)
+
+                    expectErrorContaining "only allowed inside safe ARC directories" entityFolderResult
+                    do! expectRelativePathExists arcPath "assays/NewAssay" false
+
+                    let! canonicalFileResult =
+                        ArcFileSystemHelper.createFileSystemItemOnDisk
+                            arcPath
+                            (createItemRequest "assays" "isa.assay.xlsx" FileSystemItemKind.File)
+
+                    expectErrorContaining "must not target canonical ARC files" canonicalFileResult
+                    do! expectRelativePathExists arcPath "assays/isa.assay.xlsx" false
+
+                    let! extensionlessFileResult =
+                        ArcFileSystemHelper.createFileSystemItemOnDisk
+                            arcPath
+                            (createItemRequest "assays" "Assay1" FileSystemItemKind.File)
+
+                    expectErrorContaining "file extension" extensionlessFileResult
+                    do! expectRelativePathExists arcPath "assays/Assay1" false
 
                     let! createdPath =
                         createItemOrFail arcPath (createItemRequest "assays" "overview.md" FileSystemItemKind.File)
@@ -540,9 +568,11 @@ Vitest.describe (
                     do! deleteItemOrFail arcPath "assays/summary.md"
                     do! expectRelativePathExists arcPath "assays/summary.md" false
 
-                    match! ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath "assays/AssayA" with
-                    | Ok() -> failwith "Expected entity folder deletion through the generic path to be rejected."
-                    | Error error -> Vitest.expect(error.Message.Length).toBeGreaterThan (0)
+                    let! entityDeleteResult =
+                        ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath "assays/AssayA"
+
+                    expectErrorContaining "safe non-entity paths" entityDeleteResult
+                    do! expectRelativePathExists arcPath "assays/AssayA" true
 
                     let! reloadedArc = TestHelpers.loadArcAsync arcPath
                     Vitest.expect(reloadedArc.ContainsAssay("AssayA")).toBe (true)
@@ -624,6 +654,21 @@ Vitest.describe (
                     do! expectGenericRename arcPath "assays/AssayA" false
                     do! expectGenericRename arcPath "assays/MissingAssay" false
                     do! expectGenericRename arcPath "assays/AssayA/protocol.md" true
+                })
+        )
+
+        Vitest.test (
+            "renames dot files directly inside an add zone to regular file names",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! writeRelativeFileAsync arcPath "assays/.DS_Store" ""
+
+                    let! isAddZoneRootFile = ArcFileSystemHelper.isAddZoneRootFileAsync arcPath "assays/.DS_Store"
+                    Vitest.expect(isAddZoneRootFile).toBe (true)
+
+                    do! renameItemOrFail arcPath (renameRequest "assays/.DS_Store" "notes.md")
+                    do! expectRelativePathExists arcPath "assays/.DS_Store" false
+                    do! expectRelativePathExists arcPath "assays/notes.md" true
                 })
         )
 
