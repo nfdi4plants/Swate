@@ -401,6 +401,15 @@ Vitest.test (
         Vitest
             .expect(alert.textContent)
             .toBe "Publication search failed: Crossref could not load this publication (HTTP 500). Please try again."
+
+        status <- 200
+        Helpers.click "Search"
+
+        let! _ =
+            RTL.screen.findByText
+                "Publication search failed: Swate could not read the response from Crossref. Please try again."
+
+        ()
     }
 )
 
