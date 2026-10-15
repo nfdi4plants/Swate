@@ -4,6 +4,7 @@ open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Composite.GraphCanvas.Types
 open Swate.Components.Composite.GraphCanvas.Pills

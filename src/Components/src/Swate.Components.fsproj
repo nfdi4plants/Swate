@@ -78,7 +78,6 @@
     <Compile Include="JsBindings\Elk.fs" />
     <Compile Include="JsBindings\Dom.fs" />
     <Compile Include="JsBindings\Errors.fs" />
-    <Compile Include="JsBindings\ReactHooks.fs" />
     <Compile Include="Util\Download.fs" />
     <Compile Include="Util\SemVer.fs" />
     <Compile Include="Util\SemVer.test.fs" />
