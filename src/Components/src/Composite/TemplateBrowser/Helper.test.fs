@@ -154,6 +154,7 @@ Vitest.test (
         let imported = updated.Tables().[1]
         Vitest.expect(imported.Headers).toEqual source.Headers
         Vitest.expect(imported.RowCount).toBe 0
+        Vitest.expect(imported.Columns.Count).toBe (imported.ColumnCount)
         imported.AddRowsEmpty 3
         verifyReadableAndSerializable (ArcFiles.refreshRef updated)
 )
