@@ -831,7 +831,7 @@ let classifyCreateProjectFailure (status: int) (bodyText: string) : CreateProjec
         | _ -> None
 
     match namespaceTexts, status with
-    // GitLab's namespace messages are field fragments such as "is not valid", not sentences.
+    // GitLab's namespace messages are field fragments such as "is not valid". They mean nothing to the user.
     | Some _, _ -> CreateProjectError.NotAllowed None
     | None, 403 -> CreateProjectError.NotAllowed messageText
     | None, (400 | 409) ->
