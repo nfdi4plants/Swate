@@ -39,11 +39,7 @@ You can find indepth documentation on how to use ARCitISA on our [knowledgebase]
 
 ### 🧭 Other ways to use ARCitISA
 
-Besides the desktop app, ARCitISA is available on several other platforms:
-
--   **Web Tool**: [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
--   **Excel Add-In**: [ARC Excel Add-In](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/swate/annotate-in-excel/)
--   **ARCitect**: ARCitISA is also embedded in the [ARCitect](https://github.com/nfdi4plants/ARCitect) desktop application.
+Besides the desktop app, ARCitISA is available as a **Web Tool** as well: [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
 
 You can also follow along our tutorial [Violas Journey](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/start-here/) 🪻
 
