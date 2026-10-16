@@ -136,7 +136,7 @@ type JsonImport =
             SidebarComponents.SidebarLayout.Description(
                 Html.p [
                     Html.b "Import JSON files."
-                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
+                    Html.text " You can use \"Json Export\" to create these files from existing ARCitISA tables. "
                 ]
             )
 

@@ -90,7 +90,7 @@ type TermSearchConfigSetter =
             ]
 
             renderer {|
-                title = "Enable Swate default search"
+                title = "Enable ARCitISA default search"
                 settingElement =
                     Html.input [
                         prop.className [

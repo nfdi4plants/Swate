@@ -30,20 +30,20 @@ module GitLabUrls =
             "read_api"
             "api"
             "write_repository"
-            "self_rotate" // This is used to allow users to rotate their token from within Swate without having to log in to GitLab. It is a scope that only allows the token itself to be revoked, not any other tokens or account access.
+            "self_rotate" // This is used to allow users to rotate their token from within ARCitISA without having to log in to GitLab. It is a scope that only allows the token itself to be revoked, not any other tokens or account access.
         ]
 
         let scopeParam = scopes |> String.concat ","
 
         let description =
             "👉 What to do:
-The permissions are already selected. Simply click \"Generate token\" below, then copy it and paste it back into Swate.
+The permissions are already selected. Simply click \"Generate token\" below, then copy it and paste it back into ARCitISA.
 
-Swate uses this token to access your repositories and user information. You can revoke it at any time."
+ARCitISA uses this token to access your repositories and user information. You can revoke it at any time."
             |> Fable.Core.JS.encodeURIComponent
 
         sprintf
-            "%s/-/user_settings/personal_access_tokens?name=swate-electron&description=%s&scopes=%s"
+            "%s/-/user_settings/personal_access_tokens?name=arcitisa-electron&description=%s&scopes=%s"
             gitlabBaseUrl
             description
             scopeParam

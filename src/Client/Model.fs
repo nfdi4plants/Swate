@@ -88,7 +88,7 @@ type LogItem =
         | "error" -> Error(System.DateTime.UtcNow, message)
         | "Warning"
         | "warning" -> Warning(System.DateTime.UtcNow, message)
-        | others -> Error(System.DateTime.UtcNow, sprintf "Swate found an unexpected log identifier: %s" others)
+        | others -> Error(System.DateTime.UtcNow, sprintf "ARCitISA found an unexpected log identifier: %s" others)
 
 module TermSearch =
 

@@ -1640,7 +1640,7 @@ type Main =
             return [
                 InteropLogging.Msg.create
                     InteropLogging.Info
-                    $"Replaced existing Swate information! Added {tables.TableCount} tables!"
+                    $"Replaced existing ARCitISA information! Added {tables.TableCount} tables!"
             ]
         }
 

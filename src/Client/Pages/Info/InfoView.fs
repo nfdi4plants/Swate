@@ -12,19 +12,9 @@ module private AboutHelper =
 
             prop.children [
                 Html.p [
-                    Html.b "Swate"
-                    Html.text " is a "
-                    Html.b "S"
-                    Html.text "wate "
-                    Html.b "W"
-                    Html.text "orkflow "
-                    Html.b "A"
-                    Html.text "nnotation "
-                    Html.b "T"
-                    Html.text "ool for "
-                    Html.b "E"
+                    Html.b "ARCitISA"
                     Html.text
-                        "veryone. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
+                        " is a workflow annotation tool for everyone. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
                     Html.a [
                         prop.href Swate.Components.Shared.URLs.SWATE_WIKI
                         prop.target.blank
@@ -68,7 +58,7 @@ module private AboutHelper =
                 React.Fragment [
                     Html.strong "DataPLANT"
                     Html.br []
-                    Html.p "Swate is part of the DataPLANT organisation."
+                    Html.p "ARCitISA is part of the DataPLANT organisation."
                     Html.p [
                         Html.text "Services and infrastructures to support "
                         Html.a [
@@ -117,7 +107,7 @@ module private AboutHelper =
                 React.Fragment [
                     Html.strong "GitHub"
                     Html.br []
-                    Html.text "You can find the Swate source code  "
+                    Html.text "You can find the ARCitISA source code  "
                     Html.a [
                         prop.href Swate.Components.Shared.URLs.SwateRepo
                         prop.target.blank
@@ -145,7 +135,7 @@ module private AboutHelper =
                 Html.h2 "API Documentation"
                 Html.div [
                     prop.className "swt:text-base-content/70"
-                    prop.text "Swate offers some APIs to retrieve ontology information."
+                    prop.text "ARCitISA offers some APIs to retrieve ontology information."
                 ]
                 Html.ul [
                     prop.children [
@@ -156,7 +146,7 @@ module private AboutHelper =
                                 prop.text "IOntologyAPIv3"
                             ]
                             Html.span
-                                " - API for searching and retrieving ontology terms and trees in Swate. This is the API used by Swate itself and thus the most up-to-date one. If you want to retrieve ontology information for your own applications, this is the API you should use."
+                                " - API for searching and retrieving ontology terms and trees in ARCitISA. This is the API used by ARCitISA itself and thus the most up-to-date one. If you want to retrieve ontology information for your own applications, this is the API you should use."
                         ]
                     ]
                 ]
@@ -168,7 +158,7 @@ type About =
         Html.div [
             prop.className "swt:prose-sm swt:md:prose swt:lg:prose-lg swt:divide-y-2 swt:gap-y-2 swt:py-1 swt:lg:py-4"
             prop.children [
-                Html.h1 "Swate"
+                Html.h1 "ARCitISA"
                 AboutHelper.IntroductionElement()
                 AboutHelper.GetInContactElements()
                 AboutHelper.APIDocsElement()
