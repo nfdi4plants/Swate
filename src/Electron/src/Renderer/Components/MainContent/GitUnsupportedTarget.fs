@@ -27,7 +27,7 @@ let Main (unsupportedPage: GitUnsupportedPageData) =
                     Html.p [
                         prop.className "swt:mt-4 swt:text-sm swt:text-base-content/70"
                         prop.text
-                            $"Swate can only open plain-text git diffs and merge conflicts here. '{unsupportedPage.Path}' is not supported."
+                            $"ARCitISA can only open plain-text git diffs and merge conflicts here. '{unsupportedPage.Path}' is not supported."
                     ]
                     match unsupportedPage.Reason with
                     | Some reason ->

@@ -40,7 +40,7 @@ module IPCHelper =
         : JS.Promise<Result<'T, exn>> =
         if vault.isBusyWriting then
             JS.Constructors.Promise.resolve (
-                Error(exn "Swate is still saving another change. Please wait a moment and try again.")
+                Error(exn "ARCitISA is still saving another change. Please wait a moment and try again.")
             )
         else
             withBusyWritingScope vault operation

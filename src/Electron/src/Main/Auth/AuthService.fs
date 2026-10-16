@@ -294,7 +294,7 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
             toAuthResult (
                 Error {
                     Kind = AuthFailureKind.StorageUnavailable
-                    Message = "Swate safe storage is not available on this system."
+                    Message = "ARCitISA safe storage is not available on this system."
                 }
             )
     else

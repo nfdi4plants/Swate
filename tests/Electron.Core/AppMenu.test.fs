@@ -66,7 +66,7 @@ Vitest.test (
             (fun (parent, options) ->
                 shown <- true
                 Vitest.expect(parent.id).toBe window.id
-                Vitest.expect(options.message).toBe "Swate"
+                Vitest.expect(options.message).toBe "ARCitISA"
 
                 Vitest.expect(options.detail).toEqual ($"Version {Main.Settings.AppVersion.getState().CurrentVersion}")
 
@@ -119,7 +119,7 @@ Vitest.test (
 
         Vitest.expect(dialogs.ToArray()).toEqual [|
             "Swate v2.0.0 is available."
-            "Swate is up to date."
+            "ARCitISA is up to date."
             "Could not check for updates."
         |]
     }

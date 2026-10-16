@@ -4554,7 +4554,7 @@ let private confirmMergeResolutionAsync
                     None
                 elif partialNeedsMaterialization then
                     Some
-                        "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                        "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                 elif objectWasNotMaterialized && not downloadLargeFiles then
                     match resolution.Resolution with
                     | ConflictResolutionDto.PickCandidate candidateId when candidateId = useOnlineCandidateId ->

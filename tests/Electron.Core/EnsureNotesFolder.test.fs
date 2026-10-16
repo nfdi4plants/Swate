@@ -76,7 +76,7 @@ Vitest.describe (
                     Vitest.expect(hasNotesFolder).toBe (true)
                     Vitest.expect(hasNotesReadme).toBe (true)
                     Vitest.expect(readmeContent.Contains("Automatically create notes folder")).toBe (true)
-                    Vitest.expect(readmeContent.Contains("Swate Settings")).toBe (true)
+                    Vitest.expect(readmeContent.Contains("ARCitISA Settings")).toBe (true)
                     do! removePathAsync rootPath
                 with error ->
                     do! removePathAsync rootPath

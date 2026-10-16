@@ -230,7 +230,7 @@ type Navbar =
             Html.button [
                 prop.type'.button
                 prop.className "swt:btn swt:btn-primary swt:btn-sm swt:mr-2"
-                prop.title $"Download Swate {available}"
+                prop.title $"Download ARCitISA {available}"
                 prop.text "Update"
                 prop.onClick (fun _ ->
                     promise {

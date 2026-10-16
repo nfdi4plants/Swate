@@ -182,7 +182,7 @@ let create (read: unit -> string option) (write: string -> Result<unit, string>)
                 match load () with
                 | NewerSchema ->
                     Error
-                        "The saved defaults were written by a newer version of Swate. They stay as they are until Swate is updated."
+                        "The saved defaults were written by a newer version of ARCitISA. They stay as they are until ARCitISA is updated."
                 | Stored _ ->
                     let overrides = overridesOf values
 
