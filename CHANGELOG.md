@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔄 Changed
 
-- Swate is now called ARCitISA and has a new logo, designed by @Feymaurer. (by @caroott)
+- Swate is now called ARCitISA and has a new logo, designed by @Feymaurer. #1425 (by @caroott)
 
 ## 2.6.1 - 2026-10-16
 
