@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="274.57 351.75 376.50 376.50" width="377" height="377" role="img" aria-label="ARCitISA">
+  <title>ARCitISA</title>
+  <defs>
+    <clipPath id="card"><rect x="278.57" y="355.75" width="368.50" height="368.50" rx="61.42"/></clipPath>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="40"/></filter>
+    <filter id="inner" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="30"/></filter>
+    <filter id="glowWide" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
+    <filter id="glowTight" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.5"/></filter>
+  </defs>
+  <rect x="278.57" y="355.75" width="368.50" height="368.50" rx="61.42" fill="#0E2841"/>
+  <g clip-path="url(#card)">
+    <rect x="363.80" y="417.75" width="221.70" height="244.50" rx="36.95" fill="#1FC2A7" fill-opacity="0.27" filter="url(#soft)"/>
+    <path fill="#1FC2A7" fill-opacity="0.5" fill-rule="evenodd" filter="url(#inner)" d="M78.57 155.75h768.50v768.50h-768.50z M296.57 373.75h408.50v408.50h-408.50z"/>
+  </g>
+  <rect x="278.57" y="355.75" width="368.50" height="368.50" rx="61.42" fill="none" stroke="#1FC2A7" stroke-width="6.00"/>
+  <g transform="translate(371.31 696.02)">
+  <g fill="none" stroke-linejoin="miter">
+    <g transform="translate(6.14 1.50)">
+      <path d="M172.3759765625 0.0H127.2900390625L118.15625 -57.7177734375H61.2158203125L52.08203125 0.0H7.1904296875V-0.77734375L66.07421875 -304.5244140625H113.880859375ZM111.7431640625 -96.779296875 89.5888671875 -233.98046875 67.240234375 -96.779296875Z" stroke="#168875" stroke-opacity="0.4" stroke-width="15.00" filter="url(#glowWide)"/>
+      <path d="M172.3759765625 0.0H127.2900390625L118.15625 -57.7177734375H61.2158203125L52.08203125 0.0H7.1904296875V-0.77734375L66.07421875 -304.5244140625H113.880859375ZM111.7431640625 -96.779296875 89.5888671875 -233.98046875 67.240234375 -96.779296875Z" stroke="#168875" stroke-width="3.00"/>
+    </g>
+    <path d="M172.3759765625 0.0H127.2900390625L118.15625 -57.7177734375H61.2158203125L52.08203125 0.0H7.1904296875V-0.77734375L66.07421875 -304.5244140625H113.880859375ZM111.7431640625 -96.779296875 89.5888671875 -233.98046875 67.240234375 -96.779296875Z" stroke="#1FC2A7" stroke-opacity="0.4" stroke-width="6.00" filter="url(#glowTight)"/>
+    <path d="M172.3759765625 0.0H127.2900390625L118.15625 -57.7177734375H61.2158203125L52.08203125 0.0H7.1904296875V-0.77734375L66.07421875 -304.5244140625H113.880859375ZM111.7431640625 -96.779296875 89.5888671875 -233.98046875 67.240234375 -96.779296875Z" stroke="#1FC2A7" stroke-width="3.00"/>
+  </g>
+  </g>
+</svg>

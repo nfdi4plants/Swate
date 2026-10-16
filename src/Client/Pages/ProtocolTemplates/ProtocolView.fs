@@ -318,7 +318,7 @@ type Templates =
                             prop.text "Metadata Quiz"
                             prop.className "swt:text-blue-600 swt:hover:underline swt:cursor-pointer"
                         ]
-                        Html.text " to find the swate template best suited to your data."
+                        Html.text " to find the ARCitISA template best suited to your data."
                     ]
                 ]
             )

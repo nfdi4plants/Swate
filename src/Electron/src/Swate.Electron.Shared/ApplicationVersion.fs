@@ -34,5 +34,5 @@ let current =
 
 let windowTitle (arcName: string option) =
     match arcName with
-    | Some name when not (System.String.IsNullOrWhiteSpace name) -> $"Swate {current} — {name}"
-    | _ -> $"Swate {current}"
+    | Some name when not (System.String.IsNullOrWhiteSpace name) -> $"ARCitISA {current} — {name}"
+    | _ -> $"ARCitISA {current}"

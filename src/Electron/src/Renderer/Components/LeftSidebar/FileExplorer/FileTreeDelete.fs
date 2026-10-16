@@ -46,7 +46,7 @@ module FileTreeDeleteWorkflow =
                 config.closeDeleteModal ()
 
                 applyError
-                    $"Swate cannot delete '{deletePath}' while a large file download or free runs on a file the delete would remove. Wait until it finishes, then try again."
+                    $"ARCitISA cannot delete '{deletePath}' while a large file download or free runs on a file the delete would remove. Wait until it finishes, then try again."
             else
                 run
                     config.setIsDeleting

@@ -127,6 +127,6 @@ flowchart LR
     style storybook fill:#C8E6C9
 ```
 
-> **Note:** `electron-web` builds the prebundled web client frontend, historically used as an iframe in an external Electron app. It is unrelated to the `electron-bin` target which builds the Swate desktop application via `electron-forge make`.
+> **Note:** `electron-web` builds the prebundled web client frontend, historically used as an iframe in an external Electron app. It is unrelated to the `electron-bin` target which builds the ARCitISA desktop application via `electron-forge make`.
 
 If a desktop build is missing, its release_electron_binaries job fails. post_release then does not run, and the GitHub release stays a draft. post_release also checks the downloaded artifacts and stops before it uploads anything when one is incomplete. `Release.verifyReleaseAssets` in `build/Actions/Release.fs` lists the expected artifacts. Update that list when the `release_electron_binaries` matrix changes.

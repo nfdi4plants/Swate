@@ -16,9 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 3.0.0 - 2026-10-16
+
 ### ✨ Added
 
-- The settings page has a "Git defaults" section where you choose the git sidebar settings that every ARC opened afterwards starts with, and Swate keeps them across restarts and updates. #1424 (by @caroott)
+- The settings page has a "Git defaults" section where you choose the git sidebar settings that every ARC opened afterwards starts with, and ARCitISA keeps them across restarts and updates. #1424 (by @caroott)
+
+### 🔄 Changed
+
+- Swate is now called ARCitISA and has a new logo, designed by @Feymaurer. (by @caroott)
 
 ## 2.6.1 - 2026-10-16
 

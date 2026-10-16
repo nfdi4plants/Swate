@@ -54,7 +54,7 @@ Can be references like this in a react test repo after moving the `.tgz` file to
 0. Release normally and copy `<new_version>` from console output.
 1. `npm version <new_version> --no-git-tag-version`
 2. `npm run build` (transpiles with fable, creates tsc types, and bundles with rollup)
-3. (Due to [#701](https://github.com/nfdi4plants/Swate/issues/701)) replace `@layer base` with `@layer swt-base` in `dist/swate-components.css`
+3. (Due to [#701](https://github.com/nfdi4plants/ARCitISA/issues/701)) replace `@layer base` with `@layer swt-base` in `dist/swate-components.css`
 4. `npm publish --access public [--tag next]` (Use `--tag next` for prerelease)
 
 ##### Background info:
@@ -62,7 +62,7 @@ Can be references like this in a react test repo after moving the `.tgz` file to
 <details>
 <summary>Requirements</summary>
 
-1. Library MUST include swate styling via .css file.
+1. Library MUST include ARCitISA styling via .css file.
 2. Library MUST be readable code (not minified) for easier debugging.
 3. Library MUST be tree-shakeable.
 4. Library MUST include proper TypeScript types.

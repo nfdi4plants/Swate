@@ -226,7 +226,7 @@ let private unreachable provider =
     $"{provider} could not be reached. Please try again."
 
 let private unreadable provider =
-    $"Swate could not read the response from {provider}. Please try again."
+    $"ARCitISA could not read the response from {provider}. Please try again."
 
 /// Expects a DOI that normalizeDoi already accepted.
 let searchDoi doi : JS.Promise<SearchPage> = promise {

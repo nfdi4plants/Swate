@@ -7591,7 +7591,7 @@ Vitest.describe (
                             .expect(outcome.Notice)
                             .toEqual (
                                 Some
-                                    "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                                    "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                             )
 
                         nextState, finishCmd
@@ -7604,7 +7604,7 @@ Vitest.describe (
                     .expect(nextState.WarningNotice)
                     .toEqual (
                         Some
-                            "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                            "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                     )
 
                 Vitest.expect(nextState.ActiveConflict |> Option.map _.Handle).toEqual (Some refreshedHandle)
@@ -7721,7 +7721,7 @@ Vitest.describe (
                             .expect(outcome.Notice)
                             .toEqual (
                                 Some
-                                    "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                                    "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                             )
 
                         update deps ignore partialMessages[0] stateAfterPartialRequest
