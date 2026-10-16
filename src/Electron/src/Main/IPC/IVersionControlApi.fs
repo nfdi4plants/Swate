@@ -310,7 +310,9 @@ let private withTextDiff
 let private diffStoragePolicyOf (event: IpcMainInvokeEvent) : DiffStoragePolicy =
     match tryGetVaultAndArcPath event with
     | Ok(_, arcPath) -> VersionControlSettings.diffStoragePolicy (WorkspaceSessionHost.get().GetSettings arcPath)
-    | Error _ -> VersionControlSettings.diffStoragePolicy VersionControlSettings.defaults
+    | Error _ ->
+        let defaults = WorkspaceSessionHost.get().Runtime.SessionDefaults()
+        VersionControlSettings.diffStoragePolicy defaults.InitialSettings
 
 /// The window of the IPC call. Electron supplies it, so the renderer cannot choose it.
 let private callingWindowId (event: IpcMainInvokeEvent) : int option =
@@ -557,13 +559,14 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     let! reopened = host.ReopenSession(arcPath, context)
 
                     match reopened with
-                    | Succeeded _
-                    | PartiallySucceeded _ ->
-                        // The new session starts checked, so the checkbox value goes back first.
+                    | Succeeded outcome
+                    | PartiallySucceeded(outcome, _) ->
+                        // The new session starts from the current defaults, so the checkbox value goes back first.
                         savedUploadRightAway
                         |> Option.iter (fun saved -> host.SetUploadRightAway(arcPath, saved) |> ignore)
 
-                        if savedSettings <> VersionControlSettings.defaults then
+                        // Only settings that differ from what the fresh session started with need restoring.
+                        if savedSettings <> outcome.Value.Settings then
                             do! restoreSavedSettings savedSettings context
                     | _ -> ()
 

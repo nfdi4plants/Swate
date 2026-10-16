@@ -7,6 +7,9 @@ type VersionControlRuntime = {
     Catalog: ProviderResolver.ProviderCatalog
     Bindings: WorkspaceBindingStore.IWorkspaceBindingStore
     PathCaseSensitivity: PathCaseSensitivity
+    /// What a new session starts from. The host calls it once per opened session, so a later change
+    /// of the user defaults leaves open sessions alone.
+    SessionDefaults: unit -> Main.UserDefaults.SessionDefaults
 }
 
 /// Creates production dependencies after the app is ready, when the settings root exists.
@@ -18,4 +21,5 @@ let createProduction (windowOwnerOf: OperationContext -> string) : VersionContro
         Catalog = ProviderComposition.createProductionCatalog sensitivity windowOwnerOf
         Bindings = WorkspaceBindingStore.createSettingsStore sensitivity
         PathCaseSensitivity = sensitivity
+        SessionDefaults = fun () -> Main.UserDefaults.sessionDefaultsOf Main.UserDefaults.production
     }

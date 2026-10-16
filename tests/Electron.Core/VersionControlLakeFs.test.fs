@@ -58,6 +58,7 @@ let private createRuntimeWithFactory
             ]
         Bindings = bindings
         PathCaseSensitivity = CaseInsensitive
+        SessionDefaults = UserDefaults.builtInSessionDefaults
     }
 
 let private createRuntimeWithHooks

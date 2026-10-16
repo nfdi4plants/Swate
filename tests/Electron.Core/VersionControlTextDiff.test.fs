@@ -323,6 +323,7 @@ let private textDiffRuntime
         Catalog = ProviderComposition.createCatalog [ factory ]
         Bindings = TestHelpers.memoryBindings ()
         PathCaseSensitivity = CaseInsensitive
+        SessionDefaults = UserDefaults.builtInSessionDefaults
     }
 
 /// Registers a vault at the workspace root for each window and lets every window's web

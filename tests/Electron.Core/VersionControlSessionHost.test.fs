@@ -100,6 +100,32 @@ let private withFixture (body: Fixture -> JS.Promise<unit>) = promise {
         return raise error
 }
 
+/// A fixture whose host reads the session defaults from the given cell, so a test can change them
+/// between two session opens.
+let private withFixtureDefaults (defaults: UserDefaults.SessionDefaults ref) (body: Fixture -> JS.Promise<unit>) =
+    withFixture (fun fixture -> promise {
+        let runtime = {
+            fixture.Runtime with
+                SessionDefaults = fun () -> defaults.Value
+        }
+
+        let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+        WorkspaceSessionHost.initialize host
+
+        try
+            do!
+                body {
+                    fixture with
+                        Runtime = runtime
+                        Host = host
+                }
+
+            do! host.CloseAll() |> Async.StartAsPromise
+        with error ->
+            do! host.CloseAll() |> Async.StartAsPromise
+            return raise error
+    })
+
 Vitest.describe (
     "Workspace session host",
     fun () ->
@@ -671,6 +697,7 @@ let private fakeProviderRuntimeWithStoragePolicy
         Catalog = ProviderComposition.createCatalog [ coreFactory; brokenFactory ]
         Bindings = memoryBindings ()
         PathCaseSensitivity = CaseInsensitive
+        SessionDefaults = UserDefaults.builtInSessionDefaults
     }
 
 let private fakeProviderRuntime coreOnlyRoot failingRoot =
@@ -2889,5 +2916,155 @@ Vitest.describe (
 
                 Vitest.expect(VersionControlCodes.Recovery.RefreshConflictSession).toBe
                     ConflictRecovery.RefreshConflictSession
+        )
+)
+
+Vitest.describe (
+    "User defaults for new sessions",
+    fun () ->
+        let customDefaults: UserDefaults.SessionDefaults = {
+            InitialSettings = {
+                Settings.defaults with
+                    AutoTrackThresholdMb = 7
+                    DownloadLargeFiles = true
+            }
+            InitialUploadRightAway = false
+        }
+
+        Vitest.afterEach (fun () ->
+            electronMock?reset () |> ignore
+            ARC_VAULTS.Vaults.Clear()
+        )
+
+        Vitest.test (
+            "a new session starts from the user defaults, and a root without a session reports them",
+            fun () ->
+                withFixtureDefaults
+                    (ref customDefaults)
+                    (fun fixture -> promise {
+                        Vitest.expect(fixture.Host.GetSettings fixture.RepoRoot).toEqual customDefaults.InitialSettings
+
+                        let! opened =
+                            fixture.Host.OpenSession(fixture.RepoRoot, detached "open-user-defaults")
+                            |> Async.StartAsPromise
+
+                        let hosted = expectValue "open" opened
+                        Vitest.expect(hosted.Settings).toEqual customDefaults.InitialSettings
+                        Vitest.expect(hosted.UploadRightAway).toBe false
+
+                        Vitest
+                            .expect(
+                                git fixture.RepoRoot [
+                                    "config"
+                                    "--local"
+                                    "--get"
+                                    "versioncontrolservice.lfs.autotrackthresholdmb"
+                                ]
+                                |> _.Trim()
+                            )
+                            .toBe
+                            "7"
+                    })
+        )
+
+        Vitest.test (
+            "changing the defaults leaves the open session alone and applies to the next one",
+            fun () ->
+                let defaults = ref customDefaults
+
+                withFixtureDefaults
+                    defaults
+                    (fun fixture -> promise {
+                        let! opened =
+                            fixture.Host.OpenSession(fixture.RepoRoot, detached "open-before-change")
+                            |> Async.StartAsPromise
+
+                        expectValue "open" opened |> ignore
+
+                        defaults.Value <- UserDefaults.builtInSessionDefaults ()
+
+                        Vitest.expect(fixture.Host.GetSettings fixture.RepoRoot).toEqual customDefaults.InitialSettings
+
+                        Vitest
+                            .expect(expectValue "read the checkbox" (fixture.Host.GetUploadRightAway fixture.RepoRoot))
+                            .toBe
+                            false
+
+                        do! fixture.Host.CloseSession fixture.RepoRoot |> Async.StartAsPromise
+
+                        let! reopened =
+                            fixture.Host.OpenSession(fixture.RepoRoot, detached "open-after-change")
+                            |> Async.StartAsPromise
+
+                        expectValue "reopen" reopened |> ignore
+                        Vitest.expect(fixture.Host.GetSettings fixture.RepoRoot).toEqual Settings.defaults
+
+                        Vitest
+                            .expect(expectValue "read the checkbox" (fixture.Host.GetUploadRightAway fixture.RepoRoot))
+                            .toBe
+                            true
+                    })
+        )
+
+        Vitest.test (
+            "a bind reopen keeps session values that differ from the defaults the fresh session started with",
+            fun () ->
+                withFixtureDefaults
+                    (ref customDefaults)
+                    (fun fixture -> promise {
+                        registerVault 301 fixture.RepoRoot |> ignore
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 301)
+
+                        let! opened =
+                            fixture.Host.OpenSession(fixture.RepoRoot, detached "open-before-bind")
+                            |> Async.StartAsPromise
+
+                        expectValue "open" opened |> ignore
+
+                        // The session goes back to the built-in values while the user defaults stay custom.
+                        let! changed =
+                            api.setStoragePolicySettings {
+                                OperationId = "set-built-in-before-bind"
+                                Settings = {
+                                    AutoPolicyThresholdMb = Some Settings.defaults.AutoTrackThresholdMb
+                                    MaterializeLargeObjects = Settings.defaults.DownloadLargeFiles
+                                    DiffIndexingLimitMb = None
+                                }
+                            }
+
+                        expectDtoValue "set built-in values" changed |> ignore
+
+                        let! checkedAgain = api.setUploadRightAway true
+                        expectDtoValue "check the upload choice" checkedAgain |> ignore
+
+                        let! bound =
+                            api.bindWorkspace {
+                                OperationId = "bind-with-user-defaults"
+                                ProviderLocation = "https://example.invalid/never/reached.git"
+                                DisplayName = Some "reached"
+                            }
+
+                        expectDtoValue "bind" bound |> ignore
+
+                        Vitest.expect(fixture.Host.GetSettings fixture.RepoRoot).toEqual Settings.defaults
+
+                        Vitest
+                            .expect(expectValue "read the checkbox" (fixture.Host.GetUploadRightAway fixture.RepoRoot))
+                            .toBe
+                            true
+
+                        Vitest
+                            .expect(
+                                git fixture.RepoRoot [
+                                    "config"
+                                    "--local"
+                                    "--get"
+                                    "versioncontrolservice.lfs.autotrackthresholdmb"
+                                ]
+                                |> _.Trim()
+                            )
+                            .toBe
+                            "1"
+                    })
         )
 )
