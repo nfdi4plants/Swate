@@ -56,4 +56,4 @@ If you want to contribute or just check out ARCitISA on your local machine have 
 
 Every release is published to Zenodo with a stable DOI.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21456532.svg)](https://doi.org/10.5281/zenodo.21456532)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21456531.svg)](https://doi.org/10.5281/zenodo.21456531)
