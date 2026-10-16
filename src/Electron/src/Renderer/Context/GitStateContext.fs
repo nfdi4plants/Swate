@@ -18,6 +18,7 @@ type GitStateController = {
     state: GitState
     refresh: unit -> unit
     sidebarVisibilityChanged: bool -> unit
+    uploadRightAwayChanged: bool -> unit
     initRepository: unit -> unit
     fetch: unit -> unit
     push: unit -> unit
@@ -69,6 +70,8 @@ module private Helper =
             getRepositoryWebUrl = Renderer.VersionControlApiClient.getRepositoryWebUrl
             getStoragePolicySettings = Renderer.VersionControlApiClient.getStoragePolicySettings
             setStoragePolicySettings = Renderer.VersionControlApiClient.setStoragePolicySettings
+            getUploadRightAway = Renderer.VersionControlApiClient.getUploadRightAway
+            setUploadRightAway = Renderer.VersionControlApiClient.setUploadRightAway
             loadConflictPage = loadConflictPage
             updatePageState = updatePageState
             initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
@@ -121,6 +124,7 @@ let GitStateCtx =
             state = GitState.Empty
             refresh = fun () -> ()
             sidebarVisibilityChanged = fun _ -> ()
+            uploadRightAwayChanged = fun _ -> ()
             initRepository = fun () -> ()
             fetch = fun () -> ()
             push = fun () -> ()
@@ -195,6 +199,8 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let sidebarVisibilityChanged isVisible =
         dispatch (SidebarVisibilityChanged isVisible)
+
+    let uploadRightAwayChanged (value: bool) = dispatch (UploadRightAwayChanged value)
 
     let initRepository () = dispatch InitRepositoryRequested
 
@@ -279,6 +285,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 state = gitState
                 refresh = refresh
                 sidebarVisibilityChanged = sidebarVisibilityChanged
+                uploadRightAwayChanged = uploadRightAwayChanged
                 initRepository = initRepository
                 fetch = fetch
                 push = push

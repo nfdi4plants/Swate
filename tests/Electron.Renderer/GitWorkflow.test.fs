@@ -316,6 +316,10 @@ let private defaultDependencies: GitDependencies = {
     getRepositoryWebUrl = fun _ -> promise { return Ok(succeeded None) }
     getStoragePolicySettings = fun _ -> unexpectedPromise "getStoragePolicySettings"
     setStoragePolicySettings = fun _ -> unexpectedPromise "setStoragePolicySettings"
+    // The main process holds no stored value by default, so a refresh keeps the checkbox it has.
+    getUploadRightAway =
+        fun () -> promise { return Ok(failed NotFound VersionControlCodes.SessionUnavailable "no stored value") }
+    setUploadRightAway = fun _ -> promise { return Ok(succeeded ()) }
     loadConflictPage = fun _ _ _ -> unexpectedPromise "loadConflictPage"
     updatePageState = ignore
     initializeWorkspace = fun _ -> unexpectedPromise "initializeWorkspace"
@@ -1877,6 +1881,153 @@ Vitest.describe (
 
                 Vitest.expect(openedState.SidebarVisible).toBe (true)
                 Vitest.expect(openMessages).toEqual ([| RefreshRequestedSilently |])
+            }
+        )
+
+        Vitest.test (
+            "UploadRightAwayChanged starts checked, stores the new value and hands it to the main process",
+            fun () -> promise {
+                let stored = ResizeArray<bool>()
+
+                let deps = {
+                    defaultDependencies with
+                        setUploadRightAway =
+                            fun value ->
+                                stored.Add value
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let uncheckedState, uncheckedCmd =
+                    update deps ignore (UploadRightAwayChanged false) runningState
+
+                let rechecked, recheckedCmd =
+                    update deps ignore (UploadRightAwayChanged true) uncheckedState
+
+                let! uncheckedMessages = collectMessages uncheckedCmd
+                let! recheckedMessages = collectMessages recheckedCmd
+
+                Vitest.expect(GitState.Empty.UploadRightAway).toBe (true)
+                Vitest.expect(uncheckedState.UploadRightAway).toBe (false)
+                Vitest.expect(rechecked.UploadRightAway).toBe (true)
+                Vitest.expect(uncheckedMessages).toEqual ([||])
+                Vitest.expect(recheckedMessages).toEqual ([||])
+                Vitest.expect(stored.ToArray()).toEqual ([| false; true |])
+            }
+        )
+
+        Vitest.test (
+            "The first refresh of an ARC reads the stored upload right away choice and applies it",
+            fun () -> promise {
+                let reads = ResizeArray<string>()
+
+                let deps = {
+                    withRefresh cleanStatus defaultDependencies with
+                        getUploadRightAway =
+                            fun () ->
+                                reads.Add "read"
+                                promise { return Ok(succeeded false) }
+                }
+
+                let! bound, bindMessages = step deps GitState.Empty (ArcPathChanged(Some "C:/arc"))
+                let! refreshing, refreshMessages = step deps bound bindMessages[0]
+                let! refreshed, loadMessages = step deps refreshing refreshMessages[0]
+
+                Vitest.expect(refreshed.UploadRightAway).toBe (true)
+                Vitest.expect(loadMessages).toEqual ([| UploadRightAwayLoaded(bound.ArcSessionId, false) |])
+
+                let! loaded, _ = step deps refreshed loadMessages[0]
+
+                Vitest.expect(loaded.UploadRightAway).toBe (false)
+                Vitest.expect(reads.Count).toBe 1
+
+                let! refreshingAgain, againMessages = step deps loaded RefreshRequested
+                let! _, afterSecondRefresh = step deps refreshingAgain againMessages[0]
+
+                Vitest.expect(afterSecondRefresh).toEqual ([||])
+                Vitest.expect(reads.Count).toBe 1
+            }
+        )
+
+        Vitest.test (
+            "A stored upload right away choice that arrives after a local change is ignored",
+            fun () -> promise {
+                let pendingState = {
+                    runningState with
+                        UploadRightAwayLoad = UploadRightAwayLoad.Pending
+                }
+
+                let changedState, _ =
+                    update defaultDependencies ignore (UploadRightAwayChanged false) pendingState
+
+                let afterLoad, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UploadRightAwayLoaded(runningState.ArcSessionId, true))
+                        changedState
+
+                Vitest.expect(afterLoad.UploadRightAway).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "A stored upload right away choice of an earlier ARC session is ignored",
+            fun () -> promise {
+                let pendingState = {
+                    runningState with
+                        UploadRightAwayLoad = UploadRightAwayLoad.Pending
+                }
+
+                let nextArc, _ =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) pendingState
+
+                // The new ARC has its own read in flight, so only the session id tells the two apart.
+                let nextArcLoading = {
+                    nextArc with
+                        UploadRightAwayLoad = UploadRightAwayLoad.Pending
+                }
+
+                let afterLoad, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UploadRightAwayLoaded(runningState.ArcSessionId, false))
+                        nextArcLoading
+
+                Vitest.expect(nextArc.ArcSessionId).not.toBe runningState.ArcSessionId
+                Vitest.expect(afterLoad.UploadRightAway).toBe (true)
+                Vitest.expect(afterLoad.UploadRightAwayLoad).toEqual UploadRightAwayLoad.Pending
+            }
+        )
+
+        Vitest.test (
+            "Closing and reopening the sidebar keeps the upload right away choice",
+            fun () -> promise {
+                let uncheckedState, _ =
+                    update defaultDependencies ignore (UploadRightAwayChanged false) runningState
+
+                let closedState, _ =
+                    update defaultDependencies ignore (SidebarVisibilityChanged false) uncheckedState
+
+                let reopenedState, _ =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) closedState
+
+                Vitest.expect(closedState.UploadRightAway).toBe (false)
+                Vitest.expect(reopenedState.UploadRightAway).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "ArcPathChanged resets the upload right away choice to checked",
+            fun () -> promise {
+                let uncheckedState, _ =
+                    update defaultDependencies ignore (UploadRightAwayChanged false) runningState
+
+                let nextState, _ =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) uncheckedState
+
+                Vitest.expect(nextState.CurrentArcPath).toEqual (Some "C:/arc-b")
+                Vitest.expect(nextState.UploadRightAway).toBe (true)
             }
         )
 
@@ -10994,6 +11145,48 @@ Vitest.describe (
 
                 Vitest.expect(primaryAllMessage).toEqual (Some "save everything")
                 Vitest.expect(commitAllCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar shows the controlled upload right away value and reports changes without storing them",
+            fun () -> promise {
+                let reported = ResizeArray<bool>()
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = noopCallbacks,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024,
+                            uploadRightAway = false,
+                            onUploadRightAwayChange = reported.Add
+                        )
+                    )
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                Vitest.expect(uploadCheckbox.``checked``).toBe (false)
+
+                uploadCheckbox.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(reported |> Seq.toArray).toEqual ([| true |])
+                Vitest.expect(uploadCheckbox.``checked``).toBe (false)
 
                 cleanup ()
             }

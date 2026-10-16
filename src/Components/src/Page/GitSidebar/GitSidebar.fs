@@ -1873,7 +1873,9 @@ type GitSidebar =
             ?canCancelOperation: bool,
             ?onOpenRemoteRepository: unit -> unit,
             ?onSubmitPublishRename: GitSidebarPublishSubmit -> unit,
-            ?onCancelPublishRename: unit -> unit
+            ?onCancelPublishRename: unit -> unit,
+            ?uploadRightAway: bool,
+            ?onUploadRightAwayChange: bool -> unit
         ) =
 
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
@@ -1914,7 +1916,15 @@ type GitSidebar =
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
         let isMissingMessageModalOpen, setMissingMessageModalOpen = React.useState false
-        let uploadRightAway, setUploadRightAway = React.useState true
+        let localUploadRightAway, setLocalUploadRightAway = React.useState true
+        let isUploadRightAwayControlled = uploadRightAway.IsSome
+        let uploadRightAway = defaultArg uploadRightAway localUploadRightAway
+
+        let setUploadRightAway (value: bool) =
+            if not isUploadRightAwayControlled then
+                setLocalUploadRightAway value
+
+            onUploadRightAwayChange |> Option.iter (fun notify -> notify value)
 
         let publishRenameInput, setPublishRenameInput =
             React.useState (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
