@@ -1,6 +1,6 @@
 # ARCitISA 
 
-![ARCitISA Logo](https://raw.githubusercontent.com/nfdi4plants/Branding/refs/heads/master/logos/Swate/Swate_logo_bg_transparent.svg)
+![ARCitISA logo](docs/arcitisa-banner.svg)
 
 ARCitISA is a powerful tool for research data management, providing a rich set of features for managing and annotating your data with a seamless experience.
 
