@@ -1,9 +1,11 @@
 module ElectronRenderer.ArcVaultHelperTests
 
+open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Renderer.Components.Helper.ArcVaultHelper
 open Renderer.Context.GitWorkflow
+open Swate.Components.PageComponents.SettingsPage
 open Swate.Electron.Shared.IPCTypes
 open Vitest
 
@@ -28,11 +30,34 @@ let private getUserDefaults () : JS.Promise<UserDefaultsDto> = promise {
     | None -> return failwith "main process unavailable"
 }
 
+/// The values the migration stored through the mocked main process.
+let private setUserDefaultsCalls = ResizeArray<UserDefaultValuesDto>()
+
+/// Makes the mocked main process refuse the next stores.
+let mutable private setUserDefaultsFails = false
+
+let private setUserDefaults (values: UserDefaultValuesDto) : JS.Promise<Result<UserDefaultsDto, string>> = promise {
+    setUserDefaultsCalls.Add values
+
+    if setUserDefaultsFails then
+        return Error "Could not write the user defaults."
+    else
+        return
+            Ok {
+                Effective = values
+                BuiltIn = builtInUserDefaults
+            }
+}
+
 Vitest.vi.mock (
     "./src/Electron/src/Renderer/Api.js",
     box (fun () ->
         createObj [
-            "ipcUserDefaultsApi" ==> createObj [ "getUserDefaults" ==> getUserDefaults ]
+            "ipcUserDefaultsApi"
+            ==> createObj [
+                "getUserDefaults" ==> getUserDefaults
+                "setUserDefaults" ==> setUserDefaults
+            ]
             "ipcArcVaultApi"
             ==> createObj [
                 "createARC"
@@ -163,5 +188,60 @@ Vitest.describe (
 
                 for stored, effective, expected in rows do
                     Vitest.expect(legacyAutoCreateNotesFolderAction stored effective).toEqual (expected)
+        )
+)
+
+/// Runs the migration with the old key set to the stored value and returns what it stored and what stays in localStorage.
+let private runMigration (stored: string option) (effective: bool) (storeFails: bool) = promise {
+    let key = SettingsPageDefaults.AutoCreateNotesFolderLocalStorageKey
+
+    match stored with
+    | Some value -> window.localStorage.setItem (key, value)
+    | None -> window.localStorage.removeItem key
+
+    effectiveAutoCreateNotesFolder <- Some effective
+    setUserDefaultsFails <- storeFails
+    setUserDefaultsCalls.Clear()
+    do! migrateLegacyAutoCreateNotesFolder ()
+    return setUserDefaultsCalls.ToArray(), window.localStorage.getItem key |> Option.ofObj
+}
+
+Vitest.describe (
+    "ArcVaultHelper.migrateLegacyAutoCreateNotesFolder",
+    fun () ->
+        Vitest.afterEach (fun () ->
+            window.localStorage.removeItem SettingsPageDefaults.AutoCreateNotesFolderLocalStorageKey
+            setUserDefaultsFails <- false
+        )
+
+        Vitest.test (
+            "stores a differing old value as the default and removes the key",
+            fun () -> promise {
+                let! calls, keyAfter = runMigration (Some "false") true false
+
+                Vitest.expect(calls.Length).toBe (1)
+                Vitest.expect(calls[0].AutoCreateNotesFolder).toBe (false)
+                Vitest.expect(keyAfter).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "keeps the key when the main process refuses the value",
+            fun () -> promise {
+                let! calls, keyAfter = runMigration (Some "false") true true
+
+                Vitest.expect(calls.Length).toBe (1)
+                Vitest.expect(keyAfter).toEqual (Some "false")
+            }
+        )
+
+        Vitest.test (
+            "removes the key without a store call when the old value equals the default",
+            fun () -> promise {
+                let! calls, keyAfter = runMigration (Some "true") true false
+
+                Vitest.expect(calls.Length).toBe (0)
+                Vitest.expect(keyAfter).toEqual (None)
+            }
         )
 )

@@ -210,7 +210,8 @@ let GitStateCtxProvider (children: ReactElement) =
                     Renderer.IpcReceiver.subscribeProxyReceiver<IUserDefaultsRendererApi> {
                         userDefaultsChanged = Some >> update
                     }
-            // The built-in values stay in place. The settings page reports the failed load to the user.
+            // The built-in values stay in place. Only the settings page reports the failed load, and only
+            // once the user opens it.
             onError = fun error -> console.warn ("Could not load the user defaults: " + error.Message)
             dependencies = [||]
         }

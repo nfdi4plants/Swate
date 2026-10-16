@@ -193,13 +193,16 @@ export const ControlledAutoCreateNotesFolder: PropsStory = {
     onAutoCreateNotesFolderChange: fn(),
     onAutoCreateNotesFolderEnabled: fn(),
   },
+  beforeEach: () => {
+    // Stories share one localStorage. Clear what an earlier story wrote before the page mounts.
+    window.localStorage.removeItem(autoCreateNotesFolderKey);
+  },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const toggle = canvas.getByTestId('SettingsAutoCreateNotesFolder');
 
-    // Stories share one localStorage. Clear what an earlier story wrote.
-    window.localStorage.removeItem(autoCreateNotesFolderKey);
-
+    // A write on mount would show up here.
+    await expect(window.localStorage.getItem(autoCreateNotesFolderKey)).toBeNull();
     await expect(toggle).not.toBeChecked();
     await userEvent.click(toggle);
 

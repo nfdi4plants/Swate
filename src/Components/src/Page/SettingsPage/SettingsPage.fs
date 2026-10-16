@@ -312,7 +312,7 @@ type SettingsPage =
                         SettingsPage.GitDefaultRow(
                             downloadId,
                             "Download large files",
-                            $"Downloads the content of large files when an ARC is opened. {appliesFromNow}",
+                            $"Downloads the content of large files when you clone an ARC or download changes. {appliesFromNow}",
                             SettingsPage.GitDefaultToggle(downloadId, downloadLargeFiles, setDownloadLargeFiles),
                             downloadLargeFiles <> builtIn.DownloadLargeFiles,
                             (fun () -> setDownloadLargeFiles builtIn.DownloadLargeFiles)

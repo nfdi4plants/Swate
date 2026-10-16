@@ -68,7 +68,8 @@ type UserDefaultsDto = {
 type IUserDefaultsApi = {
     getUserDefaults: unit -> JS.Promise<UserDefaultsDto>
     /// Validates every field, stores the values that differ from the built-in ones and tells all windows.
-    /// An Error names the refused field and leaves the stored values as they were.
+    /// An Error leaves the stored values as they were. It names the refused field for an invalid value.
+    /// A newer-schema file or a failed write gets a message without a field.
     setUserDefaults: UserDefaultValuesDto -> JS.Promise<Result<UserDefaultsDto, string>>
 }
 

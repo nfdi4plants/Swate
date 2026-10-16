@@ -8,8 +8,8 @@ type SettingsGitDefaults = {
     UploadRightAway: bool
 }
 
-/// The allowed range of the numeric git settings in MB. The git sidebar, the settings page and the main
-/// process accept the same values.
+/// The allowed range of the numeric git settings in MB. The git sidebar and the settings page use it.
+/// The ranges mirror VersionControlSettings in the main process, which keeps its own copy.
 module GitSettingRanges =
 
     [<Literal>]
