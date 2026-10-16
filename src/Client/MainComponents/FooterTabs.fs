@@ -72,7 +72,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let id = $"ReorderMe_{index}_{table.Name}"
     let tabRef = React.useElementRef ()
 
-    /// https://github.com/nfdi4plants/Swate/issues/925
+    /// https://github.com/nfdi4plants/ARCitISA/issues/925
     let startEdit = fun _ -> { state with IsEditable = true } |> setState
 
     let updateName =

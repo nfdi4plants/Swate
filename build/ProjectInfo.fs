@@ -2,7 +2,7 @@ module ProjectInfo
 
 open System.IO
 
-let DEFINE_SWATE_ENVIRONMENT_FABLE = [ "--define"; "SWATE_ENVIRONMENT" ]
+let DEFINE_ARCITISA_ENVIRONMENT_FABLE = [ "--define"; "ARCITISA_ENVIRONMENT" ]
 
 module ProjectPaths =
 
@@ -13,7 +13,7 @@ module ProjectPaths =
     let electronPath = Path.GetFullPath "src/Electron"
     let deployPath = Path.GetFullPath "deploy"
     let nugetDeployPath = Path.GetFullPath "nupkgs"
-    let nugetSln = Path.GetFullPath "Nuget.sln"
+    let nugetSln = Path.GetFullPath "Nuget.slnx"
 
     let sharedTestsPath = Path.GetFullPath "tests/Shared"
     let serverTestsPath = Path.GetFullPath "tests/Server"
@@ -33,4 +33,4 @@ let gitOwner = "nfdi4plants"
 let project = "ARCitISA"
 let projectRepo = $"https://github.com/{gitOwner}/{project}"
 
-let componentsPackageName = "@nfdi4plants/swate-components"
+let componentsPackageName = "@nfdi4plants/arcitisa-components"

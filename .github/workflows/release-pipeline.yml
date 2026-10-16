@@ -86,13 +86,13 @@ jobs:
     needs: verify_release
     if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
-    # The npm and NuGet trusted publishing policies still name the old Swate repo. Until they are
-    # updated, a failed npm or NuGet publish must not stop the GitHub release.
-    continue-on-error: ${{ matrix.target == 'nuget' || matrix.target == 'npm' }}
+    # # The npm and NuGet trusted publishing policies still name the old Swate repo. Until they are
+    # # updated, a failed npm or NuGet publish must not stop the GitHub release.
+    # continue-on-error: ${{ matrix.target == 'nuget' || matrix.target == 'npm' }}
     strategy:
       fail-fast: false
       matrix:
-        target: [nuget, npm, docker, electron-web, storybook]
+        target: [nuget, npm, docker, storybook]
     steps:
       # Checkout the repository
       - name: Checkout code
@@ -139,13 +139,6 @@ jobs:
           NUGET_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
         run: dotnet run --project ./build/Build.fsproj -- release ${{ matrix.target }} --ci --user=${{ github.actor }}
-
-      # Release.verifyReleaseAssets in build/Actions/Release.fs expects this artifact.
-      - uses: actions/upload-artifact@v4
-        if: ${{ matrix.target == 'electron-web' }}
-        with:
-          name: release-assets-client
-          path: SwateClient.zip
 
       # This publishes storybook folder to gh-pages. Only run on matrix.target == 'storybook'
       - name: Publish Storybook to GitHub Pages

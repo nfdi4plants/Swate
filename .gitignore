@@ -39,6 +39,9 @@ artifacts/
 ./SwateClient.zip
 !.idea/.idea.Swate/.idea/workspace.xml
 !.idea/.idea.Swate/.idea/tailwindcss.xml
+./ARCitISAClient.zip
+!.idea/.idea.ARCitISA/.idea/workspace.xml
+!.idea/.idea.ARCitISA/.idea/tailwindcss.xml
 opencode.json
 docs/superpowers/
 .opencode/

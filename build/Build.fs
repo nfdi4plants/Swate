@@ -23,7 +23,7 @@ let main args =
                 Bundle.Client(true)
                 0
         | _ ->
-            run "dotnet" [ "restore"; "./Swate.sln" ] "."
+            run "dotnet" [ "restore"; "./ARCitISA.slnx" ] "."
             Bundle.All()
             0
     | "run" :: a ->

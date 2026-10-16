@@ -14,8 +14,8 @@
     <Compile Include="Shared.Tests.fs"/>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Components\src\Swate.Components.fsproj"/>
-    <ProjectReference Include="..\..\src\Shared\Swate.Components.Core.fsproj"/>
+    <ProjectReference Include="..\..\src\Components\src\ARCitISA.Components.fsproj"/>
+    <ProjectReference Include="..\..\src\Shared\ARCitISA.Components.Core.fsproj"/>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Fable.Mocha"/>

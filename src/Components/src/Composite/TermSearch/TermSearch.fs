@@ -136,7 +136,7 @@ module private API =
 
     let callSearch =
         fun (query: string) ->
-            Api.SwateApi.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
+            Api.ARCitISAApi.ARCitISAApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->
@@ -146,7 +146,7 @@ module private API =
 
     let callParentSearch =
         fun (parent: string, query: string) ->
-            Api.SwateApi.SwateApi.searchTerm (
+            Api.ARCitISAApi.ARCitISAApi.searchTerm (
                 Swate.Components.Shared.DTOs.TermQuery.create (query, 10, parentTermId = parent)
             )
             |> Async.StartAsPromise
@@ -158,7 +158,7 @@ module private API =
 
     let callAllChildSearch =
         fun (parent: string) ->
-            Api.SwateApi.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
+            Api.ARCitISAApi.ARCitISAApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results.results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->
@@ -168,7 +168,7 @@ module private API =
 
     let callAdvancedSearch =
         fun dto ->
-            Api.SwateApi.SwateApi.searchTermAdvanced dto
+            Api.ARCitISAApi.ARCitISAApi.searchTermAdvanced dto
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->

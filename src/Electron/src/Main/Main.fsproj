@@ -74,8 +74,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
-    <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj" />
+    <ProjectReference Include="..\..\..\Components\src\ARCitISA.Components.fsproj" />
+    <ProjectReference Include="..\ARCitISA.Electron.Shared\ARCitISA.Electron.Shared.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -21,7 +21,7 @@ module Route =
             // -> We want to keep fable-remoting's flexible for development and production.
             //      When we publish the components, we want to use the production URL.
             //      Both for npm and nuget packages.
-#if SWATE_ENVIRONMENT || !FABLE_COMPILER
+#if ARCITISA_ENVIRONMENT || !FABLE_COMPILER
             ""
 #else
             URLs.PRODUCTION_URL

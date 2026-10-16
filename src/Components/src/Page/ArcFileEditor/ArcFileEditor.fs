@@ -503,7 +503,7 @@ type Main =
                 | _ ->
 
                     promise {
-                        let! json = Api.SwateApi.SwateTemplateApi.getTemplates () |> Async.StartAsPromise
+                        let! json = Api.ARCitISAApi.ARCitISAApiTemplateApi.getTemplates () |> Async.StartAsPromise
                         return Ok(ARCtrl.Json.Templates.fromJsonString json)
                     }
                     |> Promise.catch (fun error ->
