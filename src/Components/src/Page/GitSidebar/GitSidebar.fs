@@ -212,8 +212,6 @@ type private AdvancedActionsProps = {
     RemoteActionsWarning: string option
     SubmitDownloadLargeFiles: bool -> unit
     SubmitUpdateFromOnline: unit -> unit
-    HasMarkedFiles: bool
-    CanRunPrimarySave: bool
     IsAdvancedActionsOpen: bool
     ToggleAdvancedActions: unit -> unit
     SubmitFetch: unit -> unit
@@ -2329,8 +2327,6 @@ type GitSidebar =
                             fun () ->
                                 setLocalError None
                                 onUpdateFromOnline ()
-                        HasMarkedFiles = hasMarkedFiles
-                        CanRunPrimarySave = canRunPrimarySave
                         IsAdvancedActionsOpen = isAdvancedActionsOpen
                         ToggleAdvancedActions =
                             fun () ->
