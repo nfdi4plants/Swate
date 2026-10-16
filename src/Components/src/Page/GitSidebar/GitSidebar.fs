@@ -151,14 +151,6 @@ module private GitSidebarInternal =
         | Some id -> string id
         | None -> "personal"
 
-    /// The range of the background indexing limit in MB, the same as the main process allows. A value
-    /// below 64 is the memory budget of a diff held in memory.
-    [<Literal>]
-    let MinDiffIndexingLimitMb = 1
-
-    [<Literal>]
-    let MaxDiffIndexingLimitMb = 1048576
-
     let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
         match
             orderedPaths
@@ -849,8 +841,8 @@ type GitSidebar =
                                     prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
                                     prop.type'.number
                                     prop.custom ("step", "1")
-                                    prop.custom ("min", "1")
-                                    prop.custom ("max", "100")
+                                    prop.custom ("min", string GitSettingRanges.MinLfsAutoTrackThresholdMb)
+                                    prop.custom ("max", string GitSettingRanges.MaxLfsAutoTrackThresholdMb)
                                     prop.disabled props.IsBusy
                                     prop.value props.LfsThresholdInput
                                     prop.onChange props.SetLfsThresholdInput
@@ -922,8 +914,8 @@ type GitSidebar =
                                     prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
                                     prop.type'.number
                                     prop.custom ("step", "1")
-                                    prop.custom ("min", string GitSidebarInternal.MinDiffIndexingLimitMb)
-                                    prop.custom ("max", string GitSidebarInternal.MaxDiffIndexingLimitMb)
+                                    prop.custom ("min", string GitSettingRanges.MinDiffIndexingLimitMb)
+                                    prop.custom ("max", string GitSettingRanges.MaxDiffIndexingLimitMb)
                                     prop.disabled props.IsBusy
                                     prop.value props.DiffIndexingLimitInput
                                     prop.onChange props.SetDiffIndexingLimitInput
@@ -2166,10 +2158,14 @@ type GitSidebar =
 
             if not success then
                 setLocalError (Some "Git LFS threshold must be a whole number.")
-            elif parsedThresholdMb < 1 then
-                setLocalError (Some "Git LFS threshold must be at least 1 MB.")
-            elif parsedThresholdMb > 100 then
-                setLocalError (Some "Git LFS threshold must not exceed 100 MB.")
+            elif parsedThresholdMb < GitSettingRanges.MinLfsAutoTrackThresholdMb then
+                setLocalError (
+                    Some $"Git LFS threshold must be at least {GitSettingRanges.MinLfsAutoTrackThresholdMb} MB."
+                )
+            elif parsedThresholdMb > GitSettingRanges.MaxLfsAutoTrackThresholdMb then
+                setLocalError (
+                    Some $"Git LFS threshold must not exceed {GitSettingRanges.MaxLfsAutoTrackThresholdMb} MB."
+                )
             else
                 setLocalError None
                 onSaveLfsAutoTrackThreshold parsedThresholdMb
@@ -2180,13 +2176,13 @@ type GitSidebar =
 
             if not success then
                 setLocalError (Some "Background indexing limit must be a whole number.")
-            elif parsedLimitMb < GitSidebarInternal.MinDiffIndexingLimitMb then
+            elif parsedLimitMb < GitSettingRanges.MinDiffIndexingLimitMb then
                 setLocalError (
-                    Some $"Background indexing limit must be at least {GitSidebarInternal.MinDiffIndexingLimitMb} MB."
+                    Some $"Background indexing limit must be at least {GitSettingRanges.MinDiffIndexingLimitMb} MB."
                 )
-            elif parsedLimitMb > GitSidebarInternal.MaxDiffIndexingLimitMb then
+            elif parsedLimitMb > GitSettingRanges.MaxDiffIndexingLimitMb then
                 setLocalError (
-                    Some $"Background indexing limit must not exceed {GitSidebarInternal.MaxDiffIndexingLimitMb} MB."
+                    Some $"Background indexing limit must not exceed {GitSettingRanges.MaxDiffIndexingLimitMb} MB."
                 )
             else
                 setLocalError None

@@ -1,9 +1,11 @@
 namespace Swate.Components.PageComponents.SettingsPage
 
+open System
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components
+open Swate.Components.Page.GitSidebarTypes
 open Swate.Components.Primitive.LayoutComponents
 open Swate.Components.Composite.ThemeSelector
 open Swate.Components.Composite.ThemeSelector.Context
@@ -13,6 +15,25 @@ open Swate.Components.Util.UserOS
 module SettingsPageDefaults =
     [<Literal>]
     let AutoCreateNotesFolderLocalStorageKey = "swate-settings-auto-create-notes-folder"
+
+module private SettingsPageHelper =
+
+    /// The number in the input if it is a whole number inside the range.
+    let tryParseInRange (minValue: int) (maxValue: int) (input: string) : int option =
+        let success, value = Int32.TryParse(input.Trim())
+
+        if success && value >= minValue && value <= maxValue then
+            Some value
+        else
+            None
+
+    /// Compares field by field. Callers from JavaScript pass plain objects, and record equality
+    /// does not match those against record instances.
+    let sameGitDefaults (a: SettingsGitDefaults) (b: SettingsGitDefaults) =
+        a.LfsAutoTrackThresholdMb = b.LfsAutoTrackThresholdMb
+        && a.DownloadLargeFiles = b.DownloadLargeFiles
+        && a.DiffIndexingLimitMb = b.DiffIndexingLimitMb
+        && a.UploadRightAway = b.UploadRightAway
 
 [<Erase; Mangle(false)>]
 type SettingsPage =
@@ -38,28 +59,19 @@ type SettingsPage =
         ]
 
     [<ReactComponent>]
-    static member private AutoCreateNotesFolderSetting(?onEnabled: unit -> unit) =
-        let onEnabled = defaultArg onEnabled ignore
-
-        let autoCreateNotesFolder, setAutoCreateNotesFolder =
-            React.useLocalStorage (SettingsPageDefaults.AutoCreateNotesFolderLocalStorageKey, true)
-
+    static member private AutoCreateNotesFolderToggle(isEnabled: bool, onChange: bool -> unit) =
         SettingsPage.SettingColumnElement(
             "Automatically create notes folder",
             Html.input [
+                prop.testId "SettingsAutoCreateNotesFolder"
                 prop.className [
-                    if autoCreateNotesFolder then
+                    if isEnabled then
                         "swt:toggle-primary"
                     "swt:toggle"
                 ]
                 prop.type'.checkbox
-                prop.isChecked autoCreateNotesFolder
-                prop.onChange (fun (isEnabled: bool) ->
-                    setAutoCreateNotesFolder isEnabled
-
-                    if isEnabled then
-                        onEnabled ()
-                )
+                prop.isChecked isEnabled
+                prop.onChange onChange
             ],
             description =
                 Html.p [
@@ -68,6 +80,292 @@ type SettingsPage =
                         "Automatically creates an optional /notes folder when an ARC is opened or created. Disable this here if you do not want automatic notes scaffolding."
                 ]
         )
+
+    /// Keeps the value in localStorage. The hook writes its default into localStorage on mount, so the
+    /// controlled variant is a separate component and never mounts it.
+    [<ReactComponent>]
+    static member private LocalAutoCreateNotesFolderSetting(?onEnabled: unit -> unit) =
+        let onEnabled = defaultArg onEnabled ignore
+
+        let autoCreateNotesFolder, setAutoCreateNotesFolder =
+            React.useLocalStorage (SettingsPageDefaults.AutoCreateNotesFolderLocalStorageKey, true)
+
+        SettingsPage.AutoCreateNotesFolderToggle(
+            autoCreateNotesFolder,
+            fun isEnabled ->
+                setAutoCreateNotesFolder isEnabled
+
+                if isEnabled then
+                    onEnabled ()
+        )
+
+    [<ReactComponent>]
+    static member private ControlledAutoCreateNotesFolderSetting
+        (isEnabled: bool, ?onChange: bool -> unit, ?onEnabled: unit -> unit)
+        =
+        let onChange = defaultArg onChange ignore
+        let onEnabled = defaultArg onEnabled ignore
+
+        SettingsPage.AutoCreateNotesFolderToggle(
+            isEnabled,
+            fun nextValue ->
+                onChange nextValue
+
+                if nextValue then
+                    onEnabled ()
+        )
+
+    [<ReactComponent>]
+    static member private AutoCreateNotesFolderSetting
+        (?autoCreateNotesFolder: bool, ?onChange: bool -> unit, ?onEnabled: unit -> unit)
+        =
+        match autoCreateNotesFolder with
+        | Some isEnabled ->
+            SettingsPage.ControlledAutoCreateNotesFolderSetting(isEnabled, ?onChange = onChange, ?onEnabled = onEnabled)
+        | None -> SettingsPage.LocalAutoCreateNotesFolderSetting(?onEnabled = onEnabled)
+
+    [<ReactComponent>]
+    static member private GitDefaultRow
+        (
+            rowId: string,
+            title: string,
+            description: string,
+            control: ReactElement,
+            isChanged: bool,
+            onReset: unit -> unit,
+            ?rangeHint: string
+        ) =
+        SettingsPage.SettingColumnElement(
+            title,
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-1"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                        prop.children [
+                            control
+                            if isChanged then
+                                Html.span [
+                                    prop.testId (rowId + "Changed")
+                                    prop.className "swt:badge swt:badge-sm swt:badge-warning"
+                                    prop.title "Differs from the built-in default"
+                                    prop.text "Custom"
+                                ]
+
+                                Html.button [
+                                    prop.testId (rowId + "Reset")
+                                    prop.type'.button
+                                    prop.className "swt:btn swt:btn-ghost swt:btn-sm swt:btn-square"
+                                    prop.title "Reset to the built-in default"
+                                    prop.ariaLabel "Reset to the built-in default"
+                                    prop.onClick (fun _ -> onReset ())
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:iconify swt:fluent--arrow-reset-24-regular swt:size-4"
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
+                    if rangeHint.IsSome then
+                        Html.p [
+                            prop.testId (rowId + "Range")
+                            prop.className "swt:text-sm swt:text-error"
+                            prop.text rangeHint.Value
+                        ]
+                ]
+            ],
+            description =
+                Html.p [
+                    prop.className "swt:mt-1 swt:text-sm swt:text-base-content/70"
+                    prop.text description
+                ]
+        )
+
+    [<ReactComponent>]
+    static member private GitDefaultNumberInput
+        (rowId: string, draft: string, onDraft: string -> unit, minValue: int, maxValue: int, isValid: bool)
+        =
+        Html.input [
+            prop.testId rowId
+            prop.className [
+                "swt:input swt:w-32"
+                if not isValid then
+                    "swt:input-error"
+            ]
+            prop.type'.number
+            prop.step 1
+            prop.min minValue
+            prop.max maxValue
+            prop.custom ("aria-invalid", not isValid)
+            prop.value draft
+            prop.onChange (fun (value: string) -> onDraft value)
+        ]
+
+    [<ReactComponent>]
+    static member private GitDefaultToggle(rowId: string, isChecked: bool, onChange: bool -> unit) =
+        Html.input [
+            prop.testId rowId
+            prop.className [
+                if isChecked then
+                    "swt:toggle-primary"
+                "swt:toggle"
+            ]
+            prop.type'.checkbox
+            prop.isChecked isChecked
+            prop.onChange onChange
+        ]
+
+    [<ReactComponent>]
+    static member private GitDefaults
+        (gitDefaults: SettingsGitDefaults, builtIn: SettingsGitDefaults, onSave: SettingsGitDefaults -> unit)
+        =
+        let lfsInput, setLfsInput =
+            React.useState (string gitDefaults.LfsAutoTrackThresholdMb)
+
+        let downloadLargeFiles, setDownloadLargeFiles =
+            React.useState gitDefaults.DownloadLargeFiles
+
+        let diffInput, setDiffInput =
+            React.useState (string gitDefaults.DiffIndexingLimitMb)
+
+        let uploadRightAway, setUploadRightAway = React.useState gitDefaults.UploadRightAway
+
+        React.useEffect (
+            (fun () ->
+                setLfsInput (string gitDefaults.LfsAutoTrackThresholdMb)
+                setDownloadLargeFiles gitDefaults.DownloadLargeFiles
+                setDiffInput (string gitDefaults.DiffIndexingLimitMb)
+                setUploadRightAway gitDefaults.UploadRightAway
+            ),
+            [|
+                box gitDefaults.LfsAutoTrackThresholdMb
+                box gitDefaults.DownloadLargeFiles
+                box gitDefaults.DiffIndexingLimitMb
+                box gitDefaults.UploadRightAway
+            |]
+        )
+
+        let lfsValue =
+            SettingsPageHelper.tryParseInRange
+                GitSettingRanges.MinLfsAutoTrackThresholdMb
+                GitSettingRanges.MaxLfsAutoTrackThresholdMb
+                lfsInput
+
+        let diffValue =
+            SettingsPageHelper.tryParseInRange
+                GitSettingRanges.MinDiffIndexingLimitMb
+                GitSettingRanges.MaxDiffIndexingLimitMb
+                diffInput
+
+        let draft =
+            match lfsValue, diffValue with
+            | Some lfs, Some diff ->
+                Some {
+                    LfsAutoTrackThresholdMb = lfs
+                    DownloadLargeFiles = downloadLargeFiles
+                    DiffIndexingLimitMb = diff
+                    UploadRightAway = uploadRightAway
+                }
+            | _ -> None
+
+        let canSave =
+            match draft with
+            | Some draft -> not (SettingsPageHelper.sameGitDefaults draft gitDefaults)
+            | None -> false
+
+        let lfsId = "SettingsGitDefaultLfsThreshold"
+        let downloadId = "SettingsGitDefaultDownloadLargeFiles"
+        let diffId = "SettingsGitDefaultDiffIndexingLimit"
+        let uploadId = "SettingsGitDefaultUploadRightAway"
+        let appliesFromNow = "This is the default for ARCs opened from now on."
+
+        Html.div [
+            prop.testId "SettingsGitDefaultsSection"
+            prop.className "swt:contents"
+            prop.children [
+                LayoutComponents.BoxedField(
+                    "Git defaults",
+                    content = [
+                        SettingsPage.GitDefaultRow(
+                            lfsId,
+                            "Large file threshold (MB)",
+                            $"Files larger than this are tracked with Git LFS. {appliesFromNow}",
+                            SettingsPage.GitDefaultNumberInput(
+                                lfsId,
+                                lfsInput,
+                                setLfsInput,
+                                GitSettingRanges.MinLfsAutoTrackThresholdMb,
+                                GitSettingRanges.MaxLfsAutoTrackThresholdMb,
+                                lfsValue.IsSome
+                            ),
+                            lfsValue <> Some builtIn.LfsAutoTrackThresholdMb,
+                            (fun () -> setLfsInput (string builtIn.LfsAutoTrackThresholdMb)),
+                            ?rangeHint =
+                                (if lfsValue.IsNone then
+                                     Some
+                                         $"Enter a whole number from {GitSettingRanges.MinLfsAutoTrackThresholdMb} to {GitSettingRanges.MaxLfsAutoTrackThresholdMb}."
+                                 else
+                                     None)
+                        )
+
+                        SettingsPage.GitDefaultRow(
+                            downloadId,
+                            "Download large files",
+                            $"Downloads the content of large files when an ARC is opened. {appliesFromNow}",
+                            SettingsPage.GitDefaultToggle(downloadId, downloadLargeFiles, setDownloadLargeFiles),
+                            downloadLargeFiles <> builtIn.DownloadLargeFiles,
+                            (fun () -> setDownloadLargeFiles builtIn.DownloadLargeFiles)
+                        )
+
+                        SettingsPage.GitDefaultRow(
+                            diffId,
+                            "Diff indexing limit (MB)",
+                            $"Limits how much of a file the diff reads in the background. {appliesFromNow}",
+                            SettingsPage.GitDefaultNumberInput(
+                                diffId,
+                                diffInput,
+                                setDiffInput,
+                                GitSettingRanges.MinDiffIndexingLimitMb,
+                                GitSettingRanges.MaxDiffIndexingLimitMb,
+                                diffValue.IsSome
+                            ),
+                            diffValue <> Some builtIn.DiffIndexingLimitMb,
+                            (fun () -> setDiffInput (string builtIn.DiffIndexingLimitMb)),
+                            ?rangeHint =
+                                (if diffValue.IsNone then
+                                     Some
+                                         $"Enter a whole number from {GitSettingRanges.MinDiffIndexingLimitMb} to {GitSettingRanges.MaxDiffIndexingLimitMb}."
+                                 else
+                                     None)
+                        )
+
+                        SettingsPage.GitDefaultRow(
+                            uploadId,
+                            "Upload right away",
+                            $"Uploads saved changes to the online repository right away. {appliesFromNow}",
+                            SettingsPage.GitDefaultToggle(uploadId, uploadRightAway, setUploadRightAway),
+                            uploadRightAway <> builtIn.UploadRightAway,
+                            (fun () -> setUploadRightAway builtIn.UploadRightAway)
+                        )
+
+                        Html.div [
+                            prop.className "swt:flex swt:justify-end"
+                            prop.children [
+                                Html.button [
+                                    prop.testId "SettingsGitDefaultsSave"
+                                    prop.type'.button
+                                    prop.className "swt:btn swt:btn-primary"
+                                    prop.disabled (not canSave)
+                                    prop.text "Save"
+                                    prop.onClick (fun _ -> draft |> Option.iter onSave)
+                                ]
+                            ]
+                        ]
+                    ]
+                )
+            ]
+        ]
 
     [<ReactComponent>]
     static member private UIScalingSetting(uiScaling: int, onUIScaling: int -> unit) =
@@ -138,8 +436,13 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member private General
-        (?onAutoCreateNotesFolderEnabled: unit -> unit, ?uiScaling: int, ?onUIScaling: int -> unit)
-        =
+        (
+            ?onAutoCreateNotesFolderEnabled: unit -> unit,
+            ?uiScaling: int,
+            ?onUIScaling: int -> unit,
+            ?autoCreateNotesFolder: bool,
+            ?onAutoCreateNotesFolderChange: bool -> unit
+        ) =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
@@ -157,7 +460,11 @@ type SettingsPage =
                         ]
                 )
 
-                SettingsPage.AutoCreateNotesFolderSetting(onEnabled = onAutoCreateNotesFolderEnabled)
+                SettingsPage.AutoCreateNotesFolderSetting(
+                    ?autoCreateNotesFolder = autoCreateNotesFolder,
+                    ?onChange = onAutoCreateNotesFolderChange,
+                    onEnabled = onAutoCreateNotesFolderEnabled
+                )
 
                 match uiScaling, onUIScaling with
                 | Some uiScaling, Some onUIScaling -> SettingsPage.UIScalingSetting(uiScaling, onUIScaling)
@@ -182,8 +489,16 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member SettingsPage
-        (?onAutoCreateNotesFolderEnabled: unit -> unit, ?uiScaling: int, ?onUIScaling: int -> unit)
-        =
+        (
+            ?onAutoCreateNotesFolderEnabled: unit -> unit,
+            ?uiScaling: int,
+            ?onUIScaling: int -> unit,
+            ?gitDefaults: SettingsGitDefaults,
+            ?gitBuiltInDefaults: SettingsGitDefaults,
+            ?onGitDefaultsSave: SettingsGitDefaults -> unit,
+            ?autoCreateNotesFolder: bool,
+            ?onAutoCreateNotesFolderChange: bool -> unit
+        ) =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
@@ -191,8 +506,15 @@ type SettingsPage =
             SettingsPage.General(
                 onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled,
                 ?uiScaling = uiScaling,
-                ?onUIScaling = onUIScaling
+                ?onUIScaling = onUIScaling,
+                ?autoCreateNotesFolder = autoCreateNotesFolder,
+                ?onAutoCreateNotesFolderChange = onAutoCreateNotesFolderChange
             )
+
+            match gitDefaults, gitBuiltInDefaults, onGitDefaultsSave with
+            | Some gitDefaults, Some gitBuiltInDefaults, Some onGitDefaultsSave ->
+                SettingsPage.GitDefaults(gitDefaults, gitBuiltInDefaults, onGitDefaultsSave)
+            | _ -> Html.none
 
             SettingsPage.SearchConfig()
 
