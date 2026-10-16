@@ -1,9 +1,14 @@
 /* Maps the CSS variables of @uiw/react-markdown-preview to daisyUI theme tokens.
 
-   The preview package ships its own stylesheet, which switches to a dark palette
-   under prefers-color-scheme: dark. These rules sit unlayered so they win over that
-   unlayered CSS, and they only apply below an element with a data-theme attribute.
-   Without one (the Auto theme), the preview keeps following the OS.
+   The preview package ships its own unlayered stylesheet. It switches to a dark palette
+   under prefers-color-scheme: dark and sets its syntax colors per mode below an element
+   with a data-color-mode attribute. The theme provider sets data-color-mode on the root
+   element for an explicit theme, so those per-mode syntax colors match the active theme.
+
+   These rules stay unlayered because a layered rule loses to the unlayered preview CSS.
+   They win through the higher specificity of the [data-theme] ancestor selector, and they
+   only apply below an element with a data-theme attribute. Without one (the Auto theme),
+   data-color-mode is absent too and the preview keeps following the OS.
 
    The Components stylesheet and both app stylesheets (src/Client and the Electron
    renderer) import this file. A new theme needs an entry in the color-scheme list below
