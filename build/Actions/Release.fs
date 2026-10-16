@@ -40,7 +40,7 @@ let npm (version: Changelog.Version) (isDryRun: bool) =
             failwithf "CSS file not found at %s" cssFilePath
 
         let content = System.IO.File.ReadAllText(cssFilePath)
-        let replacedContent = content.Replace("@layer base", "@layer arcitisa-base")
+        let replacedContent = content.Replace("@layer base", "@layer swt-base")
         System.IO.File.WriteAllText(cssFilePath, replacedContent)
 
         printGreenfn "Start publishing npm package"
