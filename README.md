@@ -14,7 +14,7 @@ The easiest way to get started is the ARCitISA desktop app. Download the latest 
 
 ### 📖 Storybook Preview
 
-See all available components in action by visiting our [Storybook](https://nfdi4plants.github.io/Swate/).
+See all available components in action by visiting our [Storybook](https://nfdi4plants.github.io/ARCitISA/).
 
 ARCitISA's UI is built from reusable **React Components**, published as the npm package `@nfdi4plants/swate-components` and the Fable NuGet package `Swate.Components` for .NET developers.
 
