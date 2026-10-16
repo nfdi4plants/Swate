@@ -16,7 +16,7 @@ let private broadcast (dto: UserDefaultsDto) =
         Main.WindowSend.send<IUserDefaultsRendererApi> window (fun api -> api.userDefaultsChanged dto)
     )
 
-/// The API over a given store. Tests pass a store over memory.
+/// The API over a given store. A successful update broadcasts the new values to every window.
 let createApi (store: Main.UserDefaults.IUserDefaultsStore) : IUserDefaultsApi = {
     getUserDefaults = fun () -> promise { return toDto store }
     setUserDefaults =

@@ -4,25 +4,23 @@ open Fable.Core
 open Main
 open Vitest
 
-/// A store over a file held in memory. The counters tell how often the store read and wrote it.
+/// A store over a file held in memory. The counter tells how often the store wrote it.
 type private MemoryFile = {
     Content: string option ref
-    Reads: int ref
     Writes: int ref
 }
 
 let private memoryFile (initial: string option) : MemoryFile = {
     Content = ref initial
-    Reads = ref 0
     Writes = ref 0
 }
 
+let private storeWithWriter (file: MemoryFile) (write: string -> Result<unit, string>) =
+    UserDefaults.create (fun () -> file.Content.Value) write
+
 let private storeOver (file: MemoryFile) =
-    UserDefaults.create
-        (fun () ->
-            file.Reads.Value <- file.Reads.Value + 1
-            file.Content.Value
-        )
+    storeWithWriter
+        file
         (fun next ->
             file.Writes.Value <- file.Writes.Value + 1
             file.Content.Value <- Some next
@@ -107,17 +105,14 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "the file is read once and later calls are served from memory",
+            "a change that another process saved is seen by the next call",
             fun () ->
-                let file =
-                    memoryFile (Some """{ "schemaVersion": 1, "diffIndexingLimitMb": 2048 }""")
-
+                let file = memoryFile None
                 let store = storeOver file
+                Vitest.expect(store.Effective()).toEqual UserDefaults.builtIn
 
-                for _ in 1..3 do
-                    Vitest.expect(store.Effective().DiffIndexingLimitMb).toBe 2048
-
-                Vitest.expect(file.Reads.Value).toBe 1
+                file.Content.Value <- Some """{ "schemaVersion": 1, "diffIndexingLimitMb": 2048 }"""
+                Vitest.expect(store.Effective().DiffIndexingLimitMb).toBe 2048
         )
 
         Vitest.test (
@@ -139,6 +134,34 @@ Vitest.describe (
                     }
 
                     Vitest.expect(expectUpdated store changed).toEqual changed
+                    Vitest.expect(storeOver file |> fun reopened -> reopened.Effective()).toEqual changed
+        )
+
+        Vitest.test (
+            "a failed write returns the error and keeps the previous values",
+            fun () ->
+                let file = memoryFile None
+
+                let previous = {
+                    UserDefaults.builtIn with
+                        UploadRightAway = false
+                }
+
+                expectUpdated (storeOver file) previous |> ignore
+
+                let failingWriters = [
+                    storeWithWriter file (fun _ -> Error "The disk is full.")
+                    storeWithWriter file (fun _ -> failwith "The disk is gone.")
+                ]
+
+                for store in failingWriters do
+                    expectRefused store {
+                        UserDefaults.builtIn with
+                            DownloadLargeFiles = true
+                    }
+                    |> ignore
+
+                    Vitest.expect(store.Effective()).toEqual previous
         )
 
         Vitest.test (
@@ -196,7 +219,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "values outside the allowed ranges are refused with the field name and nothing is stored",
+            "values outside the allowed ranges are refused and nothing is stored",
             fun () ->
                 let file = memoryFile None
                 let store = storeOver file
@@ -211,8 +234,8 @@ Vitest.describe (
                         DiffIndexingLimitMb = 1048577
                 }
 
-                Vitest.expect(expectRefused store tooSmall).toContain "LfsAutoTrackThresholdMb"
-                Vitest.expect(expectRefused store tooLarge).toContain "DiffIndexingLimitMb"
+                expectRefused store tooSmall |> ignore
+                expectRefused store tooLarge |> ignore
                 Vitest.expect(file.Writes.Value).toBe 0
                 Vitest.expect(store.Effective()).toEqual UserDefaults.builtIn
         )

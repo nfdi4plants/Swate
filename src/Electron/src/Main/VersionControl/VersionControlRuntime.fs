@@ -7,8 +7,9 @@ type VersionControlRuntime = {
     Catalog: ProviderResolver.ProviderCatalog
     Bindings: WorkspaceBindingStore.IWorkspaceBindingStore
     PathCaseSensitivity: PathCaseSensitivity
-    /// What a new session starts from. The host calls it once per opened session, so a later change
-    /// of the user defaults leaves open sessions alone.
+    /// What a new session starts from. The host calls it when it opens a session, and it also
+    /// serves roots without a session (the settings of such a root and the diff storage policy
+    /// fallback). An open session keeps the values it started with when the user defaults change.
     SessionDefaults: unit -> Main.UserDefaults.SessionDefaults
 }
 

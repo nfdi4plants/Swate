@@ -12,6 +12,8 @@ open Swate.Electron.Shared.IPCTypes
 [<Literal>]
 let userDefaultsFileName = "user-defaults.json"
 
+/// A new optional field needs no version bump. An older Swate ignores fields it does not know and
+/// drops them when it saves. Bump the version only for a change that older versions must not read.
 [<Literal>]
 let CurrentSchemaVersion = 1
 
@@ -22,6 +24,12 @@ let builtIn: UserDefaultValuesDto = {
     DiffIndexingLimitMb = VersionControlSettings.defaults.DiffIndexingLimitMb
     UploadRightAway = true
     AutoCreateNotesFolder = true
+}
+
+let toVersionControlSettings (values: UserDefaultValuesDto) : VersionControlSettings = {
+    AutoTrackThresholdMb = values.LfsAutoTrackThresholdMb
+    DownloadLargeFiles = values.DownloadLargeFiles
+    DiffIndexingLimitMb = values.DiffIndexingLimitMb
 }
 
 /// One entry per value. None means the user has not changed it.
@@ -49,16 +57,12 @@ let private diffLimitInRange (value: int) =
     value >= VersionControlSettings.MinDiffIndexingLimitMb
     && value <= VersionControlSettings.MaxDiffIndexingLimitMb
 
-/// Ok when every value is within its allowed range. The message names the first refused field.
+/// Ok when every value is within its allowed range. The message says in plain words which setting
+/// is out of range, and it is shown on the settings page.
 let validate (values: UserDefaultValuesDto) : Result<UserDefaultValuesDto, string> =
-    if not (thresholdInRange values.LfsAutoTrackThresholdMb) then
-        Error
-            $"The automatic large-object threshold (LfsAutoTrackThresholdMb) must be from {VersionControlSettings.MinAutoTrackThresholdMb} to {VersionControlSettings.MaxAutoTrackThresholdMb} MiB."
-    elif not (diffLimitInRange values.DiffIndexingLimitMb) then
-        Error
-            $"The background indexing limit (DiffIndexingLimitMb) must be from {VersionControlSettings.MinDiffIndexingLimitMb} to {VersionControlSettings.MaxDiffIndexingLimitMb} MiB."
-    else
-        Ok values
+    match VersionControlSettings.validate (toVersionControlSettings values) with
+    | Ok _ -> Ok values
+    | Error(_, message) -> Error message
 
 type private StoredDefaults =
     /// Written by a newer Swate. The file is ignored and never overwritten.
@@ -147,10 +151,11 @@ let private overridesOf (values: UserDefaultValuesDto) : UserDefaultOverrides =
     }
 
 type IUserDefaultsStore =
-    /// The values a new session starts from, read from the file once and then served from memory.
+    /// The values a new session starts from. Every call reads the file, so a change that another
+    /// Swate process on the same profile saved is seen at once.
     abstract Effective: unit -> UserDefaultValuesDto
     /// Validates the values and stores those that differ from the built-in ones. The Error names
-    /// the refused field, or says why the file could not be written. Nothing changes on an Error.
+    /// the refused setting, or says why the file could not be written. Nothing changes on an Error.
     abstract Update: UserDefaultValuesDto -> Result<UserDefaultValuesDto, string>
 
 /// A store over caller-supplied read and write functions, so tests and the settings folder share one
@@ -164,31 +169,18 @@ let create (read: unit -> string option) (write: string -> Result<unit, string>)
         with _ ->
             Stored noOverrides
 
-    let cached: UserDefaultOverrides option ref = ref None
-
     { new IUserDefaultsStore with
         member _.Effective() =
-            match cached.Value with
-            | Some overrides -> effectiveOf overrides
-            | None ->
-                let overrides =
-                    match load () with
-                    | NewerSchema -> noOverrides
-                    | Stored overrides -> overrides
-
-                cached.Value <- Some overrides
-                effectiveOf overrides
+            match load () with
+            | NewerSchema -> effectiveOf noOverrides
+            | Stored overrides -> effectiveOf overrides
 
         member _.Update values =
             match validate values with
             | Error message -> Error message
             | Ok values ->
-                // Read the file again, because another Swate process on the same profile may have
-                // written a newer schema since the cache was filled.
                 match load () with
                 | NewerSchema ->
-                    cached.Value <- Some noOverrides
-
                     Error
                         "The saved defaults were written by a newer version of Swate. They stay as they are until Swate is updated."
                 | Stored _ ->
@@ -200,11 +192,7 @@ let create (read: unit -> string option) (write: string -> Result<unit, string>)
                         with error ->
                             Error $"Could not write the user defaults: {error.Message}"
 
-                    match written with
-                    | Error message -> Error message
-                    | Ok() ->
-                        cached.Value <- Some overrides
-                        Ok(effectiveOf overrides)
+                    written |> Result.map (fun () -> effectiveOf overrides)
     }
 
 /// The store in the application settings folder.
@@ -213,32 +201,22 @@ let createSettingsStore () : IUserDefaultsStore =
         (fun () -> SettingsStore.tryReadSettingsFile userDefaultsFileName)
         (fun content -> SettingsStore.tryWriteSettingsFileAtomic userDefaultsFileName content)
 
-/// The store of the running app. It reads the settings folder on first use, after the app is ready.
+/// The store of the running app. It reads the settings folder only when called, after the app is ready.
 let production: IUserDefaultsStore = createSettingsStore ()
 
-let toVersionControlSettings (values: UserDefaultValuesDto) : VersionControlSettings = {
-    AutoTrackThresholdMb = values.LfsAutoTrackThresholdMb
-    DownloadLargeFiles = values.DownloadLargeFiles
-    DiffIndexingLimitMb = values.DiffIndexingLimitMb
-}
-
-let effectiveVersionControlSettings (store: IUserDefaultsStore) : VersionControlSettings =
-    toVersionControlSettings (store.Effective())
-
-let effectiveUploadRightAway (store: IUserDefaultsStore) : bool = store.Effective().UploadRightAway
-
-let effectiveAutoCreateNotesFolder (store: IUserDefaultsStore) : bool = store.Effective().AutoCreateNotesFolder
-
-/// What a new session starts from. The session host reads it once, when the session opens.
+/// What a new session starts from.
 type SessionDefaults = {
     InitialSettings: VersionControlSettings
     InitialUploadRightAway: bool
 }
 
-let sessionDefaultsOf (store: IUserDefaultsStore) : SessionDefaults = {
-    InitialSettings = effectiveVersionControlSettings store
-    InitialUploadRightAway = effectiveUploadRightAway store
-}
+let sessionDefaultsOf (store: IUserDefaultsStore) : SessionDefaults =
+    let values = store.Effective()
+
+    {
+        InitialSettings = toVersionControlSettings values
+        InitialUploadRightAway = values.UploadRightAway
+    }
 
 /// The session defaults of a profile without overrides.
 let builtInSessionDefaults () : SessionDefaults = {
