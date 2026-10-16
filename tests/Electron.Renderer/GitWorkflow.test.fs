@@ -1819,6 +1819,79 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Opening the sidebar refreshes the Git state silently",
+            fun () -> promise {
+                let openedState, openCmd =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) runningState
+
+                let! openMessages = collectMessages openCmd
+
+                Vitest.expect(openedState.SidebarVisible).toBe (true)
+                Vitest.expect(openMessages).toEqual ([| RefreshRequestedSilently |])
+            }
+        )
+
+        Vitest.test (
+            "Opening the sidebar during a running refresh does not replace it",
+            fun () -> promise {
+                let refreshingState, _ =
+                    update defaultDependencies ignore RefreshRequested runningState
+
+                let openedState, openCmd =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) refreshingState
+
+                let! openMessages = collectMessages openCmd
+
+                Vitest.expect(openedState.SidebarVisible).toBe (true)
+                Vitest.expect(openedState.RefreshRequestId).toEqual (refreshingState.RefreshRequestId)
+                Vitest.expect(openMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "Opening the sidebar without an ARC keeps a running clone",
+            fun () -> promise {
+                let cloningState = {
+                    GitState.Empty with
+                        BusyOperation = Some(GitBusyOperation.CloningRepository "C:/clone")
+                        WriteRequestId = 1
+                        CurrentOperation = Some { OperationId = "clone-op" }
+                }
+
+                let openedState, openCmd =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) cloningState
+
+                let! openMessages = collectMessages openCmd
+
+                Vitest
+                    .expect(openedState)
+                    .toEqual (
+                        {
+                            cloningState with
+                                SidebarVisible = true
+                        }
+                    )
+
+                Vitest.expect(openMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "A silent refresh disables the sidebar without notice text and a normal refresh shows it",
+            fun () -> promise {
+                let silentState, _ =
+                    update defaultDependencies ignore RefreshRequestedSilently runningState
+
+                let normalState, _ = update defaultDependencies ignore RefreshRequested runningState
+
+                Vitest.expect(silentState.BusyOperation).toEqual (Some GitBusyOperation.Refreshing)
+                Vitest.expect(silentState.BusyNotice).toEqual (None)
+                Vitest.expect(currentRunStatus silentState).toEqual (Some GitSidebarRunStatus.BusyWithoutNotice)
+                Vitest.expect(normalState.BusyNotice.IsSome).toBe (true)
+            }
+        )
+
+        Vitest.test (
             "Primary save creates the revision with exactly the selected paths and never stages separately",
             fun () -> promise {
                 let mutable captured = None

@@ -744,7 +744,12 @@ let busyNoticeFromOperation =
 let currentRunStatus (model: GitState) =
     match model.CurrentProgress with
     | Some progress -> Some(GitSidebarRunStatus.Progress progress)
-    | None -> model.BusyNotice |> Option.map GitSidebarRunStatus.Busy
+    | None ->
+        match model.BusyNotice, model.BusyOperation with
+        | Some notice, _ -> Some(GitSidebarRunStatus.Busy notice)
+        // Only a silent refresh runs without notice text.
+        | None, Some _ -> Some GitSidebarRunStatus.BusyWithoutNotice
+        | None, None -> None
 
 let private countOrZero (value: int option) = value |> Option.defaultValue 0
 
@@ -4793,7 +4798,15 @@ let private updateCore
                 ExternalChangesSeen = false
         },
         Cmd.ofMsg RefreshRequested
-    | SidebarVisibilityChanged true -> { model with SidebarVisible = true }, Cmd.none
+    // Without an ARC the silent refresh would reset the model, including a clone that runs
+    // from the DataHub browser. A running refresh would be replaced, and its errors would
+    // no longer reach the user.
+    | SidebarVisibilityChanged true when
+        model.CurrentArcPath.IsNone
+        || model.BusyOperation = Some GitBusyOperation.Refreshing
+        ->
+        { model with SidebarVisible = true }, Cmd.none
+    | SidebarVisibilityChanged true -> { model with SidebarVisible = true }, Cmd.ofMsg RefreshRequestedSilently
     | ExternalChangesDetected when not model.SidebarVisible ->
         {
             model with
@@ -4894,6 +4907,8 @@ let private updateCore
             model
             |> withBusyOperation (Some GitBusyOperation.Refreshing)
             |> startRefreshRequest requestId
+            // No notice text, so the sidebar shows no banner that pushes its content down.
+            |> fun state -> { state with BusyNotice = None }
 
         let cmd =
             Cmd.OfPromise.either

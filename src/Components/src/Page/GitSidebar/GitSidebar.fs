@@ -435,7 +435,8 @@ type GitSidebar =
                         ]
                     ]
                 ]
-            | GitSidebarRunStatus.Idle -> Html.none
+            | GitSidebarRunStatus.Idle
+            | GitSidebarRunStatus.BusyWithoutNotice -> Html.none
 
             match errorNotice with
             | Some message ->
@@ -1894,6 +1895,7 @@ type GitSidebar =
             match runStatus with
             | GitSidebarRunStatus.Idle -> false
             | GitSidebarRunStatus.Busy _
+            | GitSidebarRunStatus.BusyWithoutNotice
             | GitSidebarRunStatus.Progress _ -> true
 
         let visibleError = errorNotice |> Option.orElse localError
