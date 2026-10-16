@@ -4800,8 +4800,8 @@ let private updateCore
 
         // Without an ARC the silent refresh would reset the model, including a clone that runs
         // from the DataHub browser. A running refresh would be replaced, and its errors would
-        // no longer reach the user. The running refresh also picks up the external changes, and
-        // an ARC change starts its own refresh, so the flag is cleared in both cases.
+        // no longer reach the user. The running refresh shows the state when it finishes, and an
+        // ARC change starts its own refresh, so the flag is cleared in both cases.
         if
             model.CurrentArcPath.IsNone
             || model.BusyOperation = Some GitBusyOperation.Refreshing
