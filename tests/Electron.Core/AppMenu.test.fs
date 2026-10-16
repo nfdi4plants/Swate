@@ -118,7 +118,7 @@ Vitest.test (
         do! Main.AppMenu.checkForUpdates (Some parentWindow) (fun () -> promise { return Error(exn "Offline") })
 
         Vitest.expect(dialogs.ToArray()).toEqual [|
-            "Swate v2.0.0 is available."
+            "ARCitISA v2.0.0 is available."
             "ARCitISA is up to date."
             "Could not check for updates."
         |]
