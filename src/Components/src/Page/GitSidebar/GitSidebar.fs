@@ -6,7 +6,6 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
-open Swate.Components.Primitive.Popover
 open Swate.Components.Primitive.BaseModal
 
 open Swate.Components.Page.GitSidebarTypes
@@ -728,13 +727,14 @@ type GitSidebar =
                                             prop.testId "GitSidebarAheadBadge"
                                             prop.className "swt:badge swt:badge-outline swt:badge-sm swt:gap-0.5"
                                             prop.title label
-                                            prop.ariaLabel label
                                             prop.children [
                                                 Html.span [
+                                                    prop.ariaHidden true
                                                     prop.className
                                                         "swt:iconify swt:fluent--arrow-up-20-regular swt:size-3 swt:shrink-0"
                                                 ]
-                                                Html.span [ prop.text props.Status.Ahead ]
+                                                Html.span [ prop.ariaHidden true; prop.text props.Status.Ahead ]
+                                                Html.span [ prop.className "swt:sr-only"; prop.text label ]
                                             ]
                                         ]
 
@@ -746,13 +746,14 @@ type GitSidebar =
                                             prop.testId "GitSidebarBehindBadge"
                                             prop.className "swt:badge swt:badge-outline swt:badge-sm swt:gap-0.5"
                                             prop.title label
-                                            prop.ariaLabel label
                                             prop.children [
                                                 Html.span [
+                                                    prop.ariaHidden true
                                                     prop.className
                                                         "swt:iconify swt:fluent--arrow-down-20-regular swt:size-3 swt:shrink-0"
                                                 ]
-                                                Html.span [ prop.text props.Status.Behind ]
+                                                Html.span [ prop.ariaHidden true; prop.text props.Status.Behind ]
+                                                Html.span [ prop.className "swt:sr-only"; prop.text label ]
                                             ]
                                         ]
                                 ]
@@ -1175,24 +1176,26 @@ type GitSidebar =
                     Html.div [
                         prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:gap-2"
                         prop.children [
+                            // Save All keeps its place and style. Clicking a row marks it, so a click on
+                            // the old spot of the button must not save only the viewed file.
+                            GitSidebar.CommitSaveButton(
+                                "GitSidebarSaveAllButton",
+                                "Save All Changes",
+                                "swt:fluent--checkmark-circle-24-regular",
+                                true,
+                                not props.CanRunPrimarySave,
+                                props.SubmitSaveAll
+                            )
+
                             if props.HasMarkedFiles then
                                 GitSidebar.CommitSaveButton(
                                     "GitSidebarSaveSelectedButton",
                                     "Save Selected Changes",
                                     "swt:fluent--document-checkmark-24-regular",
-                                    true,
+                                    false,
                                     not props.CanRunPrimarySave,
                                     props.SubmitSaveSelected
                                 )
-
-                            GitSidebar.CommitSaveButton(
-                                "GitSidebarSaveAllButton",
-                                "Save All Changes",
-                                "swt:fluent--checkmark-circle-24-regular",
-                                not props.HasMarkedFiles,
-                                not props.CanRunPrimarySave,
-                                props.SubmitSaveAll
-                            )
                         ]
                     ]
                     Html.label [
@@ -1301,10 +1304,15 @@ type GitSidebar =
                                                 ]
                                                 match directory with
                                                 | Some directory ->
-                                                    Html.span [
-                                                        prop.testId $"GitSidebarChangeDirectory-{props.Index}"
-                                                        prop.className "swt:ml-2 swt:text-xs swt:text-base-content/60"
-                                                        prop.text directory
+                                                    // The space keeps assistive tech from reading name and directory as one word.
+                                                    React.Fragment [
+                                                        Html.text " "
+                                                        Html.span [
+                                                            prop.testId $"GitSidebarChangeDirectory-{props.Index}"
+                                                            prop.className
+                                                                "swt:ml-1 swt:text-xs swt:text-base-content/60"
+                                                            prop.text directory
+                                                        ]
                                                     ]
                                                 | None -> Html.none
                                             ]

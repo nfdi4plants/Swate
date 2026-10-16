@@ -896,7 +896,10 @@ export const CommitComposer: Story = {
     const sectionBounds = canvas.getByTestId("GitSidebarCommitSection").getBoundingClientRect();
     expect(loneBounds.width).toBeGreaterThan(sectionBounds.width / 2);
 
+    await expect(canvas.getByTestId("GitSidebarSaveAllButton")).not.toHaveClass("swt:btn-outline");
+
     // Marked: two equal buttons share one row and nothing below them moves.
+    // Save All stays filled on the left, Save Selected is the outlined one on the right.
     await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
     const saveSelected = await canvas.findByTestId("GitSidebarSaveSelectedButton");
     const selectedBounds = saveSelected.getBoundingClientRect();
@@ -905,9 +908,12 @@ export const CommitComposer: Story = {
     expect(selectedBounds.height).toBe(loneBounds.height);
     expect(allBounds.height).toBe(loneBounds.height);
     expect(allBounds.top).toBe(loneBounds.top);
-    expect(selectedBounds.right).toBeLessThanOrEqual(allBounds.left);
+    expect(allBounds.left).toBe(loneBounds.left);
+    expect(allBounds.right).toBeLessThanOrEqual(selectedBounds.left);
     expect(Math.abs(selectedBounds.width - allBounds.width)).toBeLessThan(1);
     expect(uploadCheckbox.getBoundingClientRect().top).toBe(uploadTop);
+    await expect(canvas.getByTestId("GitSidebarSaveAllButton")).not.toHaveClass("swt:btn-outline");
+    await expect(saveSelected).toHaveClass("swt:btn-outline");
 
     // Ctrl+click deselects the row and the single button returns.
     fireEvent.mouseDown(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
