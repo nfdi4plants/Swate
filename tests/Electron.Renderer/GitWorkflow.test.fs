@@ -9915,7 +9915,10 @@ Vitest.describe (
                         )
                     )
 
-                Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
+                Vitest
+                    .expect(container.querySelector("[data-testid='GitSidebarChangeRow-3']").getAttribute ("title"))
+                    .toBe ("studies/s-study-01/protocol.md")
+
                 Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeStatusIcon-3']")).not.toBeNull ()
 
                 cleanup ()

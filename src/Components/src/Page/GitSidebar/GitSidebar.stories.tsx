@@ -272,12 +272,18 @@ export const ChangedFiles: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
-      "assays/isa.assay.xlsx",
+    await expect(canvas.getByTestId("GitSidebarChangeName-1")).toHaveTextContent("isa.assay.xlsx");
+    await expect(canvas.getByTestId("GitSidebarChangeDirectory-1")).toHaveTextContent("assays");
+    await expect(canvas.queryByTestId("GitSidebarChangeDirectory-0")).toBeNull();
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1").offsetHeight).toBe(
+      canvas.getByTestId("GitSidebarChangeRow-0").offsetHeight,
     );
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
-      "Renamed from notes/protocol-draft.md",
+    await expect(canvas.getByTestId("GitSidebarChangeRenamedFrom-2")).toHaveAttribute(
+      "title",
+      "notes/protocol-draft.md",
     );
+    await expect(canvas.getByTestId("GitSidebarAheadBadge")).toHaveTextContent("2");
+    await expect(canvas.getByTestId("GitSidebarBehindBadge")).toHaveTextContent("1");
     await expect(
       canvas.getByTestId("GitSidebarChangedFilesVirtualContent"),
     ).toBeInTheDocument();
@@ -564,6 +570,11 @@ export const LongWrappedFile: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toHaveClass("swt:items-center");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toHaveAttribute(
+      "title",
+      "src/very/long/path/that/wraps/in/the/sidebar/and/needs/a/fixed/status/icon.txt",
+    );
+    await expect(canvas.getByTestId("GitSidebarChangeName-0")).toHaveTextContent("icon.txt");
     await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:shrink-0");
     await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:self-center");
   },

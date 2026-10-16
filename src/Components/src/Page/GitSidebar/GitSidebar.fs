@@ -91,6 +91,15 @@ module private GitSidebarInternal =
             ToneClassName = "swt:text-error"
           }
 
+    /// Splits a repository-relative path into the file name and its parent directory. A trailing slash stays with the name.
+    let splitPath (path: string) : string * string option =
+        match path.TrimEnd('/').LastIndexOf '/' with
+        | index when index > 0 -> path.Substring(index + 1), Some(path.Substring(0, index))
+        | _ -> path, None
+
+    let commitCountLabel (count: int) =
+        if count = 1 then "1 commit" else $"{count} commits"
+
     let branchKindLabel (kind: GitSidebarBranchKind) =
         match kind with
         | GitSidebarBranchKind.Local -> "Local"
@@ -636,15 +645,18 @@ type GitSidebar =
                                     Html.span [
                                         prop.testId "GitSidebarTitle"
                                         prop.className "swt:truncate swt:text-sm swt:font-semibold"
+                                        prop.title "Source Control"
                                         prop.text "Source Control"
                                     ]
+                                    let branchName =
+                                        match props.Status.CurrentBranch with
+                                        | Some branch -> branch
+                                        | None -> "Detached HEAD"
+
                                     Html.span [
                                         prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
-                                        prop.text (
-                                            match props.Status.CurrentBranch with
-                                            | Some branch -> branch
-                                            | None -> "Detached HEAD"
-                                        )
+                                        prop.title branchName
+                                        prop.text branchName
                                     ]
                                 ]
                             ]
@@ -709,15 +721,39 @@ type GitSidebar =
                                         ]
 
                                     if props.Status.Ahead > 0 then
+                                        let label =
+                                            $"{GitSidebarInternal.commitCountLabel props.Status.Ahead} ahead of remote"
+
                                         Html.span [
-                                            prop.className "swt:badge swt:badge-outline swt:badge-sm"
-                                            prop.text $"Ahead {props.Status.Ahead}"
+                                            prop.testId "GitSidebarAheadBadge"
+                                            prop.className "swt:badge swt:badge-outline swt:badge-sm swt:gap-0.5"
+                                            prop.title label
+                                            prop.ariaLabel label
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--arrow-up-20-regular swt:size-3 swt:shrink-0"
+                                                ]
+                                                Html.span [ prop.text props.Status.Ahead ]
+                                            ]
                                         ]
 
                                     if props.Status.Behind > 0 then
+                                        let label =
+                                            $"{GitSidebarInternal.commitCountLabel props.Status.Behind} behind remote"
+
                                         Html.span [
-                                            prop.className "swt:badge swt:badge-outline swt:badge-sm"
-                                            prop.text $"Behind {props.Status.Behind}"
+                                            prop.testId "GitSidebarBehindBadge"
+                                            prop.className "swt:badge swt:badge-outline swt:badge-sm swt:gap-0.5"
+                                            prop.title label
+                                            prop.ariaLabel label
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--arrow-down-20-regular swt:size-3 swt:shrink-0"
+                                                ]
+                                                Html.span [ prop.text props.Status.Behind ]
+                                            ]
                                         ]
                                 ]
                             ]
@@ -730,7 +766,7 @@ type GitSidebar =
                                     prop.children [
                                         Html.span [
                                             prop.className
-                                                "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
+                                                "swt:iconify swt:fluent--cloud-24-regular swt:size-4 swt:shrink-0"
                                         ]
                                         Html.span [
                                             prop.className "swt:min-w-0 swt:wrap-anywhere"
@@ -919,7 +955,7 @@ type GitSidebar =
                 prop.children [
                     GitSidebar.ActionButton(
                         "Download Changes",
-                        "swt:fluent--arrow-down-24-regular",
+                        "swt:fluent--arrow-download-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarPullButton",
@@ -928,7 +964,7 @@ type GitSidebar =
                     )
                     GitSidebar.ActionButton(
                         "Upload Changes",
-                        "swt:fluent--arrow-up-24-regular",
+                        "swt:fluent--arrow-upload-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitPush,
                         testId = "GitSidebarPushButton",
@@ -992,7 +1028,7 @@ type GitSidebar =
                             prop.children [
                                 GitSidebar.ActionButton(
                                     "Check for Changes",
-                                    "swt:fluent--arrow-download-24-regular",
+                                    "swt:fluent--arrow-sync-24-regular",
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitFetch,
                                     testId = "GitSidebarFetchButton",
@@ -1205,6 +1241,7 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
+        let fileName, directory = GitSidebarInternal.splitPath change.Path
 
         let activateRow ctrlKey shiftKey =
             props.UpdateMarkedSelection change ctrlKey shiftKey
@@ -1227,6 +1264,7 @@ type GitSidebar =
                     prop.custom ("data-index", props.Index)
                     prop.role "button"
                     prop.tabIndex 0
+                    prop.title change.Path
                     prop.className [
                         "swt:group swt:flex swt:min-h-6 swt:w-full swt:min-w-0 swt:items-center swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:text-left swt:transition-colors swt:select-none swt:@max-xs:gap-1.5"
                         "swt:cursor-pointer"
@@ -1252,16 +1290,32 @@ type GitSidebar =
                                 Html.div [
                                     prop.className "swt:min-w-0"
                                     prop.children [
+                                        // One truncating line: the ellipsis cuts the directory first and the file name only when it does not fit alone.
                                         Html.span [
                                             prop.className
-                                                "swt:block swt:min-w-0 swt:truncate swt:text-sm swt:font-medium swt:@max-xs:text-xs"
-                                            prop.text change.Path
+                                                "swt:block swt:min-w-0 swt:truncate swt:text-sm swt:@max-xs:text-xs"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.testId $"GitSidebarChangeName-{props.Index}"
+                                                    prop.text fileName
+                                                ]
+                                                match directory with
+                                                | Some directory ->
+                                                    Html.span [
+                                                        prop.testId $"GitSidebarChangeDirectory-{props.Index}"
+                                                        prop.className "swt:ml-2 swt:text-xs swt:text-base-content/60"
+                                                        prop.text directory
+                                                    ]
+                                                | None -> Html.none
+                                            ]
                                         ]
                                         match change.OriginalPath with
                                         | Some originalPath ->
                                             Html.div [
+                                                prop.testId $"GitSidebarChangeRenamedFrom-{props.Index}"
                                                 prop.className
                                                     "swt:mt-0.5 swt:truncate swt:text-xs swt:text-base-content/60"
+                                                prop.title originalPath
                                                 prop.text $"Renamed from {originalPath}"
                                             ]
                                         | None -> Html.none
@@ -1386,7 +1440,7 @@ type GitSidebar =
                 prop.ariaLabel "Changed files"
                 prop.ref scrollContainerRef
                 prop.className
-                    "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:px-2 swt:pb-2 swt:@max-xs:px-1"
+                    "swt:min-h-26 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:px-2 swt:pb-2 swt:@max-xs:px-1"
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
@@ -2207,7 +2261,7 @@ type GitSidebar =
         Html.div [
             prop.testId "GitSidebar"
             prop.className
-                "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:bg-base-100"
+                "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:overflow-y-auto swt:bg-base-100"
             prop.children [
                 GitSidebar.BranchHeader(branchHeaderProps)
 
