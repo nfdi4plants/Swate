@@ -13,9 +13,9 @@
     <Compile Include="Util\ElmishHelper.fs" />
     <Compile Include="Util\MessageInterop.fs" />
     <Compile Include="Util\Helper.fs" />
-    <Compile Include="Util\ARCitISAHost.fs" />
+    <Compile Include="Util\SwateHost.fs" />
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
-    <Compile Include="LocalStorage\ARCitISASearchConfig.fs" />
+    <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="SharedComponents\Widgets.fs" />
     <Compile Include="SharedComponents\JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Cytoscape.fs" />

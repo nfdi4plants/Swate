@@ -25,7 +25,7 @@ module IPCTypesHelper =
 open IPCTypesHelper
 
 [<Literal>]
-let releaseRepository = "nfdi4plants/ARCitISA"
+let ReleaseRepository = "nfdi4plants/ARCitISA"
 
 type AppVersionState = {
     CurrentVersion: string

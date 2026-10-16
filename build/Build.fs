@@ -110,12 +110,6 @@ let main args =
 
             printGreenfn ("Release docker!")
             0
-        // electron-web builds the prebundled web client frontend,
-        // historically used as an iframe in an external Electron app.
-        | "electron-web" ->
-            Release.electron ()
-            printGreenfn ("Release electron-web!")
-            0
         | "electron-bin" ->
 
             let arch =
@@ -203,6 +197,7 @@ let main args =
         0
     | "dev" :: a ->
         let latestVersion = Changelog.getLatestVersion ()
+        VersionIO.updateAllVersionInformationInFiles latestVersion
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")

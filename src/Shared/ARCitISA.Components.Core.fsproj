@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <PackageId>ARCitISA.Components.Core</PackageId>
-    <PackageVersion>2.0.0</PackageVersion>
+    <PackageVersion>3.0.0</PackageVersion>
     <Authors>Kevin Frey</Authors>
     <Description>Types for ARCitISA.Components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

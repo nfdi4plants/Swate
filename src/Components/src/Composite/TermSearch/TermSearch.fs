@@ -159,7 +159,7 @@ module private API =
     let callAllChildSearch =
         fun (parent: string) ->
             Api.ARCitISAApi.ARCitISAApi.searchChildTerms (
-                ARCitISA ARCitISA.Components.Shared.DTOs.ParentTermQuery.create (parent, 300)
+                ARCitISA.Components.Shared.DTOs.ParentTermQuery.create (parent, 300)
             )
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results.results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)

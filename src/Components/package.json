@@ -1,6 +1,6 @@
 {
   "name": "@nfdi4plants/arcitisa-components",
-  "version": "0.0.0",
+  "version": "3.0.0",
   "description": "Customizable React components for ontology annotation, based on ARCitISA and the ARC.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
