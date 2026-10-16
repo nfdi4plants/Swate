@@ -569,6 +569,32 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a directory read leaves out the staging folder of a running import",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let datasetPath = join [| rootPath; "dataset" |]
+
+                        let stagingPath =
+                            join [|
+                                datasetPath
+                                Main.IPC.FileSystemIO.ArcFileSystemHelper.createTemporaryImportDirectoryName ()
+                            |]
+
+                        do! createDirectoryAtAsync stagingPath
+                        do! writeUtf8FileAsync (join [| stagingPath; "staged.csv" |]) "staged"
+                        do! writeUtf8FileAsync (join [| datasetPath; "kept.csv" |]) "kept"
+
+                        let! page = FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 100
+
+                        Vitest.expect(page.Entries |> Array.map _.name).toEqual [| "kept.csv" |]
+                        Vitest.expect(page.HasMore).toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
             "cursor lookahead advances each underlying directory entry exactly once",
             fun () -> promise {
                 let mutable readCalls = 0

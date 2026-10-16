@@ -537,80 +537,26 @@ module ArcVaultExtensions =
 
                     refreshWhileDirty () |> Promise.start
 
-        /// Turns a change of the polled ARC root into a refresh of the root. Returns false while the poller
-        /// is not the root's active observer yet, so the poller reports the change again after activation.
-        member private this.HandleRootDirectoryChange(observer: DirectoryObserver) =
+        /// Turns a change of a polled directory into a refresh of that directory. Returns false while the
+        /// poller is not the directory's active observer yet, so the poller reports the change again after
+        /// activation.
+        member private this.HandleDirectoryModification(directory: string, observer: DirectoryObserver) =
             let controller = this.LoadedDirectoryWatcherController
 
-            if not (controller.OwnsDirectory(RootDirectory, observer)) then
+            if not (controller.OwnsDirectory(directory, observer)) then
                 false
             else
-                if
-                    controller.Current.LifecycleActive
-                    && this.IsFileTreeDirectoryLoaded RootDirectory
-                then
+                if controller.Current.LifecycleActive && this.IsFileTreeDirectoryLoaded directory then
+                    // An added or replaced file can be a pointer or content, so the shared listing is renewed.
                     this.LargeObjectMetadata.Invalidate()
-                    this.QueueLoadedDirectoryRefresh RootDirectory
+                    this.QueueLoadedDirectoryRefresh directory
 
                 true
 
-        /// Turns an event of one directory watcher into a refresh of that directory. Events of a watcher
-        /// that is not, or no longer, the directory's active watcher are dropped; the catch-up read that
-        /// follows watcher readiness covers them.
-        member private this.HandleLoadedDirectoryWatcherEvent
-            (arcPath: string, directory: string, observer: DirectoryObserver, eventName: string, changedPath: string)
-            =
-            let controller = this.LoadedDirectoryWatcherController
-
-            if
-                not (WatcherHelpers.eventNameEquals Chokidar.Events.Error eventName)
-                && not (WatcherHelpers.eventNameEquals Chokidar.Events.Ready eventName)
-                && controller.Current.LifecycleActive
-                && controller.OwnsDirectory(directory, observer)
-                && this.IsFileTreeDirectoryLoaded directory
-            then
-                let absoluteChangedPath =
-                    if isAbsolute changedPath then
-                        changedPath
-                    else
-                        join [| arcPath; changedPath |]
-
-                match tryGetRepoRelativePathOrRoot arcPath (dirname absoluteChangedPath) with
-                | Some parentPath when PathHelpers.pathsEqual parentPath directory ->
-                    let isDirectoryEvent =
-                        WatcherHelpers.eventNameEquals Chokidar.Events.AddDir eventName
-                        || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir eventName
-
-                    // A changed file can switch between pointer and content, so the shared listing is renewed.
-                    if not isDirectoryEvent then
-                        this.LargeObjectMetadata.Invalidate()
-
-                    if
-                        WatcherHelpers.eventNameEquals Chokidar.Events.Unlink eventName
-                        || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir eventName
-                    then
-                        let watcherEvent =
-                            WatcherHelpers.buildWatcherEvent arcPath eventName absoluteChangedPath
-
-                        this.ApplyWatcherFileTreeEvents [ watcherEvent ]
-                        |> Promise.catch (fun error ->
-                            swatelogfn
-                                this.window.id
-                                "Unable to apply loaded-directory watcher event '%s' on '%s': %s"
-                                eventName
-                                watcherEvent.RelativePath
-                                error.Message
-                        )
-                        |> Promise.start
-
-                    this.QueueLoadedDirectoryRefresh directory
-                | _ -> ()
-
         /// The sole owner of loaded-directory observer creation, readiness and retirement.
-        /// Every loaded directory has its own shallow native watcher, so covering a new directory scans
-        /// only that directory and leaves the watchers of all other directories untouched. The ARC root is
-        /// polled instead, so Swate never holds a handle on it. Directories that are no longer loaded lose
-        /// their observer. A newer request cancels the establishment of an older one.
+        /// The root and every loaded directory have their own modification-time poller, so covering a new
+        /// directory leaves the observers of all other directories untouched. Directories that are no
+        /// longer loaded lose their observer. A newer request cancels the establishment of an older one.
         member internal this.RequestLoadedDirectoryWatcherCoverage(shouldWatch: bool, ?allowDuringMutation: bool) =
             let controller = this.LoadedDirectoryWatcherController
             let generation, cancelled = controller.BeginEstablishment()
@@ -634,39 +580,21 @@ module ArcVaultExtensions =
                 let logError (error: exn) =
                     swatelogfn this.window.id "Loaded-directory watcher error for '%s': %s" directory error.Message
 
-                if directory = RootDirectory then
-                    let observer = ref None
+                let observer = ref None
 
-                    let stop, ready =
-                        createDirectoryModificationPoller
-                            arcPath
-                            rootDirectoryPollIntervalMilliseconds
-                            (fun () -> observer.Value |> Option.exists this.HandleRootDirectoryChange)
-                            logError
+                let stop, ready =
+                    createDirectoryModificationPoller
+                        (join [| arcPath; directory |])
+                        directoryPollIntervalMilliseconds
+                        (fun () ->
+                            observer.Value
+                            |> Option.exists (fun observer -> this.HandleDirectoryModification(directory, observer))
+                        )
+                        logError
 
-                    let poller = ModificationPoller stop
-                    observer.Value <- Some poller
-                    poller, ready
-                else
-                    let watcher, ready =
-                        createLoadedDirectoryWatcherWithReady arcPath [| join [| arcPath; directory |] |] logError
-
-                    let nativeWatcher = NativeWatcher watcher
-
-                    watcher.on (
-                        Chokidar.Events.All,
-                        fun eventName changedPath ->
-                            this.HandleLoadedDirectoryWatcherEvent(
-                                arcPath,
-                                directory,
-                                nativeWatcher,
-                                eventName,
-                                changedPath
-                            )
-                    )
-                    |> ignore
-
-                    nativeWatcher, ready
+                let poller = DirectoryObserver stop
+                observer.Value <- Some poller
+                poller, ready
 
             let lifecycle = promise {
                 do! precedingLifecycle

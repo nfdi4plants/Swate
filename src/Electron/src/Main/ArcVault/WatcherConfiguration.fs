@@ -15,13 +15,12 @@ let private currentNodePlatform () : string =
 let isFileWatcherPathIgnored (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
     let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
     || isGitMetadataPath normalizedPath
     || isLegacyDataMapPath normalizedPath
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
+    || isTemporaryImportPath normalizedPath
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
 
 let isPermanentFileWatcherPathIgnored (arcPath: string) (path: string) =
@@ -98,30 +97,14 @@ let createFileWatcherWithReady (path: string) (usePolling: bool option) (onError
 
     watcher, captureWatcherReadiness onError watcher
 
-/// Creates a native, shallow watcher for loaded FileTree directories and captures readiness.
-/// Chokidar emits `ready` once after its initial scan, not after later `add` calls.
-let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) (onError: exn -> unit) =
-    let watcher =
-        Chokidar.Chokidar.watch (
-            paths,
-            Chokidar.WatchOptions(
-                cwd = arcPath,
-                awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
-                ignoreInitial = true,
-                usePolling = false,
-                depth = 0
-            )
-        )
-
-    watcher, captureWatcherReadiness onError watcher
-
-/// Polling interval of the ARC root observation.
-let rootDirectoryPollIntervalMilliseconds = 500
+/// Polling interval of the File Explorer directory observation.
+let directoryPollIntervalMilliseconds = 500
 
 /// Observes a directory through its modification time, which changes whenever a direct child is
-/// added, removed or renamed. Only stat calls are made, so no handle stays open on the directory:
-/// a native watcher on the ARC root would keep Windows from moving the ARC folder or its items.
+/// added, removed or renamed. Only stat calls are made, so no handle stays open on the directory and
+/// the cost does not grow with the number of entries, unlike a native watcher, which keeps one handle
+/// per entry.
+/// A directory that disappears is reported as one change, and its absence becomes the new baseline.
 /// onChange returns whether it handled the change; an unhandled change keeps the previous baseline, so
 /// it is reported again by the next poll instead of being lost.
 /// Returns the stop function and a readiness promise that settles once the baseline is taken.
@@ -133,21 +116,32 @@ let createDirectoryModificationPoller
     =
     let mutable stopped = false
     let mutable timeout: int option = None
-    let mutable lastModified: float option = None
+    // None until the baseline is taken; Some None while the directory does not exist.
+    let mutable baseline: float option option = None
 
-    let poll () = promise {
+    let observe () = promise {
         try
             let! stats = Filesystem.statAsync directoryPath
+            return Ok(Some stats.mtimeMs)
+        with error ->
+            match Filesystem.tryGetNodeErrorCode error with
+            | Some "ENOENT"
+            | Some "ENOTDIR" -> return Ok None
+            | _ -> return Error error
+    }
 
-            match lastModified with
-            | Some previous when previous <> stats.mtimeMs ->
+    let poll () = promise {
+        match! observe () with
+        | Ok observed ->
+            match baseline with
+            | Some previous when previous <> observed ->
                 if not stopped && onChange () then
-                    lastModified <- Some stats.mtimeMs
+                    baseline <- Some observed
             | Some _ -> ()
-            | None -> lastModified <- Some stats.mtimeMs
+            | None -> baseline <- Some observed
 
             return Ok()
-        with error ->
+        | Error error ->
             if not stopped then
                 onError error
 

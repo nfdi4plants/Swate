@@ -16,7 +16,9 @@ open VersionControlService.Abstractions
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
 
-let private shouldIgnoreDirName (name: string) = name = ".git"
+// A running import stages its files in a temporary folder of the target directory.
+let private shouldIgnoreDirName (name: string) =
+    name = ".git" || isTemporaryImportPath name
 
 let private shouldIgnorePath (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path

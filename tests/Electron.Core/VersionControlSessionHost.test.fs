@@ -14,23 +14,15 @@ open VersionControlService.Abstractions
 open Vitest
 open ElectronCore.TestHelpers
 
-Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
-
 module Settings = Main.VersionControl.VersionControlSettings.VersionControlSettings
 
 let private electron: obj = importAll "electron"
-
-[<Import("watch", "chokidar")>]
-let private watchMock: obj = jsNative
 
 [<Emit("$0.mockResolvedValue($1)")>]
 let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
 [<Emit("$0.mock.calls.length")>]
 let private mockCallCount (mock: obj) : int = jsNative
-
-[<Emit("$0.mockClear()")>]
-let private clearMock (mock: obj) : unit = jsNative
 
 let private waitUntil description predicate =
     let rec loop remaining = promise {
@@ -2273,12 +2265,10 @@ Vitest.describe (
                         do! vault.EnsureInitialFileTreeRootPage workspace |> Promise.map ignore
                         do! vault.RefreshFileTreeDirectory "dataset"
 
-                        Vitest
-                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
-                            .toBe
-                            true
+                        let datasetObserverBeforeBind =
+                            vault.LoadedDirectoryWatcherController.Current.Watchers.TryFind "dataset"
 
-                        clearMock watchMock
+                        Vitest.expect(datasetObserverBeforeBind.IsSome).toBe true
                         let targetLocation = "https://example.invalid/explicit-bind.git"
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 93)
                         providerEvents.Clear()
@@ -2304,15 +2294,21 @@ Vitest.describe (
                             .toEqual (Some targetLocation)
 
                         // The bind refreshes the loaded tree instead of resetting it, so restoration creates a
-                        // replacement watcher for dataset. The root is polled and needs no native watcher.
-                        Vitest.expect(mockCallCount watchMock).toBe 1
+                        // replacement observer for dataset.
                         Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
                         Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "").toBe true
 
+                        let datasetObserverAfterBind =
+                            vault.LoadedDirectoryWatcherController.Current.Watchers.TryFind "dataset"
+
+                        Vitest.expect(datasetObserverAfterBind.IsSome).toBe true
+
                         Vitest
-                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
+                            .expect(
+                                obj.ReferenceEquals(datasetObserverBeforeBind.Value, datasetObserverAfterBind.Value)
+                            )
                             .toBe
-                            true
+                            false
                     finally
                         providerEvents.Clear()
                         bindInvocations.Clear()

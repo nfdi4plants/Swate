@@ -26,6 +26,13 @@ let getPathDepth (path: string) =
 let pathsEqual (left: string) (right: string) =
     PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
+/// Returns true when a path is, or lies inside, the temporary folder of a running file import.
+let isTemporaryImportPath (path: string) =
+    getNonEmptyPathParts path
+    |> Array.exists (fun segment ->
+        Text.RegularExpressions.Regex.IsMatch(segment, """^\.swate-import-[0-9a-fA-F]{32}$""")
+    )
+
 let isLegacyDataMapPath (path: string) =
     getNonEmptyPathParts path
     |> Array.tryLast

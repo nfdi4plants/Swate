@@ -1,22 +1,15 @@
 module Main.LoadedDirectoryWatcher
 
 open Fable.Core
-open Main.Bindings
 
 /// The ARC root key in the watcher map. The root is covered whenever any coverage is active.
 [<Literal>]
 let RootDirectory = ""
 
-/// The observation of one covered directory. Loaded directories use a shallow native watcher that
-/// reports individual changes. The ARC root is polled instead, so Swate never holds a handle on it.
-type internal DirectoryObserver =
-    | NativeWatcher of Chokidar.IWatcher
-    | ModificationPoller of stop: (unit -> JS.Promise<unit>)
-
-    member this.Close() =
-        match this with
-        | NativeWatcher watcher -> watcher.close ()
-        | ModificationPoller stop -> stop ()
+/// The observation of one covered directory: a poller of its modification time. Swate never holds a
+/// handle on a covered directory, and covering one costs a stat call per interval, whatever its size.
+type internal DirectoryObserver(stop: unit -> JS.Promise<unit>) =
+    member _.Close() = stop ()
 
 type internal LoadedDirectoryWatcherState = {
     LifecycleActive: bool
