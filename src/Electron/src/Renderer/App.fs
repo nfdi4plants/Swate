@@ -209,6 +209,8 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
 let Main () =
     let model, dispatch = React.useElmish (init, update, subscribe, [||])
 
+    React.useEffect ((fun () -> Helper.ArcVaultHelper.migrateLegacyAutoCreateNotesFolder () |> Promise.start), [||])
+
     let setPageState (pageState: PageState option) = dispatch (PageStateChanged pageState)
 
     let updatePageState =

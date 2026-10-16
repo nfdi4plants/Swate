@@ -1,28 +1,59 @@
 module Renderer.Components.Helper.ArcVaultHelper
 
-open System
 open Browser.Dom
 open Fable.Core
 open Swate.Components.PageComponents.SettingsPage
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes
 
-let private tryParseLocalStorageBool (raw: string option) : bool option =
-    raw
-    |> Option.bind (fun value ->
-        if String.Equals(value, "true", StringComparison.OrdinalIgnoreCase) then
-            Some true
-        elif String.Equals(value, "false", StringComparison.OrdinalIgnoreCase) then
-            Some false
-        else
-            None
-    )
+/// What the one-time move of the old localStorage value does with its key.
+[<RequireQualifiedAccess>]
+type LegacyAutoCreateNotesFolderAction =
+    /// No old value is stored.
+    | Leave
+    /// The old value is unusable or equals the effective one.
+    | RemoveKey
+    /// The old value differs. Store it as the effective default and remove the key after that succeeds.
+    | AdoptThenRemoveKey of bool
 
-let private isAutoCreateNotesFolderEnabled () =
-    window.localStorage.getItem SettingsPageDefaults.AutoCreateNotesFolderLocalStorageKey
-    |> Option.ofObj
-    |> tryParseLocalStorageBool
-    |> Option.defaultValue true
+/// The old settings page wrote the value with useLocalStorage, which stores a JSON boolean.
+let legacyAutoCreateNotesFolderAction (stored: string option) (effective: bool) : LegacyAutoCreateNotesFolderAction =
+    match stored |> Option.map _.Trim() with
+    | None -> LegacyAutoCreateNotesFolderAction.Leave
+    | Some "true" when effective -> LegacyAutoCreateNotesFolderAction.RemoveKey
+    | Some "false" when not effective -> LegacyAutoCreateNotesFolderAction.RemoveKey
+    | Some "true" -> LegacyAutoCreateNotesFolderAction.AdoptThenRemoveKey true
+    | Some "false" -> LegacyAutoCreateNotesFolderAction.AdoptThenRemoveKey false
+    | Some _ -> LegacyAutoCreateNotesFolderAction.RemoveKey
+
+/// Moves the value of the old localStorage key into the user defaults of the main process.
+/// An unanswered call keeps the key, so the next start tries again.
+let migrateLegacyAutoCreateNotesFolder () : JS.Promise<unit> = promise {
+    let key = SettingsPageDefaults.AutoCreateNotesFolderLocalStorageKey
+    let stored = window.localStorage.getItem key |> Option.ofObj
+    let! userDefaults = Api.ipcUserDefaultsApi.getUserDefaults ()
+
+    match legacyAutoCreateNotesFolderAction stored userDefaults.Effective.AutoCreateNotesFolder with
+    | LegacyAutoCreateNotesFolderAction.Leave -> ()
+    | LegacyAutoCreateNotesFolderAction.RemoveKey -> window.localStorage.removeItem key
+    | LegacyAutoCreateNotesFolderAction.AdoptThenRemoveKey value ->
+        match!
+            Api.ipcUserDefaultsApi.setUserDefaults {
+                userDefaults.Effective with
+                    AutoCreateNotesFolder = value
+            }
+        with
+        | Ok _ -> window.localStorage.removeItem key
+        | Error _ -> ()
+}
+
+let private isAutoCreateNotesFolderEnabled () : JS.Promise<bool> = promise {
+    try
+        let! userDefaults = Api.ipcUserDefaultsApi.getUserDefaults ()
+        return userDefaults.Effective.AutoCreateNotesFolder
+    with _ ->
+        return true
+}
 
 let createErrorModalCallback
     (enqueueErrorModal: ErrorModalRequest -> unit)
@@ -38,7 +69,9 @@ let ensureNotesFolder (onError: string -> unit) : JS.Promise<unit> = promise {
 }
 
 let ensureNotesFolderIfEnabled (onError: string -> unit) : JS.Promise<unit> = promise {
-    if isAutoCreateNotesFolderEnabled () then
+    let! isEnabled = isAutoCreateNotesFolderEnabled ()
+
+    if isEnabled then
         do! ensureNotesFolder onError
 }
 
