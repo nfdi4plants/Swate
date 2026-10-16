@@ -228,8 +228,10 @@ type private CommitSectionProps = {
     MarkedCount: int
     HasMarkedFiles: bool
     CanRunPrimarySave: bool
-    SubmitPrimarySave: unit -> unit
-    SubmitLocalCommit: unit -> unit
+    UploadRightAway: bool
+    SetUploadRightAway: bool -> unit
+    SubmitSaveSelected: unit -> unit
+    SubmitSaveAll: unit -> unit
 }
 
 type private ChangedFilesListProps = {
@@ -1050,56 +1052,34 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private SaveOptionsHelpPopover() =
-        Popover.Popover(
-            debug = "GitSidebarSaveOptionsHelp",
-            children =
-                React.Fragment [
-                    Popover.Trigger(
-                        Html.span "?",
-                        className =
-                            "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-6 swt:w-6 swt:px-0 swt:text-xs swt:font-bold",
-                        props = [ prop.testId "GitSidebarSaveOptionsHelpButton" ]
-                    )
-                    Popover.Content(
-                        children =
-                            Html.div [
-                                prop.className "swt:flex swt:max-w-72 swt:flex-col swt:gap-2 swt:text-sm"
-                                prop.children [
-                                    Popover.Heading(Html.text "Save options")
-                                    Html.p [
-                                        prop.text
-                                            "Save changes commits locally, then updates and uploads online when the repository can sync safely."
-                                    ]
-                                    Html.p [
-                                        prop.text
-                                            "Add and commit changes only writes the local Git commit. Online sync stays pending until you update or upload later."
-                                    ]
-                                ]
-                            ]
-                    )
+    static member private CommitSaveButton
+        (testId: string, label: string, iconClassName: string, isFilled: bool, isDisabled: bool, onClick: unit -> unit)
+        =
+        Html.button [
+            prop.testId testId
+            prop.className [
+                "swt:btn swt:btn-sm swt:btn-success swt:min-w-0 swt:flex-1 swt:basis-0 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case"
+                "swt:@max-3xs/gitSidebar:gap-0 swt:@max-3xs/gitSidebar:px-0"
+                if not isFilled then
+                    "swt:btn-outline"
+            ]
+            prop.disabled isDisabled
+            prop.ariaLabel label
+            prop.title label
+            prop.onClick (fun _ -> onClick ())
+            prop.children [
+                Html.span [
+                    prop.className [ "swt:iconify"; iconClassName; "swt:size-4 swt:shrink-0" ]
                 ]
-        )
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate swt:@max-3xs/gitSidebar:sr-only"
+                    prop.text label
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member private CommitSection(props: CommitSectionProps) =
-        let isSaveMenuOpen, setSaveMenuOpen = React.useState false
-        let saveMenuRef = React.useElementRef ()
-
-        React.useListener.onClickAway (saveMenuRef, fun _ -> setSaveMenuOpen false)
-
-        let primarySaveLabel =
-            if props.HasMarkedFiles then
-                "Save Selected Changes"
-            else
-                "Save All Changes"
-
-        let localCommitLabel =
-            if props.HasMarkedFiles then
-                "Add and commit selected Changes"
-            else
-                "Add and commit all Changes"
-
         React.Fragment [
             GitSidebar.SectionHeader("Save", None)
 
@@ -1156,84 +1136,44 @@ type GitSidebar =
                         ]
                     ]
                     Html.div [
-                        prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
+                        prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:gap-2"
                         prop.children [
-                            Html.div [
-                                prop.ref saveMenuRef
-                                prop.className "swt:relative swt:inline-flex swt:min-w-0 swt:flex-1"
-                                prop.children [
-                                    Html.div [
-                                        prop.className "swt:join swt:flex swt:min-w-0 swt:flex-1"
-                                        prop.children [
-                                            Html.button [
-                                                prop.testId "GitSidebarPrimarySaveButton"
-                                                prop.className
-                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:flex-1 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
-                                                prop.disabled (not props.CanRunPrimarySave)
-                                                prop.title primarySaveLabel
-                                                prop.onClick (fun _ -> props.SubmitPrimarySave())
-                                                prop.children [
-                                                    Html.span [
-                                                        prop.className
-                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4 swt:shrink-0"
-                                                    ]
-                                                    Html.span [
-                                                        prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
-                                                        prop.text primarySaveLabel
-                                                    ]
-                                                ]
-                                            ]
-                                            Html.button [
-                                                prop.testId "GitSidebarSaveOptionsButton"
-                                                prop.className
-                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:shrink-0 swt:px-2"
-                                                prop.disabled (not props.CanRunPrimarySave)
-                                                prop.title "Save options"
-                                                prop.onClick (fun _ -> setSaveMenuOpen (not isSaveMenuOpen))
-                                                prop.children [
-                                                    Html.span [
-                                                        prop.className
-                                                            "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4 swt:shrink-0"
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                                    if isSaveMenuOpen then
-                                        Html.ul [
-                                            prop.testId "GitSidebarSaveOptionsMenu"
-                                            prop.tabIndex 0
-                                            prop.className
-                                                "swt:menu swt:absolute swt:left-0 swt:top-full swt:z-99 swt:mt-1 swt:w-full swt:min-w-0 swt:rounded-box swt:bg-base-200 swt:p-2 swt:shadow-sm"
-                                            prop.onClick (fun _ -> setSaveMenuOpen false)
-                                            prop.children [
-                                                Html.li [
-                                                    prop.children [
-                                                        Html.button [
-                                                            prop.testId "GitSidebarLocalCommitButton"
-                                                            prop.className
-                                                                "swt:items-start swt:gap-2 swt:whitespace-normal swt:text-left"
-                                                            prop.onClick (fun _ -> props.SubmitLocalCommit())
-                                                            prop.children [
-                                                                Html.span [
-                                                                    prop.className
-                                                                        "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
-                                                                ]
-                                                                Html.span [
-                                                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
-                                                                    prop.text localCommitLabel
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                ]
+                            if props.HasMarkedFiles then
+                                GitSidebar.CommitSaveButton(
+                                    "GitSidebarSaveSelectedButton",
+                                    "Save Selected Changes",
+                                    "swt:fluent--document-checkmark-24-regular",
+                                    true,
+                                    not props.CanRunPrimarySave,
+                                    props.SubmitSaveSelected
+                                )
+
+                            GitSidebar.CommitSaveButton(
+                                "GitSidebarSaveAllButton",
+                                "Save All Changes",
+                                "swt:fluent--checkmark-circle-24-regular",
+                                not props.HasMarkedFiles,
+                                not props.CanRunPrimarySave,
+                                props.SubmitSaveAll
+                            )
+                        ]
+                    ]
+                    Html.label [
+                        prop.className "swt:mt-2 swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-xs"
+                        prop.title
+                            "When unchecked, changes are saved on this computer only and not uploaded to the online repository."
+                        prop.children [
+                            Html.input [
+                                prop.testId "GitSidebarUploadRightAwayCheckbox"
+                                prop.className "swt:checkbox swt:checkbox-xs swt:shrink-0"
+                                prop.type'.checkbox
+                                prop.disabled (not props.CanEditCommit)
+                                prop.isChecked props.UploadRightAway
+                                prop.onChange props.SetUploadRightAway
                             ]
-                            Html.div [
-                                prop.className "swt:shrink-0"
-                                prop.children [ GitSidebar.SaveOptionsHelpPopover() ]
+                            Html.span [
+                                prop.className "swt:min-w-0 swt:truncate"
+                                prop.text "Upload right away"
                             ]
                         ]
                     ]
@@ -1903,6 +1843,7 @@ type GitSidebar =
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
         let isMissingMessageModalOpen, setMissingMessageModalOpen = React.useState false
+        let uploadRightAway, setUploadRightAway = React.useState true
 
         let publishRenameInput, setPublishRenameInput =
             React.useState (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
@@ -2086,43 +2027,32 @@ type GitSidebar =
             setMarkedPaths (fun _ -> nextMarkedPaths)
             setSelectionAnchorPath (fun _ -> Some change.Path)
 
-        let submitPrimarySave () =
+        let submitSave (selectedOnly: bool) =
             let normalizedCommitMessage = commitMessage.Trim()
-            let hasMarkedFiles = (Set.count markedPaths) > 0
 
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
                 setMissingMessageModalOpen true
-            elif hasMarkedFiles then
-                setLocalError None
-
-                onPrimarySaveSelection {
-                    Message = normalizedCommitMessage
-                    Paths = markedPaths |> Set.toArray |> Array.sort
-                }
-
-                setCommitMessage ""
-                setMarkedPaths (fun _ -> Set.empty)
             else
                 setLocalError None
-                onPrimarySaveAll normalizedCommitMessage
+
+                if selectedOnly then
+                    let request = {
+                        Message = normalizedCommitMessage
+                        Paths = markedPaths |> Set.toArray |> Array.sort
+                    }
+
+                    if uploadRightAway then
+                        onPrimarySaveSelection request
+                    else
+                        onCommitSelection request
+
+                    setMarkedPaths (fun _ -> Set.empty)
+                elif uploadRightAway then
+                    onPrimarySaveAll normalizedCommitMessage
+                else
+                    onCommitAll normalizedCommitMessage
+
                 setCommitMessage ""
-
-        let submitLocalCommit () =
-            let normalizedCommitMessage = commitMessage.Trim()
-            let hasMarkedFiles = (Set.count markedPaths) > 0
-
-            if String.IsNullOrWhiteSpace normalizedCommitMessage then
-                setMissingMessageModalOpen true
-            elif hasMarkedFiles then
-                setLocalError None
-
-                onCommitSelection {
-                    Message = normalizedCommitMessage
-                    Paths = markedPaths |> Set.toArray |> Array.sort
-                }
-            else
-                setLocalError None
-                onCommitAll normalizedCommitMessage
 
         let submitDiscardSelection (paths: string[]) =
             let normalizedPaths =
@@ -2356,8 +2286,10 @@ type GitSidebar =
                         MarkedCount = markedCount
                         HasMarkedFiles = hasMarkedFiles
                         CanRunPrimarySave = canRunPrimarySave
-                        SubmitPrimarySave = submitPrimarySave
-                        SubmitLocalCommit = submitLocalCommit
+                        UploadRightAway = uploadRightAway
+                        SetUploadRightAway = setUploadRightAway
+                        SubmitSaveSelected = fun () -> submitSave true
+                        SubmitSaveAll = fun () -> submitSave false
                     }
                 )
 

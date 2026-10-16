@@ -358,7 +358,6 @@ export const AdvancedActions: Story = {
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
-    await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toBeVisible();
     await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toBeVisible();
@@ -429,6 +428,8 @@ export const ConflictsPresent: Story = {
     await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(5);
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarDiscardChangeButton-0")).toBeNull();
+    await expect(canvas.getByTestId("GitSidebarSaveAllButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarUploadRightAwayCheckbox")).toBeDisabled();
     await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
     fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-4"), { ctrlKey: true });
     await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-4")).toHaveAttribute(
@@ -869,36 +870,39 @@ export const CommitComposer: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const modal = within(document.body);
     const legacyCard = canvas.getByTestId("GitSidebarCommitSection").firstElementChild as HTMLElement;
     await expect(legacyCard).not.toHaveClass("swt:rounded-box");
     await expect(legacyCard).not.toHaveClass("swt:border");
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
-    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
-    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
-    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
-      "Add and commit selected Changes",
-    );
-    const sidebarBounds = canvas.getByTestId("GitSidebar").getBoundingClientRect();
-    const menuBounds = canvas.getByTestId("GitSidebarSaveOptionsMenu").getBoundingClientRect();
-    expect(menuBounds.left).toBeGreaterThanOrEqual(sidebarBounds.left);
-    expect(menuBounds.right).toBeLessThanOrEqual(sidebarBounds.right);
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
-    // Ctrl+click to deselect – button text should switch back to "Save All Changes"
+
+    // Nothing marked: one button fills the row.
+    await expect(canvas.queryByTestId("GitSidebarSaveSelectedButton")).toBeNull();
+    const uploadCheckbox = canvas.getByTestId("GitSidebarUploadRightAwayCheckbox");
+    await expect(uploadCheckbox).toBeChecked();
+    const loneBounds = canvas.getByTestId("GitSidebarSaveAllButton").getBoundingClientRect();
+    const uploadTop = uploadCheckbox.getBoundingClientRect().top;
+    const sectionBounds = canvas.getByTestId("GitSidebarCommitSection").getBoundingClientRect();
+    expect(loneBounds.width).toBeGreaterThan(sectionBounds.width / 2);
+
+    // Marked: two equal buttons share one row and nothing below them moves.
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    const saveSelected = await canvas.findByTestId("GitSidebarSaveSelectedButton");
+    const selectedBounds = saveSelected.getBoundingClientRect();
+    const allBounds = canvas.getByTestId("GitSidebarSaveAllButton").getBoundingClientRect();
+    expect(selectedBounds.top).toBe(allBounds.top);
+    expect(selectedBounds.height).toBe(loneBounds.height);
+    expect(allBounds.height).toBe(loneBounds.height);
+    expect(allBounds.top).toBe(loneBounds.top);
+    expect(selectedBounds.right).toBeLessThanOrEqual(allBounds.left);
+    expect(Math.abs(selectedBounds.width - allBounds.width)).toBeLessThan(1);
+    expect(uploadCheckbox.getBoundingClientRect().top).toBe(uploadTop);
+
+    // Ctrl+click deselects the row and the single button returns.
     fireEvent.mouseDown(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
     fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
-    await waitFor(() =>
-      expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes"),
-    );
-    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
-    await waitFor(() =>
-      expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
-        "Add and commit all Changes",
-      ),
-    );
-    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsHelpButton"));
-    await expect(await modal.findByTestId("popover_content_GitSidebarSaveOptionsHelp")).toBeInTheDocument();
+    await waitFor(() => expect(canvas.queryByTestId("GitSidebarSaveSelectedButton")).toBeNull());
+    expect(canvas.getByTestId("GitSidebarSaveAllButton").getBoundingClientRect().width).toBe(loneBounds.width);
   },
 };
 

@@ -9516,6 +9516,26 @@ Vitest.describe (
         )
 )
 
+let private renderSaveSidebar (callbacks: GitSidebarCallbacks) =
+    renderToBody (
+        Swate.Components.Page.GitSidebar.Main(
+            status = {
+                CurrentBranch = Some "main"
+                TrackingBranch = Some "origin/main"
+                Ahead = 0
+                Behind = 0
+                IsClean = false
+                IsMergeInProgress = false
+            },
+            changedFiles = manyChangedFiles 3,
+            branchOptions = [| sidebarLocalBranch "main" true true |],
+            callbacks = callbacks,
+            downloadLargeFiles = true,
+            lfsAutoTrackThresholdMb = 5,
+            diffIndexingLimitMb = 1024
+        )
+    )
+
 Vitest.describe (
     "GitWorkflow component behavior",
     fun () ->
@@ -10203,7 +10223,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar marks rows with Windows Explorer click semantics and shows one primary save button",
+            "GitSidebar marks rows with Windows Explorer click semantics and shows two save buttons only while rows are marked",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
@@ -10252,6 +10272,12 @@ Vitest.describe (
                 let thirdRow =
                     container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
 
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarSaveAllButton']").length).toBe (1)
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (0)
+
                 firstRow.click ()
                 do! Promise.sleep 0
 
@@ -10261,8 +10287,11 @@ Vitest.describe (
                 thirdRow.dispatchEvent shiftClick |> ignore
                 do! Promise.sleep 0
 
-                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarPrimarySaveButton']").length).toBe (1)
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarSaveAllButton']").length).toBe (1)
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
 
                 Vitest
                     .expect(container.querySelectorAll("[data-testid^='GitSidebarCommitSelectionCheckbox-']").length)
@@ -10407,10 +10436,9 @@ Vitest.describe (
                 do! Promise.sleep 0
 
                 let saveButton =
-                    container.querySelector ("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']") :?> HTMLButtonElement
 
                 Vitest.expect(saveButton.disabled).toBe (false)
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 saveButton.click ()
                 do! Promise.sleep 0
 
@@ -10494,10 +10522,9 @@ Vitest.describe (
                 do! Promise.sleep 0
 
                 let saveButton =
-                    container.querySelector ("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']") :?> HTMLButtonElement
 
                 Vitest.expect(saveButton.disabled).toBe (false)
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 saveButton.click ()
                 do! Promise.sleep 0
 
@@ -10687,7 +10714,9 @@ Vitest.describe (
                 firstRow.click ()
                 do! Promise.sleep 0
 
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
 
                 let ctrlClick =
                     createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
@@ -10695,7 +10724,11 @@ Vitest.describe (
                 firstRow.dispatchEvent ctrlClick |> ignore
                 do! Promise.sleep 0
 
-                Vitest.expect(container.textContent.Contains("Save All Changes")).toBe (true)
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (0)
+
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarSaveAllButton']").length).toBe (1)
 
                 let rowClass = firstRow.className
                 Vitest.expect(rowClass.Contains("swt:select-none")).toBe (true)
@@ -10778,6 +10811,158 @@ Vitest.describe (
                 let legacyCard = firstElementChild saveSection
                 Vitest.expect(legacyCard.className.Contains("swt:rounded-box")).toBe (false)
                 Vitest.expect(legacyCard.className.Contains("swt:border")).toBe (false)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar checks upload right away by default and Save All uses the primary save callback",
+            fun () -> promise {
+                let mutable primaryAllMessage: string option = None
+                let mutable commitAllCalls = 0
+
+                let! container, cleanup =
+                    renderSaveSidebar {
+                        noopCallbacks with
+                            OnPrimarySaveAll = fun message -> primaryAllMessage <- Some message
+                            OnCommitAll = fun _ -> commitAllCalls <- commitAllCalls + 1
+                    }
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                Vitest.expect(uploadCheckbox.``checked``).toBe (true)
+
+                setTextAreaValue messageInput "save everything"
+                do! Promise.sleep 0
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                saveAllButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(primaryAllMessage).toEqual (Some "save everything")
+                Vitest.expect(commitAllCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar Save All with rows marked sends only the message and no paths",
+            fun () -> promise {
+                let mutable primaryAllMessage: string option = None
+                let mutable primarySelectionCalls = 0
+
+                let! container, cleanup =
+                    renderSaveSidebar {
+                        noopCallbacks with
+                            OnPrimarySaveAll = fun message -> primaryAllMessage <- Some message
+                            OnPrimarySaveSelection = fun _ -> primarySelectionCalls <- primarySelectionCalls + 1
+                    }
+
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                let row2 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                row0.click ()
+                do! Promise.sleep 0
+
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
+
+                setTextAreaValue messageInput "save all while marked"
+                do! Promise.sleep 0
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                saveAllButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(primaryAllMessage).toEqual (Some "save all while marked")
+                Vitest.expect(primarySelectionCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar routes both save buttons to the local commit callbacks when upload right away is unchecked and clears the message",
+            fun () -> promise {
+                let mutable commitSelection: GitSidebarCommitSelectionRequest option = None
+                let mutable commitAllMessage: string option = None
+                let mutable primaryCalls = 0
+
+                let! container, cleanup =
+                    renderSaveSidebar {
+                        noopCallbacks with
+                            OnPrimarySaveSelection = fun _ -> primaryCalls <- primaryCalls + 1
+                            OnPrimarySaveAll = fun _ -> primaryCalls <- primaryCalls + 1
+                            OnCommitSelection = fun request -> commitSelection <- Some request
+                            OnCommitAll = fun message -> commitAllMessage <- Some message
+                    }
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                uploadCheckbox.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(uploadCheckbox.``checked``).toBe (false)
+
+                row0.click ()
+                do! Promise.sleep 0
+                setTextAreaValue messageInput "local selected"
+                do! Promise.sleep 0
+
+                let saveSelectedButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']") :?> HTMLButtonElement
+
+                saveSelectedButton.click ()
+                do! Promise.sleep 0
+
+                Vitest
+                    .expect(commitSelection |> Option.map (fun request -> request.Message, request.Paths))
+                    .toEqual (Some("local selected", [| "src/file-000.txt" |]))
+
+                Vitest.expect(messageInput.value).toBe ("")
+
+                setTextAreaValue messageInput "local all"
+                do! Promise.sleep 0
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                saveAllButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(commitAllMessage).toEqual (Some "local all")
+                Vitest.expect(messageInput.value).toBe ("")
+                Vitest.expect(primaryCalls).toBe (0)
 
                 cleanup ()
             }
