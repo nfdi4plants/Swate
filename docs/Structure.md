@@ -21,7 +21,7 @@ Reuses code from `src/Components`.
 
 ## `src/Server`
 
-The .NET backend application for centralized APIs and database access for Swate applications.
+The .NET backend application for centralized APIs and database access for ARCitISA applications.
 
 This project must not be Fable-compatible.
 
