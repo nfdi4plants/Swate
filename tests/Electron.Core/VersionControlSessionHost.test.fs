@@ -6,9 +6,9 @@ open Fable.Electron
 open Main
 open Main.Bindings.Path
 open Main.VersionControl
-open Swate.Components.Composite.Authentication.Types
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 open Vitest
 open ElectronCore.TestHelpers
@@ -42,7 +42,7 @@ type private Fixture = {
 }
 
 let private createFixture () = promise {
-    let! root = createTempDirectoryAsync "swate-vc-host-"
+    let! root = createTempDirectoryAsync "arcitisa-vc-host-"
     let repoRoot = join [| root; "repo" |]
     let remoteRoot = join [| root; "remote.git" |]
     let plainRoot = join [| root; "plain" |]
@@ -736,7 +736,7 @@ let private withCreateArcSetup
 
         let expectedArcPath =
             ARCtrl.ArcPathHelper.combine container identifier
-            |> Swate.Components.Shared.PathHelpers.normalizePath
+            |> ARCitISA.Components.Shared.PathHelpers.normalizePath
 
         Main.Bindings.Filesystem.mkdirSync container (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
 
@@ -783,7 +783,7 @@ Vitest.describe (
             "an ARC whose repository initialization fails is still created",
             fun () ->
                 withCreateArcSetup
-                    "swate-vc-arc-init-failure-"
+                    "arcitisa-vc-arc-init-failure-"
                     64
                     "failed-init"
                     (fun root expectedArcPath -> fakeProviderRuntime expectedArcPath (join [| root; "unused" |]))
@@ -810,7 +810,7 @@ Vitest.describe (
             "an ARC whose repository initialization throws is still created",
             fun () ->
                 withCreateArcSetup
-                    "swate-vc-arc-init-throw-"
+                    "arcitisa-vc-arc-init-throw-"
                     66
                     "throwing-init"
                     (fun root expectedArcPath ->
@@ -835,7 +835,7 @@ Vitest.describe (
         Vitest.test (
             "materialization defers successful tree refreshes and refreshes after failure",
             fun () -> promise {
-                let! root = createTempDirectoryAsync "swate-vc-materialize-refresh-"
+                let! root = createTempDirectoryAsync "arcitisa-vc-materialize-refresh-"
                 let workspace = join [| root; "workspace" |]
                 Main.Bindings.Filesystem.mkdirSync workspace (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
                 writeText (join [| workspace; "object.txt" |]) "object\n"
@@ -1411,7 +1411,7 @@ Vitest.describe (
                     let datasetEntry =
                         vault.fileTree.Values
                         |> Seq.tryFind (fun entry ->
-                            Swate.Components.Shared.PathHelpers.pathsEqual entry.path datasetAbsolutePath
+                            ARCitISA.Components.Shared.PathHelpers.pathsEqual entry.path datasetAbsolutePath
                         )
                         |> Option.defaultWith (fun () -> failwith "The refreshed file tree omitted the dataset file.")
 
@@ -2892,7 +2892,7 @@ Vitest.describe (
         // Recovery.InspectWorkspace, Recovery.ReopenWorkspace, Recovery.CheckDependencies,
         // Recovery.AbortMerge, Recovery.RemoveCloneTarget.
         Vitest.test (
-            "Swate's code literals match the library's",
+            "ARCitISA's code literals match the library's",
             fun () ->
                 Vitest.expect(VersionControlCodes.UpdateWouldOverwriteLocalChanges).toBe
                     SynchronizationCodes.UpdateWouldOverwriteLocalChanges

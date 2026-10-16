@@ -1,13 +1,13 @@
-module Swate.Components.Composite.DataMapTable.Helper
+module ARCitISA.Components.Composite.DataMapTable.Helper
 
 open ARCtrl
 open Browser.Dom
 open Fable.Core
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.DataMapTable.Types
-open Swate.Components.Composite.DataMapTable.ClipboardTarget
-open Swate.Components.Composite.Table.Types
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.DataMapTable.Types
+open ARCitISA.Components.Composite.DataMapTable.ClipboardTarget
+open ARCitISA.Components.Composite.Table.Types
 
 let private captureCells
     (dataMap: DataMap)
@@ -19,18 +19,18 @@ let private captureCells
         |> Seq.toArray
 
     let cells =
-        Swate.Components.ClipboardContract.Contract.Capture.matrix
+        ARCitISA.Components.ClipboardContract.Contract.Capture.matrix
             (fun coordinate -> dataMap.GetCell(coordinate.x - 1, coordinate.y - 1))
             coordinates
 
     {
-        PlainText = Swate.Components.ClipboardContract.Contract.Capture.toPlainText cells
+        PlainText = ARCitISA.Components.ClipboardContract.Contract.Capture.toPlainText cells
         Cells = Some cells
     }
 
 let copyCells (dataMap: DataMap) (coordinates: seq<CellCoordinate>) =
     let content = captureCells dataMap coordinates
-    Swate.Components.ClipboardCodec.write content.PlainText content.Cells
+    ARCitISA.Components.ClipboardCodec.write content.PlainText content.Cells
 
 let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: DataMap -> unit) =
     // Always mutate a copy so memoized views compare against the unchanged current value.
@@ -39,7 +39,7 @@ let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: Data
     setDataMap nextDataMap
 
 let cutCells (dataMap: DataMap) (coordinates: CellCoordinate[]) (setDataMap: DataMap -> unit) =
-    Swate.Components.ClipboardContract.Actions.cut
+    ARCitISA.Components.ClipboardContract.Actions.cut
         (captureCells dataMap coordinates)
         (fun () -> updateDataMap dataMap setDataMap _.ClearCells(coordinates))
 
@@ -50,7 +50,7 @@ let pasteFromClipboard
     (setDataMap: DataMap -> unit)
     =
     promise {
-        let! content = Swate.Components.ClipboardCodec.read ()
+        let! content = ARCitISA.Components.ClipboardCodec.read ()
 
         updateDataMap
             dataMap

@@ -2,8 +2,8 @@ module Main.Auth.AuthService
 
 open System
 open Fable.Core
-open Swate.Electron.Shared.AuthTypes
-open Swate.Components.Composite.Authentication.Types
+open ARCitISA.Electron.Shared.AuthTypes
+open ARCitISA.Components.Composite.Authentication.Types
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -113,17 +113,18 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
 //   2. If no match, search all accounts for a host match.
 //   3. If still no match, return None.
 
-/// Map of localSwateAccountId → account state (summary + PAT).
+/// Map of localARCitISAAccountId → account state (summary + PAT).
 let mutable private accounts: Map<string, AccountState> = Map.empty
 
 /// Currently active local account key.
-let mutable private activeLocalSwateAccountId: string option = None
+let mutable private activeLocalARCitISAAccountId: string option = None
 
 let private getActiveAccountState () =
-    activeLocalSwateAccountId |> Option.bind (fun id -> accounts |> Map.tryFind id)
+    activeLocalARCitISAAccountId
+    |> Option.bind (fun id -> accounts |> Map.tryFind id)
 
 let private persistActiveSelection () =
-    SecureAuthStore.setActiveLocalSwateAccountId activeLocalSwateAccountId
+    SecureAuthStore.setActiveLocalARCitISAAccountId activeLocalARCitISAAccountId
 
 let private invalidateRevalidationWindow () = lastRevalidationStartedAtUtc <- None
 
@@ -132,16 +133,16 @@ let private reconcileActiveAccountInvariant () =
         if accounts.IsEmpty then
             None
         else
-            match activeLocalSwateAccountId with
+            match activeLocalARCitISAAccountId with
             | Some id when accounts |> Map.containsKey id -> Some id
             | _ -> accounts |> Map.tryPick (fun id _ -> Some id)
 
-    if activeLocalSwateAccountId <> nextActive then
-        activeLocalSwateAccountId <- nextActive
+    if activeLocalARCitISAAccountId <> nextActive then
+        activeLocalARCitISAAccountId <- nextActive
         persistActiveSelection ()
 
-let private toMetadata (localSwateAccountId: string) (summary: AccountSummary) : SecureAuthStore.AuthMetadata = {
-    LocalSwateAccountId = localSwateAccountId
+let private toMetadata (localARCitISAAccountId: string) (summary: AccountSummary) : SecureAuthStore.AuthMetadata = {
+    LocalARCitISAAccountId = localARCitISAAccountId
     Id = summary.User.Id
     Username = summary.User.Username
     Name = summary.User.Name
@@ -154,10 +155,10 @@ let private toMetadata (localSwateAccountId: string) (summary: AccountSummary) :
     TokenExpiresOn = summary.TokenExpiresOn
 }
 
-let private persistAccountState (localSwateAccountId: string) (accountState: AccountState) : unit =
+let private persistAccountState (localARCitISAAccountId: string) (accountState: AccountState) : unit =
     let storeResult =
         SecureAuthStore.store {
-            Metadata = toMetadata localSwateAccountId accountState.Summary
+            Metadata = toMetadata localARCitISAAccountId accountState.Summary
             Token = accountState.Token
         }
 
@@ -205,9 +206,9 @@ let tryGetTokenForHost (host: string) : string option =
         )
 
 /// Usable token of one stored account, by local account id.
-let tryGetTokenForAccount (localSwateAccountId: string) : string option =
+let tryGetTokenForAccount (localARCitISAAccountId: string) : string option =
     accounts
-    |> Map.tryFind localSwateAccountId
+    |> Map.tryFind localARCitISAAccountId
     |> Option.filter canUseToken
     |> Option.map _.Token
 
@@ -330,9 +331,9 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
                     else
                         let dateAdded =
                             accounts
-                            |> Map.tryFind user.LocalSwateAccountId
+                            |> Map.tryFind user.LocalARCitISAAccountId
                             |> Option.map (fun accountState -> accountState.Summary.DateAdded)
-                            |> Option.defaultValue (Swate.Components.DateTimeExtensions.getUtcNowISO ())
+                            |> Option.defaultValue (ARCitISA.Components.DateTimeExtensions.getUtcNowISO ())
 
                         let accountState = {
                             Summary = {
@@ -344,10 +345,10 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
                             Token = request.PersonalAccessToken
                         }
 
-                        persistAccountState user.LocalSwateAccountId accountState
+                        persistAccountState user.LocalARCitISAAccountId accountState
 
-                        accounts <- accounts |> Map.add user.LocalSwateAccountId accountState
-                        activeLocalSwateAccountId <- Some user.LocalSwateAccountId
+                        accounts <- accounts |> Map.add user.LocalARCitISAAccountId accountState
+                        activeLocalARCitISAAccountId <- Some user.LocalARCitISAAccountId
                         persistActiveSelection ()
                         invalidateRevalidationWindow ()
                         let authStateDto = getState ()
@@ -356,7 +357,7 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
 
 /// Sign out: remove active account from memory and disk, pick next or clear.
 let signOut () : unit =
-    match activeLocalSwateAccountId with
+    match activeLocalARCitISAAccountId with
     | Some id ->
         SecureAuthStore.remove id
         accounts <- accounts |> Map.remove id
@@ -365,10 +366,10 @@ let signOut () : unit =
     | None -> ()
 
 /// Set a different account as active.
-let setActiveAccount (localSwateAccountId: string) : AuthStateDto =
-    match accounts |> Map.tryFind localSwateAccountId with
+let setActiveAccount (localARCitISAAccountId: string) : AuthStateDto =
+    match accounts |> Map.tryFind localARCitISAAccountId with
     | Some _ ->
-        activeLocalSwateAccountId <- Some localSwateAccountId
+        activeLocalARCitISAAccountId <- Some localARCitISAAccountId
         persistActiveSelection ()
         invalidateRevalidationWindow ()
     | None -> ()
@@ -376,16 +377,16 @@ let setActiveAccount (localSwateAccountId: string) : AuthStateDto =
     getState ()
 
 /// Remove a specific account (by local key). If it was active, switch to next or clear.
-let removeAccount (localSwateAccountId: string) : unit =
-    SecureAuthStore.remove localSwateAccountId
-    accounts <- accounts |> Map.remove localSwateAccountId
+let removeAccount (localARCitISAAccountId: string) : unit =
+    SecureAuthStore.remove localARCitISAAccountId
+    accounts <- accounts |> Map.remove localARCitISAAccountId
 
     reconcileActiveAccountInvariant ()
     invalidateRevalidationWindow ()
 
 /// Rotate PAT for a specific account and replace the stored token.
-let rotatePersonalAccessToken (localSwateAccountId: string) : JS.Promise<Result<AuthStateDto, AuthFailure>> = promise {
-    match accounts |> Map.tryFind localSwateAccountId with
+let rotatePersonalAccessToken (localARCitISAAccountId: string) : JS.Promise<Result<AuthStateDto, AuthFailure>> = promise {
+    match accounts |> Map.tryFind localARCitISAAccountId with
     | None ->
         return
             Error {
@@ -424,8 +425,8 @@ let rotatePersonalAccessToken (localSwateAccountId: string) : JS.Promise<Result<
                         Token = rotatedToken.token
                 }
 
-                accounts <- accounts |> Map.add localSwateAccountId updatedAccountState
-                persistAccountState localSwateAccountId updatedAccountState
+                accounts <- accounts |> Map.add localARCitISAAccountId updatedAccountState
+                persistAccountState localARCitISAAccountId updatedAccountState
                 invalidateRevalidationWindow ()
 
                 return Ok(getState ())
@@ -465,7 +466,7 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
             let mutable nextAccounts = accounts
             let mutable firstFailure: AuthFailure option = None
 
-            for localSwateAccountId, accountState in accounts |> Map.toArray do
+            for localARCitISAAccountId, accountState in accounts |> Map.toArray do
                 let currentUser = accountState.Summary.User
 
                 let! tokenInfoResult =
@@ -488,7 +489,7 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
                         // Keep the persisted local key stable to avoid file renames on profile changes.
                         let stableUser = {
                             verifiedUser with
-                                LocalSwateAccountId = localSwateAccountId
+                                LocalARCitISAAccountId = localARCitISAAccountId
                         }
 
                         let updatedAccountState = {
@@ -501,8 +502,8 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
                                 }
                         }
 
-                        nextAccounts <- nextAccounts |> Map.add localSwateAccountId updatedAccountState
-                        persistAccountState localSwateAccountId updatedAccountState
+                        nextAccounts <- nextAccounts |> Map.add localARCitISAAccountId updatedAccountState
+                        persistAccountState localARCitISAAccountId updatedAccountState
 
                     | Error failure ->
                         if firstFailure.IsNone then
@@ -517,8 +518,8 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
                                 }
                         }
 
-                        nextAccounts <- nextAccounts |> Map.add localSwateAccountId updatedAccountState
-                        persistAccountState localSwateAccountId updatedAccountState
+                        nextAccounts <- nextAccounts |> Map.add localARCitISAAccountId updatedAccountState
+                        persistAccountState localARCitISAAccountId updatedAccountState
 
                 | Error failure ->
                     if firstFailure.IsNone then
@@ -535,8 +536,8 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
                             }
                     }
 
-                    nextAccounts <- nextAccounts |> Map.add localSwateAccountId updatedAccountState
-                    persistAccountState localSwateAccountId updatedAccountState
+                    nextAccounts <- nextAccounts |> Map.add localARCitISAAccountId updatedAccountState
+                    persistAccountState localARCitISAAccountId updatedAccountState
 
             accounts <- nextAccounts
             reconcileActiveAccountInvariant ()
@@ -571,7 +572,7 @@ let tryRestoreFromStorage () : unit =
     for credential in stored do
         let user: AuthUserDto = {
             Id = credential.Metadata.Id
-            LocalSwateAccountId = credential.Metadata.LocalSwateAccountId
+            LocalARCitISAAccountId = credential.Metadata.LocalARCitISAAccountId
             Username = credential.Metadata.Username
             Name = credential.Metadata.Name
             Email = credential.Metadata.Email
@@ -590,9 +591,9 @@ let tryRestoreFromStorage () : unit =
             Token = credential.Token
         }
 
-        accounts <- accounts |> Map.add user.LocalSwateAccountId accountState
+        accounts <- accounts |> Map.add user.LocalARCitISAAccountId accountState
 
     // Restore persisted active account selection
-    activeLocalSwateAccountId <- SecureAuthStore.getActiveLocalSwateAccountId ()
+    activeLocalARCitISAAccountId <- SecureAuthStore.getActiveLocalARCitISAAccountId ()
 
     reconcileActiveAccountInvariant ()

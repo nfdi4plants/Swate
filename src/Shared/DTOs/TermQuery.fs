@@ -1,6 +1,6 @@
-namespace Swate.Components.Shared.DTOs
+namespace ARCitISA.Components.Shared.DTOs
 
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 type TermQuery = {
     query: string

@@ -2,8 +2,8 @@ namespace Renderer.Components.LeftSidebar.FileExplorer.Modals
 
 open Fable.Core
 open Feliz
-open Swate.Components.Shared
-open Swate.Components.Primitive.Dialog
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Primitive.Dialog
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 

@@ -1,4 +1,4 @@
-module Swate.Components.Page.Metadata.FormComponents.Helpers
+module ARCitISA.Components.Page.Metadata.FormComponents.Helpers
 
 open System
 open Browser.Types

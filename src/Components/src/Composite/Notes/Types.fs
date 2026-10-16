@@ -1,4 +1,4 @@
-module Swate.Components.Composite.Notes.Types
+module ARCitISA.Components.Composite.Notes.Types
 
 open ARCtrl
 

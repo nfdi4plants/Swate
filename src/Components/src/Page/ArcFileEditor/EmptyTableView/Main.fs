@@ -1,14 +1,14 @@
-namespace Swate.Components.Page.ArcFileEditor.EmptyTableView
+namespace ARCitISA.Components.Page.ArcFileEditor.EmptyTableView
 
 open Feliz
 open ARCtrl
 open Fable.Core
 
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.CardGrid
-open Swate.Components.Shared
-open Swate.Components.Page.ArcFileEditor.EmptyTableView.Helper
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.CardGrid
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Page.ArcFileEditor.EmptyTableView.Helper
 
 [<RequireQualifiedAccess>]
 type private ModalState =

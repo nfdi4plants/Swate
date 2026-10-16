@@ -1,7 +1,7 @@
 module ElectronCore.RenamePathRulesTests
 
-open Swate.Electron.Shared.RenamePathRules
-open Swate.Components.Shared
+open ARCitISA.Electron.Shared.RenamePathRules
+open ARCitISA.Components.Shared
 open Vitest
 
 let private targetRejectedMessage = "must not target canonical ARC files"

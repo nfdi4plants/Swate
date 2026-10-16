@@ -7,9 +7,9 @@ open Fable.Electron.Main
 open Main
 open Main.Bindings.Path
 open Main.VersionControl
-open Swate.Components.Composite.Authentication.Types
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 open ARCtrl
 

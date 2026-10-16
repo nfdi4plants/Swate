@@ -1,11 +1,11 @@
-namespace Swate.Components.Primitive.ComboBox
+namespace ARCitISA.Components.Primitive.ComboBox
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.ComboBox.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.ComboBox.Types
 
 [<Erase; Mangle(false)>]
 type ComboBox =

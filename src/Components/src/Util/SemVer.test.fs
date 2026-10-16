@@ -1,7 +1,7 @@
-module internal Swate.Components.Tests.SemVer
+module internal ARCitISA.Components.Tests.SemVer
 
 open Vitest
-open Swate.Components.Util.SemVer
+open ARCitISA.Components.Util.SemVer
 open ARCtrl.Helper.SemVer
 
 Vitest.describe (

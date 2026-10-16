@@ -1,6 +1,6 @@
-module Swate.Components.Page.FileExplorer.Helper
+module ARCitISA.Components.Page.FileExplorer.Helper
 
-open Swate.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Page.FileExplorer.Types
 
 let isLfs (item: FileItem) = item.IsLFS = Some true
 

@@ -1,9 +1,9 @@
 module Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 
 open Fable.Core
-open Swate.Components.Page.ArcFileEditor.Types
-open Swate.Components.Composite.Widgets.JsonImport.Types
-open Swate.Components.Shared
+open ARCitISA.Components.Page.ArcFileEditor.Types
+open ARCitISA.Components.Composite.Widgets.JsonImport.Types
+open ARCitISA.Components.Shared
 open ARCtrl
 
 let editorKey (arcFile: ArcFiles) (requestedView: ActiveView option) =

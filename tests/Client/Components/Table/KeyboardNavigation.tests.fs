@@ -1,10 +1,10 @@
 module Components.Tests.Table.KeyboardNavigation
 
 open Fable.Mocha
-open Swate.Components
+open ARCitISA.Components
 
-open global.Swate.Components.Composite.Table
-open global.Swate.Components.Composite.Table.GridSelect
+open global.ARCitISA.Components.Composite.Table
+open global.ARCitISA.Components.Composite.Table.GridSelect
 
 
 [<Literal>]

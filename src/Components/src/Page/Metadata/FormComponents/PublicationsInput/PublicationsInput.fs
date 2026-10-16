@@ -1,13 +1,13 @@
-namespace Swate.Components.Page.Metadata.FormComponents.PublicationsInput
+namespace ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput
 
 open Fable.Core
 open Browser.Types
 open Feliz
 open ARCtrl
 
-open Swate.Components
-open Swate.Components.Primitive.LayoutComponents
-open Swate.Components.Page.Metadata.FormComponents
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.LayoutComponents
+open ARCitISA.Components.Page.Metadata.FormComponents
 
 module private PublicationsInputHelper =
 

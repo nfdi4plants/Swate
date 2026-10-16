@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.VersionControl
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 open Vitest
 
@@ -1182,7 +1182,7 @@ Vitest.describe (
         Vitest.test (
             "a handle arriving after its window closed is closed at once, and one arriving after a reload is recorded under the same window",
             fun () -> promise {
-                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-registry-"
+                let! root = TestHelpers.createTempDirectoryAsync "arcitisa-text-diff-registry-"
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive
                 let closedWindow = 7
                 let reloadedWindow = 5
@@ -1268,7 +1268,7 @@ Vitest.describe (
         Vitest.test (
             "reloading and closing a window close its recorded handles as operations of that window",
             fun () -> promise {
-                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-window-close-"
+                let! root = TestHelpers.createTempDirectoryAsync "arcitisa-text-diff-window-close-"
                 let reloadedWindow = 5
                 let closedWindow = 7
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive
@@ -1356,7 +1356,7 @@ Vitest.describe (
         Vitest.test (
             "the text diff IPC handlers run every call as an operation of the calling window, and the service answers another window's handle like a closed one",
             fun () -> promise {
-                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-ipc-owner-"
+                let! root = TestHelpers.createTempDirectoryAsync "arcitisa-text-diff-ipc-owner-"
                 let windowA = 81
                 let windowB = 82
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive
@@ -1537,7 +1537,7 @@ Vitest.describe (
         Vitest.test (
             "the open of a diff sends the storage policy of the session settings and answers where the diff lives",
             fun () -> promise {
-                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-storage-"
+                let! root = TestHelpers.createTempDirectoryAsync "arcitisa-text-diff-storage-"
                 let window = 93
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive
                 TextDiffHandles.isWindowAlive <- fun _ -> true
@@ -1621,7 +1621,7 @@ Vitest.describe (
         Vitest.test (
             "an operation id in use is refused, and a window cancels only its own operations",
             fun () -> promise {
-                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-operation-ids-"
+                let! root = TestHelpers.createTempDirectoryAsync "arcitisa-text-diff-operation-ids-"
                 let windowA = 91
                 let windowB = 92
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive

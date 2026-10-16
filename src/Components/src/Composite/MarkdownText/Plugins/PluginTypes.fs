@@ -1,8 +1,8 @@
-namespace Swate.Components.Composite.MarkdownText.Plugins
+namespace ARCitISA.Components.Composite.MarkdownText.Plugins
 
 open Browser.Types
 open Fable.Core
-open Swate.Components.Composite.MarkdownText.JsBindings
+open ARCitISA.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 type MarkdownPromptInputMode =

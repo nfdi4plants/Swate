@@ -1,12 +1,12 @@
-namespace Swate.Components.Composite.Widgets.BuildingBlockWidget
+namespace ARCitISA.Components.Composite.Widgets.BuildingBlockWidget
 
 open ARCtrl
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Dropdown
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Dropdown
+open ARCitISA.Components.Shared
 
 module private BuildingBlockDropdownState =
 

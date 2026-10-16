@@ -1,7 +1,7 @@
-module Swate.Components.Composite.Layout.LeftSidebarContext
+module ARCitISA.Components.Composite.Layout.LeftSidebarContext
 
 open Feliz
-open Swate.Components
+open ARCitISA.Components
 
 type LeftSidebarCtxState = StateContext<bool>
 

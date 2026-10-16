@@ -1,4 +1,4 @@
-namespace Swate.Components.Shared
+namespace ARCitISA.Components.Shared
 
 module URLs =
 
@@ -25,11 +25,11 @@ module URLs =
     type Helpdesk =
         static member Url = @"https://support.nfdi4plants.org"
 
-        static member UrlSwateTopic = Helpdesk.Url + "/?topic=Tools_Swate"
+        static member UrlARCitISATopic = Helpdesk.Url + "/?topic=Tools_ARCitISA"
 
         static member UrlOntologyTopic = Helpdesk.Url + "/?topic=Metadata_OntologyUpdate"
 
-        static member UrlTemplateTopic = Helpdesk.Url + "/?topic=Metadata_SwateTemplate"
+        static member UrlTemplateTopic = Helpdesk.Url + "/?topic=Metadata_ARCitISATemplate"
 
     let CONTACT = Helpdesk.Url
 
@@ -37,10 +37,11 @@ module URLs =
     let AnnotationPrinciplesUrl = @"https://nfdi4plants.github.io/AnnotationPrinciples/"
 
     [<LiteralAttribute>]
-    let SWATE_WIKI = @"https://nfdi4plants.github.io/nfdi4plants.knowledgebase/swate/"
+    let ARCITISA_WIKI =
+        @"https://nfdi4plants.github.io/nfdi4plants.knowledgebase/arcitisa/"
 
     [<LiteralAttribute>]
-    let SwateRepo = @"https://github.com/nfdi4plants/ARCitISA"
+    let ARCitISARepo = @"https://github.com/nfdi4plants/ARCitISA"
 
     [<LiteralAttribute>]
     let CSBTwitterUrl = @"https://twitter.com/cs_biology"

@@ -1,8 +1,8 @@
-module Swate.Components.Composite.Table.Types
+module ARCitISA.Components.Composite.Table.Types
 
 open Fable.Core
 open Feliz
-open Swate.Components
+open ARCitISA.Components
 open Browser.Types
 
 

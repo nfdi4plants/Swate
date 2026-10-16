@@ -1,17 +1,17 @@
-namespace Swate.Components.Composite.Widgets
+namespace ARCitISA.Components.Composite.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.Template
-open Swate.Components.Composite.Widgets.Context
-open Swate.Components.Composite.Widgets.Types
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.Template
+open ARCitISA.Components.Composite.Widgets.Context
+open ARCitISA.Components.Composite.Widgets.Types
 
-module TemplateTypes = Swate.Components.Composite.Template.Types
-module TemplateActions = Swate.Components.Composite.Template.TemplateActions
-module TemplateCacheContext = Swate.Components.Composite.Template.TemplateCacheContext
+module TemplateTypes = ARCitISA.Components.Composite.Template.Types
+module TemplateActions = ARCitISA.Components.Composite.Template.TemplateActions
+module TemplateCacheContext = ARCitISA.Components.Composite.Template.TemplateCacheContext
 
 [<Erase; Mangle(false)>]
 type TemplateWidget =

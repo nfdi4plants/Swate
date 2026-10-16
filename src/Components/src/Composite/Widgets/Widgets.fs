@@ -1,14 +1,14 @@
-namespace Swate.Components.Composite.Widgets
+namespace ARCitISA.Components.Composite.Widgets
 
 open Feliz
 open Browser.Types
-open Swate
-open Swate.Components
-open Swate.Components.Composite.Widgets.LocalStorage
-open Swate.Components.Composite.Widgets.Context
-open Swate.Components.Composite.TermSearch
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Composite.Widgets.Types
+open ARCitISA
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Widgets.LocalStorage
+open ARCitISA.Components.Composite.Widgets.Context
+open ARCitISA.Components.Composite.TermSearch
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Composite.Widgets.Types
 
 module InitExtensions =
 

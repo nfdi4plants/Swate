@@ -1,6 +1,6 @@
 module ARCtrl.Json
 
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 open ARCtrl
 open System

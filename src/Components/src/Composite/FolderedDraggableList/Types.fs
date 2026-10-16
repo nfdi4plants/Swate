@@ -1,4 +1,4 @@
-module Swate.Components.Composite.FolderedDraggableList.Types
+module ARCitISA.Components.Composite.FolderedDraggableList.Types
 
 open Feliz
 

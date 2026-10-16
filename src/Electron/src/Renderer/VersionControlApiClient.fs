@@ -6,8 +6,8 @@ module Renderer.VersionControlApiClient
 
 open System
 open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 let private api: IVersionControlApi = Api.ipcVersionControlApi
 

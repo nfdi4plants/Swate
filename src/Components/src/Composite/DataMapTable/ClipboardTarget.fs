@@ -1,9 +1,9 @@
-module Swate.Components.Composite.DataMapTable.ClipboardTarget
+module ARCitISA.Components.Composite.DataMapTable.ClipboardTarget
 
 open global.ARCtrl
-open Swate.Components
-open Swate.Components.ClipboardContract.Contract
-open Swate.Components.Composite.Table.Types
+open ARCitISA.Components
+open ARCitISA.Components.ClipboardContract.Contract
+open ARCitISA.Components.Composite.Table.Types
 
 [<AutoOpen>]
 module ARCtrlExtensions =
@@ -55,7 +55,7 @@ module ARCtrlExtensions =
 
         member this.PasteTabText(startCoordinate: CellCoordinate, selection: CellCoordinate[], clipboardText: string) =
             let rows =
-                Swate.Components.ClipboardContract.Contract.PlainText.parseRows clipboardText
+                ARCitISA.Components.ClipboardContract.Contract.PlainText.parseRows clipboardText
 
             let mapped = Mapping.map rows startCoordinate selection
 

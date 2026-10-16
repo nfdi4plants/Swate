@@ -1,4 +1,4 @@
-module Swate.Components.Composite.Template.Types
+module ARCitISA.Components.Composite.Template.Types
 
 open Fable.Core
 open ARCtrl

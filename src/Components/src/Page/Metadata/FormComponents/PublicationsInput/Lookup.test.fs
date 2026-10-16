@@ -1,10 +1,10 @@
-module internal Swate.Components.Page.Metadata.FormComponents.PublicationsInput.LookupTests
+module internal ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput.LookupTests
 
 open ARCtrl
 open Fable.Core
 open Vitest
-open Swate.Components.Page.Metadata.FormComponents.PublicationsInput.Types
-open Swate.Components.Page.Metadata.FormComponents.PublicationsInput.Lookup
+open ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput.Types
+open ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput.Lookup
 
 let private json<'T> text : 'T = JS.JSON.parse text |> unbox
 

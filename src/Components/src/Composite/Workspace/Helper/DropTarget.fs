@@ -1,9 +1,9 @@
-module Swate.Components.Composite.Workspace.Helper.DropTarget
+module ARCitISA.Components.Composite.Workspace.Helper.DropTarget
 
 open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Composite.Workspace.Types
+open ARCitISA.Components.Composite.Workspace.Types
 
 
 /// This is required because fantomas produced some issues with dynamic bindings:

@@ -4,7 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Elmish
 
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 open Model
 
@@ -82,7 +82,7 @@ type FileExporter =
                         let host = model.PersistentStorageState.Host
 
                         match host with
-                        | Some Swatehost.Excel ->
+                        | Some ARCitISAhost.Excel ->
                             promise {
                                 let! result = OfficeInterop.Core.Main.tryParseToArcFile ()
 
@@ -95,8 +95,8 @@ type FileExporter =
                                     OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
                             }
                             |> ignore
-                        | Some Swatehost.Browser
-                        | Some Swatehost.ARCitect ->
+                        | Some ARCitISAhost.Browser
+                        | Some ARCitISAhost.ARCitect ->
                             if model.SpreadsheetModel.ArcFile.IsSome then
                                 SpreadsheetInterface.ExportJson(
                                     model.SpreadsheetModel.ArcFile.Value,

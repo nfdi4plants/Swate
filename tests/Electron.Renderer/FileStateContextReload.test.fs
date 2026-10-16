@@ -9,9 +9,9 @@ open Renderer.Components.Helper
 open Renderer.Context.FileStateContext
 open Renderer.Types
 open ARCtrl
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Components.Shared
-open Swate.Components.Page.ArcFileEditor.Types
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Page.ArcFileEditor.Types
 open Vitest
 
 type private RendererPageState = Renderer.Types.PageState
@@ -247,7 +247,7 @@ Vitest.describe (
             fun () ->
                 let workflowArcFile =
                     ArcWorkflow.init "DeletePreviewWorkflow"
-                    |> Swate.Components.Shared.ARCtrlHelper.ArcFiles.Workflow
+                    |> ARCitISA.Components.Shared.ARCtrlHelper.ArcFiles.Workflow
 
                 Vitest
                     .expect(
@@ -410,7 +410,7 @@ Vitest.describe (
             "fromFileContentDTO opens an ARC workbook without tables on Metadata",
             fun () ->
                 let dto =
-                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
+                    ARCitISA.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
                         ArcFiles.Assay(ArcAssay.init "assay")
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
@@ -427,7 +427,7 @@ Vitest.describe (
                 assay.AddTable(ArcTable.init "table")
 
                 let dto =
-                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (ArcFiles.Assay assay)
+                    ARCitISA.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (ArcFiles.Assay assay)
                     |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
 
                 match RendererPageState.fromFileContentDTO dto with
@@ -441,7 +441,7 @@ Vitest.describe (
                 let parent = DatamapParentInfo.create "assay" DataMapParent.Assay
 
                 let dto =
-                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
+                    ARCitISA.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
                         ArcFiles.DataMap(Some parent, DataMap.init ())
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected a DataMap DTO.")

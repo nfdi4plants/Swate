@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.MarkdownText
+namespace ARCitISA.Components.Composite.MarkdownText
 
 open System
 open Browser.Types
@@ -6,11 +6,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 
-open Swate.Components
-open Swate.Components.Composite.MarkdownText.Types
-open Swate.Components.Composite.MarkdownText.JsBindings
-open Swate.Components.Composite.MarkdownText.Plugins
-open Swate.Components.Primitive.LayoutComponents
+open ARCitISA.Components
+open ARCitISA.Components.Composite.MarkdownText.Types
+open ARCitISA.Components.Composite.MarkdownText.JsBindings
+open ARCitISA.Components.Composite.MarkdownText.Plugins
+open ARCitISA.Components.Primitive.LayoutComponents
 
 [<RequireQualifiedAccess>]
 module private MarkdownCommands =

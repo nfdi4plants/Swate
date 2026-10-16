@@ -6,8 +6,8 @@ open Fable.Core
 open Feliz
 open Vitest
 open ARCtrl
-open Swate.Components.Composite.Widgets.JsonImport.Types
-open Swate.Components.Shared
+open ARCitISA.Components.Composite.Widgets.JsonImport.Types
+open ARCitISA.Components.Shared
 
 let rec private waitUntil (predicate: unit -> bool, attempts: int) = promise {
     if predicate () then
@@ -53,7 +53,7 @@ let private jsonImportWidget
     (onImportJson: (JsonImportRequest -> JS.Promise<Result<unit, exn>>) option)
     onError
     =
-    Swate.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(
+    ARCitISA.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(
         arcFile,
         setArcFile,
         ?pickJsonFile = pickJsonFile,

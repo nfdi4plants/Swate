@@ -1,10 +1,10 @@
 module Renderer.Components.MainContent.NotesDraftTarget
 
 open Feliz
-open Swate.Components.Shared
-open Swate.Components.Composite.Notes.Editor
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.Notes.Editor
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
 open Renderer.Components.Helper
 open Renderer.Components.Helper.FileSystemHelper
 open Renderer

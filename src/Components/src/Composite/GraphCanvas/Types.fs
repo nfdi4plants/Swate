@@ -1,4 +1,4 @@
-module Swate.Components.Composite.GraphCanvas.Types
+module ARCitISA.Components.Composite.GraphCanvas.Types
 
 open Fable.Core
 

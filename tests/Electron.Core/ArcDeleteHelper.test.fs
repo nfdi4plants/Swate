@@ -6,7 +6,7 @@ open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.IPC.Delete
 open ARCtrl
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open Vitest
 
 let private expectSome (value: 'T option) (message: string) : 'T =
@@ -19,7 +19,7 @@ let private loadArcAsync = TestHelpers.loadArcAsync
 let private testWindow = TestHelpers.testWindow
 
 let private withTempArc =
-    TestHelpers.withTempArcWith "swate-delete-arc-file-" "DeleteArcFileArc"
+    TestHelpers.withTempArcWith "arcitisa-delete-arc-file-" "DeleteArcFileArc"
 
 let private deleteEntityOrFail arcPath relativePath arc = promise {
     match! ArcDeleteHelper.deleteArcEntityAsync arcPath relativePath arc with

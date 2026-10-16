@@ -1,22 +1,22 @@
-namespace Swate.Components.Composite.DataMapTable
+namespace ARCitISA.Components.Composite.DataMapTable
 
 open Feliz
 open Fable.Core
 open ARCtrl
 open Fable.Core.JsInterop
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Primitive
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Primitive.ContextMenu.Types
-open Swate.Components.Composite.TermSearch.Types
-open Swate.Components.Composite.Table
-open Swate.Components.Composite.Table.Types
-open Swate.Components.Composite.DataMapTable.Types
-open Swate.Components.Composite.AnnotationTable
-open Swate.Components.Composite.AnnotationTable.Context
-open Swate.Components.Composite.DataMapTable.Helper
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Primitive.ContextMenu
+open ARCitISA.Components.Primitive.ContextMenu.Types
+open ARCitISA.Components.Composite.TermSearch.Types
+open ARCitISA.Components.Composite.Table
+open ARCitISA.Components.Composite.Table.Types
+open ARCitISA.Components.Composite.DataMapTable.Types
+open ARCitISA.Components.Composite.AnnotationTable
+open ARCitISA.Components.Composite.AnnotationTable.Context
+open ARCitISA.Components.Composite.DataMapTable.Helper
 
 module private DatamapMemoComponents =
 

@@ -1,11 +1,11 @@
-module internal Swate.Components.Page.Metadata.FormComponents.PersonsInput.RtlTests
+module internal ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput.RtlTests
 
 open ARCtrl
 open Browser.Types
 open Fable.Core
 open Feliz
 open Vitest
-open Swate.Components.Page.Metadata.FormComponents.PersonsInput.Types
+open ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput.Types
 
 module private Helpers =
     let orcid = "0000-0002-1825-0097"

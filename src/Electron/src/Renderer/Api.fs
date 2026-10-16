@@ -1,7 +1,7 @@
 module Api
 
-open Swate.Components.Shared
-open Swate.Electron.Shared.IPCTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.IPCTypes
 
 open Fable.Core
 open Fable.Core.JsInterop

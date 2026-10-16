@@ -1,15 +1,15 @@
 /// This module SHOULD only contain the exact IPC communication types.
-module Swate.Electron.Shared.IPCTypes
+module ARCitISA.Electron.Shared.IPCTypes
 
 open Fable.Core
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Composite.Authentication.Types
-open Swate.Components.Page.DataHub.DataHubTypes
-open Swate.Components.Page.ValidationPackageBrowser.Types
-open Swate.Components.Shared
-open Swate.Components.Shared.ProvenanceGraph.Types
-open Swate.Electron.Shared.DTOs.NoteSearchDto
-open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components.Page.ValidationPackageBrowser.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Shared.ProvenanceGraph.Types
+open ARCitISA.Electron.Shared.DTOs.NoteSearchDto
+open ARCitISA.Electron.Shared.DTOs.ProvenanceGroupingDto
 open AuthTypes
 open FileIOTypes
 open VersionControlTypes
@@ -25,7 +25,7 @@ module IPCTypesHelper =
 open IPCTypesHelper
 
 [<Literal>]
-let swateReleaseRepository = "nfdi4plants/ARCitISA"
+let releaseRepository = "nfdi4plants/ARCitISA"
 
 type AppVersionState = {
     CurrentVersion: string
@@ -58,7 +58,7 @@ type UserDefaultValuesDto = {
     AutoCreateNotesFolder: bool
 }
 
-/// The values new sessions start from, next to the values Swate ships with.
+/// The values new sessions start from, next to the values ARCitISA ships with.
 type UserDefaultsDto = {
     Effective: UserDefaultValuesDto
     BuiltIn: UserDefaultValuesDto
@@ -81,7 +81,7 @@ type CreateArcOutcome =
     | CreatedButClosed of path: string
 
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
-/// through ARCtrl on the Swate .NET server or directly in the renderer due to GitHub CORS.
+/// through ARCtrl on the ARCitISA .NET server or directly in the renderer due to GitHub CORS.
 /// Remove it when ARCtrl provides a working .NET implementation or a CORS-enabled template source.
 type ITemplateApi = {
     getTemplates: unit -> JS.Promise<Result<string, exn>>

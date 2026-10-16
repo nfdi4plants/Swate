@@ -2,10 +2,10 @@ module Main.IPC.IGitLabApi
 
 open System
 open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Swate.Components.Page.DataHub.DataHubTypes
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Composite.Authentication.Helper
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Composite.Authentication.Helper
 open Main.Auth
 
 let private defaultPublicDataHubBaseUrl = Default_DataHub_Url

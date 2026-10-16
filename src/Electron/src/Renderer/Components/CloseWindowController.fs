@@ -2,12 +2,12 @@ namespace Renderer.Components
 
 open Feliz
 open Fable.Core
-open Swate.Components
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.IPCTypesHelper
 
 [<Erase; Mangle(false)>]
 type CloseWindowController =

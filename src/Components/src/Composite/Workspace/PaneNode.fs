@@ -1,13 +1,13 @@
-namespace Swate.Components.Composite.Workspace
+namespace ARCitISA.Components.Composite.Workspace
 
 open Fable.Core
 open Browser.Types
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.Workspace.Types
-open Swate.Components.Composite.Workspace.Context
-open Swate.Components.Composite.Widgets.Types
-open Swate.Components.Primitive.SplitResizer
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Workspace.Types
+open ARCitISA.Components.Composite.Workspace.Context
+open ARCitISA.Components.Composite.Widgets.Types
+open ARCitISA.Components.Primitive.SplitResizer
 
 [<Erase; Mangle(false)>]
 type PaneNode =

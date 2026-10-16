@@ -1,14 +1,14 @@
-namespace Swate.Components.Composite.Workspace
+namespace ARCitISA.Components.Composite.Workspace
 
 open System
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.JsBindings
-open Swate.Components.Composite.Workspace.Types
-open Swate.Components.Composite.Workspace.Context
-open Swate.Components.Composite.Workspace.WorkspaceModel
-open Swate.Components.Composite.Workspace.Helper.DndId
+open ARCitISA.Components
+open ARCitISA.Components.JsBindings
+open ARCitISA.Components.Composite.Workspace.Types
+open ARCitISA.Components.Composite.Workspace.Context
+open ARCitISA.Components.Composite.Workspace.WorkspaceModel
+open ARCitISA.Components.Composite.Workspace.Helper.DndId
 
 [<Erase; Mangle(false)>]
 type Workspace =

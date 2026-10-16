@@ -1,11 +1,11 @@
-namespace Swate.Components.Page.Landing
+namespace ARCitISA.Components.Page.Landing
 
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components.Page.Metadata
-open Swate.Components.Page.Metadata.FormComponents
-open Swate.Components.Page.Metadata.FormComponents.PersonsInput
+open ARCitISA.Components.Page.Metadata
+open ARCitISA.Components.Page.Metadata.FormComponents
+open ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput
 
 [<RequireQualifiedAccess>]
 module SharedFields =

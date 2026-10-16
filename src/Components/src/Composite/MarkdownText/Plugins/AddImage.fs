@@ -1,9 +1,9 @@
-namespace Swate.Components.Composite.MarkdownText.Plugins
+namespace ARCitISA.Components.Composite.MarkdownText.Plugins
 
 open System
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Composite.MarkdownText.JsBindings
+open ARCitISA.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module AddImage =

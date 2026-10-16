@@ -2,17 +2,17 @@ namespace Renderer.Components
 
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.Layout
-open Swate.Components.Composite.Authentication.Types
-open Swate.Components.Composite.Actionbar
-open Swate.Components.Composite.Actionbar.Types
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.IPCTypes
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.Layout
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Components.Composite.Actionbar
+open ARCitISA.Components.Composite.Actionbar.Types
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.IPCTypes
 open Renderer.Types
 
 type private Selector =
@@ -84,7 +84,7 @@ type private Selector =
             }
             |> Promise.start
 
-        Swate.Components.Composite.ArcSelector.ArcSelector.Main(
+        ARCitISA.Components.Composite.ArcSelector.ArcSelector.Main(
             recentArcs.state,
             (fun clickedARC -> openArcByPath onArcError clickedARC.path |> Promise.start),
             selectorIsOpen,
@@ -97,8 +97,8 @@ type private Selector =
 
 module private Authentication =
 
-    open Swate.Components.Composite.Authentication.Types
-    open Swate.Electron.Shared.AuthTypes
+    open ARCitISA.Components.Composite.Authentication.Types
+    open ARCitISA.Electron.Shared.AuthTypes
 
     [<ReactComponent>]
     let UserAvatar () =
@@ -136,9 +136,9 @@ module private Authentication =
             }
             |> Promise.start
 
-        let onSwitchAccount (localSwateAccountId: string) =
+        let onSwitchAccount (localARCitISAAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.setActiveAccount localSwateAccountId with
+                match! Api.ipcAuthApi.setActiveAccount localARCitISAAccountId with
                 | Ok _ ->
                     match! Api.ipcAuthApi.revalidate () with
                     | Ok _ -> ()
@@ -151,25 +151,25 @@ module private Authentication =
             }
             |> Promise.start
 
-        let onRemoveAccount (localSwateAccountId: string) =
+        let onRemoveAccount (localARCitISAAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.removeAccount localSwateAccountId with
+                match! Api.ipcAuthApi.removeAccount localARCitISAAccountId with
                 | Ok _ -> ()
                 | Error ex ->
                     errorModalCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error removing account"))
             }
             |> Promise.start
 
-        let onRotateToken (localSwateAccountId: string) =
+        let onRotateToken (localARCitISAAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.rotatePersonalAccessToken localSwateAccountId with
-                | Ok _ -> Browser.Dom.console.log $"Token rotation successful for account {localSwateAccountId}"
+                match! Api.ipcAuthApi.rotatePersonalAccessToken localARCitISAAccountId with
+                | Ok _ -> Browser.Dom.console.log $"Token rotation successful for account {localARCitISAAccountId}"
                 | Error ex ->
                     errorModalCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error rotating token"))
             }
             |> Promise.start
 
-        Swate.Components.Composite.Authentication.Authentication.UserAvatar(
+        ARCitISA.Components.Composite.Authentication.Authentication.UserAvatar(
             authStateCtx,
             onSignIn,
             onLogout,
@@ -384,5 +384,5 @@ type Navbar =
                 setNewArcModalIsOpen,
                 Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
             )
-            Swate.Components.Primitive.Navbar.Navbar.Main(left = left, right = right)
+            ARCitISA.Components.Primitive.Navbar.Navbar.Main(left = left, right = right)
         ]

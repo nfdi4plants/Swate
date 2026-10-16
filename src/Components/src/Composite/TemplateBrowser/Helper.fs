@@ -1,9 +1,9 @@
-module Swate.Components.Composite.Template.Helper
+module ARCitISA.Components.Composite.Template.Helper
 
 open System
 open ARCtrl
-open Swate.Components.Shared
-open Swate.Components.Composite.Template.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.Template.Types
 
 
 let toFullAuthorName (author: Person) =

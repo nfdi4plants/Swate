@@ -1,7 +1,7 @@
-module Swate.Electron.Shared.RenamePathRules
+module ARCitISA.Electron.Shared.RenamePathRules
 
 open System
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 let private normalizeRelativePath (path: string) =
     path |> PathHelpers.normalizeCanonicalRelativePath

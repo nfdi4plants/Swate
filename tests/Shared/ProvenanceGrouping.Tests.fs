@@ -6,14 +6,14 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Swate.Components.Page.ProvenanceGrouping
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Grouping
-open Swate.Components.Shared.ProvenanceGrouping.Edit
-open Swate.Components.Shared.ProvenanceGrouping.Fixtures
-open Swate.Components.Shared.ProvenanceGrouping.Session
+open ARCitISA.Components.Page.ProvenanceGrouping
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Grouping
+open ARCitISA.Components.Shared.ProvenanceGrouping.Edit
+open ARCitISA.Components.Shared.ProvenanceGrouping.Fixtures
+open ARCitISA.Components.Shared.ProvenanceGrouping.Session
 
-module Fixture = Swate.Components.Shared.ProvenanceGrouping.Fixtures
+module Fixture = ARCitISA.Components.Shared.ProvenanceGrouping.Fixtures
 
 let private sourceRef (tableName: string) : ProvenanceSourceRef = Fixture.source tableName tableName
 

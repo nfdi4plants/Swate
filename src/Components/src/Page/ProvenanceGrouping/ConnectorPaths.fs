@@ -1,15 +1,15 @@
-namespace Swate.Components.Page.ProvenanceGrouping
+namespace ARCitISA.Components.Page.ProvenanceGrouping
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Browser.Types
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Grouping
-open Swate.Components.Shared.ProvenanceGrouping.Session
-open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Primitive.ContextMenu.Types
-open Swate.Components.Page.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Grouping
+open ARCitISA.Components.Shared.ProvenanceGrouping.Session
+open ARCitISA.Components.Primitive.ContextMenu
+open ARCitISA.Components.Primitive.ContextMenu.Types
+open ARCitISA.Components.Page.ProvenanceGrouping.Types
 
 /// Projects model/UI state into logical connector specs, and measures specs into
 /// concrete SVG paths. Spec derivation is pure and memoizable; only the measure

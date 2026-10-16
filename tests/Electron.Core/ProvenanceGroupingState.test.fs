@@ -1,9 +1,9 @@
 module ElectronCore.ProvenanceGroupingStateTests
 
-open Swate.Components.Shared.ProvenanceGrouping.Fixtures
-open Swate.Components.Shared.ProvenanceGrouping.Session
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Page.ProvenanceGrouping
+open ARCitISA.Components.Shared.ProvenanceGrouping.Fixtures
+open ARCitISA.Components.Shared.ProvenanceGrouping.Session
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Page.ProvenanceGrouping
 open Vitest
 
 Vitest.describe (

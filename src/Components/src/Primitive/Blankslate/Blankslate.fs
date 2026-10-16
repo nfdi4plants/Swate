@@ -1,9 +1,9 @@
-namespace Swate.Components.Primitive.Blankslate
+namespace ARCitISA.Components.Primitive.Blankslate
 
 open Fable.Core
 open Feliz
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Blankslate.Types
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Blankslate.Types
 
 module private BlankslateHelper =
 

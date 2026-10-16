@@ -3,7 +3,7 @@ namespace Modals
 open Feliz
 open Model
 open Messages
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 open ARCtrl
 open FileImport

@@ -47,9 +47,9 @@ module.exports = {
     // worker in any folder. A pattern with ** skips dot folders, which include .vite and any
     // dot folder in the build path (C:\Users\x\.cache, for example).
     asar: { unpack: 'text-diff-worker.cjs' },
-    executableName: 'swate',
+    executableName: 'arcitisa',
     // Keeps the bundle id from before the rename, so macOS treats ARCitISA as the same app.
-    appBundleId: 'com.electron.swate',
+    appBundleId: 'com.electron.arcitisa',
     icon: platformIcon,
     extraResource: [
         "./assets"

@@ -86,7 +86,7 @@ jobs:
     needs: verify_release
     if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
-    # # The npm and NuGet trusted publishing policies still name the old Swate repo. Until they are
+    # # The npm and NuGet trusted publishing policies still name the old ARCitISA repo. Until they are
     # # updated, a failed npm or NuGet publish must not stop the GitHub release.
     # continue-on-error: ${{ matrix.target == 'nuget' || matrix.target == 'npm' }}
     strategy:

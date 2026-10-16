@@ -1,10 +1,10 @@
-module Swate.Components.Composite.Table.Context
+module ARCitISA.Components.Composite.Table.Context
 
 open Browser.Dom
 open Browser.Types
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.Table.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Table.Types
 
 let TableStateCtx = React.createContext<TableState> (TableState.init ())
 

@@ -1,4 +1,4 @@
-namespace Swate.Components.Shared
+namespace ARCitISA.Components.Shared
 
 open System
 open Fable.Core

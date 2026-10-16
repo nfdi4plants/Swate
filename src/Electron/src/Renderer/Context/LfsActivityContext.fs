@@ -6,8 +6,8 @@ module Renderer.Context.LfsActivityContext
 open System
 open Fable.Core
 open Feliz
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 
 type LfsActivity = {
     /// Shown in the row while the action runs, for example "Freeing".

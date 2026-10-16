@@ -2,8 +2,8 @@ module ElectronCore.NoteConversionTests
 
 open System
 open ARCtrl
-open Swate.Components.Composite.Notes.Editor
-open Swate.Components.Shared
+open ARCitISA.Components.Composite.Notes.Editor
+open ARCitISA.Components.Shared
 open Vitest
 
 let private mkTag name source accession =
@@ -23,8 +23,8 @@ Vitest.describe (
                 let tag =
                     OntologyAnnotation.create (
                         name = "Planning",
-                        tsr = "SWATE",
-                        tan = "SWATE:0001",
+                        tsr = "ARCITISA",
+                        tan = "ARCITISA:0001",
                         comments = ResizeArray([ Comment(name = "description", value = "Planning tag") ])
                     )
 
@@ -32,7 +32,7 @@ Vitest.describe (
                     NotesDraft.init with
                         Title = " My note "
                         DateCreated = Some(DateTime(2026, 4, 27))
-                        Tags = ResizeArray([ tag; mkTag "Review" "SWATE" "SWATE:0002" ])
+                        Tags = ResizeArray([ tag; mkTag "Review" "ARCITISA" "ARCITISA:0002" ])
                         MainText = "Body line 1\n---\nBody line 3"
                 }
 
@@ -54,8 +54,8 @@ Vitest.describe (
                 Vitest.expect(frontmatter.Date).toEqual (DateTime(2026, 4, 27))
                 Vitest.expect(tags.Count).toBe (2)
                 Vitest.expect(tags.[0].Name).toEqual (Some "Planning")
-                Vitest.expect(tags.[0].TermSourceREF).toEqual (Some "SWATE")
-                Vitest.expect(tags.[0].TermAccessionNumber).toEqual (Some "SWATE:0001")
+                Vitest.expect(tags.[0].TermSourceREF).toEqual (Some "ARCITISA")
+                Vitest.expect(tags.[0].TermAccessionNumber).toEqual (Some "ARCITISA:0001")
                 Vitest.expect(tags.[0].Comments.Count).toBe (1)
                 Vitest.expect(body.Trim()).toBe ("Body line 1\n---\nBody line 3")
         )

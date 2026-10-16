@@ -8,11 +8,11 @@ open Fable.Core.JsInterop
 open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
-open Swate.Components.Page.GitSidebarTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Page.GitSidebarTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open Vitest
 
-module Paged = Swate.Components.Page.GitComparison.GitPagedDiffTypes
+module Paged = ARCitISA.Components.Page.GitComparison.GitPagedDiffTypes
 
 [<Import("renderToStaticMarkup", "react-dom/server")>]
 let private renderToStaticMarkup (element: ReactElement) : string = jsNative

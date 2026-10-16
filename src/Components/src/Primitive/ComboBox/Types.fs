@@ -1,4 +1,4 @@
-module Swate.Components.Primitive.ComboBox.Types
+module ARCitISA.Components.Primitive.ComboBox.Types
 
 open Fable.Core
 open Feliz

@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.Notes.Editor
+namespace ARCitISA.Components.Composite.Notes.Editor
 
 open Feliz
 

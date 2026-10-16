@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.Workspace
+namespace ARCitISA.Components.Composite.Workspace
 
 
 open System

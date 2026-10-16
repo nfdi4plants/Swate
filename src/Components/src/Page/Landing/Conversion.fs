@@ -1,7 +1,7 @@
-namespace Swate.Components.Page.Landing
+namespace ARCitISA.Components.Page.Landing
 
 open ARCtrl
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 
 [<RequireQualifiedAccess>]

@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.Authentication
+namespace ARCitISA.Components.Composite.Authentication
 
 open Fable.Core
 open Feliz
@@ -23,8 +23,8 @@ type AccountManager =
         let isExpiring = account.TokenStatus = TokenStatus.Expiring
 
         Html.div [
-            prop.key account.User.LocalSwateAccountId
-            prop.testId $"AccountRow-{account.User.LocalSwateAccountId}"
+            prop.key account.User.LocalARCitISAAccountId
+            prop.testId $"AccountRow-{account.User.LocalARCitISAAccountId}"
             prop.className [
                 "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:p-1.5 swt:rounded swt:text-sm"
                 if isActive then
@@ -39,7 +39,7 @@ type AccountManager =
                     prop.className "swt:flex swt:items-center swt:gap-2 swt:overflow-hidden"
                     prop.children [
                         Html.a [
-                            prop.testId $"AccountProfileLink-{account.User.LocalSwateAccountId}"
+                            prop.testId $"AccountProfileLink-{account.User.LocalARCitISAAccountId}"
                             prop.className "swt:shrink-0 swt:btn swt:btn-square swt:btn-ghost"
                             prop.href (Helper.GitLabUrls.profileUrl account.User)
                             prop.target.blank
@@ -81,7 +81,7 @@ type AccountManager =
                                             ]
                                             Html.span [ prop.text "Token invalid" ]
                                             Html.a [
-                                                prop.testId $"RegenerateTokenLink-{account.User.LocalSwateAccountId}"
+                                                prop.testId $"RegenerateTokenLink-{account.User.LocalARCitISAAccountId}"
                                                 prop.className "swt:link swt:link-error"
                                                 prop.href (
                                                     Helper.GitLabUrls.prefillGitLabPATScopes account.User.TargetDataHub
@@ -92,7 +92,7 @@ type AccountManager =
 
                                                     onRemove
                                                     |> Option.iter (fun removeFn ->
-                                                        removeFn account.User.LocalSwateAccountId
+                                                        removeFn account.User.LocalARCitISAAccountId
                                                     )
                                                 )
                                                 prop.title
@@ -119,11 +119,12 @@ type AccountManager =
                                                 Html.button [
                                                     prop.title "Refresh token to extend expiration."
                                                     prop.ariaLabel "Refresh token to extend expiration."
-                                                    prop.testId $"RotateTokenButton-{account.User.LocalSwateAccountId}"
+                                                    prop.testId
+                                                        $"RotateTokenButton-{account.User.LocalARCitISAAccountId}"
                                                     prop.className "swt:link swt:link-warning"
                                                     prop.onClick (fun e ->
                                                         e.stopPropagation ()
-                                                        rotateToken account.User.LocalSwateAccountId
+                                                        rotateToken account.User.LocalARCitISAAccountId
                                                     )
                                                     prop.text "Refresh token"
                                                 ]
@@ -140,21 +141,21 @@ type AccountManager =
                         match onSwitch with
                         | Some switchFn when not isActive ->
                             Html.button [
-                                prop.testId $"UseAccountButton-{account.User.LocalSwateAccountId}"
+                                prop.testId $"UseAccountButton-{account.User.LocalARCitISAAccountId}"
                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost"
                                 prop.title "Switch to this account"
                                 prop.text "Use"
-                                prop.onClick (fun _ -> switchFn account.User.LocalSwateAccountId)
+                                prop.onClick (fun _ -> switchFn account.User.LocalARCitISAAccountId)
                             ]
                         | _ -> ()
                         match onRemove with
                         | Some removeFn ->
                             Html.button [
-                                prop.testId $"RemoveAccountButton-{account.User.LocalSwateAccountId}"
+                                prop.testId $"RemoveAccountButton-{account.User.LocalARCitISAAccountId}"
                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:text-error"
                                 prop.title "Remove this account"
                                 prop.text "✕"
-                                prop.onClick (fun _ -> removeFn account.User.LocalSwateAccountId)
+                                prop.onClick (fun _ -> removeFn account.User.LocalARCitISAAccountId)
                             ]
                         | None -> ()
                     ]
@@ -171,9 +172,9 @@ type AccountManager =
             ?onSwitchAccount: string -> unit,
             ?onRemoveAccount: string -> unit
         ) =
-        let activeLocalSwateAccountId =
+        let activeLocalARCitISAAccountId =
             accounts.ActiveAccount
-            |> Option.map (fun account -> account.User.LocalSwateAccountId)
+            |> Option.map (fun account -> account.User.LocalARCitISAAccountId)
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-1 swt:mt-1 swt:pt-1 swt:border-t swt:border-base-content/10"
@@ -185,7 +186,7 @@ type AccountManager =
                     ]
 
                 for acct in accounts.StoredAccounts do
-                    let isActive = activeLocalSwateAccountId = Some acct.User.LocalSwateAccountId
+                    let isActive = activeLocalARCitISAAccountId = Some acct.User.LocalARCitISAAccountId
 
                     AccountManager.AccountRow(
                         acct,

@@ -3,10 +3,10 @@ namespace Modals
 open Fable.React
 open Model
 open Messages
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive.Buttons
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Buttons
 
 type InteropLogging =
     static member Main(model: DevState, dispatch) =

@@ -1,10 +1,10 @@
 module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 open System
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
 open ARCtrl
 open Types
 

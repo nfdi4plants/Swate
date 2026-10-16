@@ -1,10 +1,10 @@
-namespace Swate.Components.Composite.MarkdownText.Plugins
+namespace ARCitISA.Components.Composite.MarkdownText.Plugins
 
 open Browser.Types
 open Feliz
 
-open Swate.Components
-open Swate.Components.Primitive.BaseModal
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.BaseModal
 
 [<RequireQualifiedAccess>]
 module MarkdownPluginPromptModal =

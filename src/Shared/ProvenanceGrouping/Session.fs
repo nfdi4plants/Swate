@@ -1,7 +1,7 @@
-module Swate.Components.Shared.ProvenanceGrouping.Session
+module ARCitISA.Components.Shared.ProvenanceGrouping.Session
 
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Edit
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Edit
 
 type ProvenanceLayerId = string
 // Temporary adapter for component migration. Remove after downstream callers stop using pair terminology.

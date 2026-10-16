@@ -1,4 +1,4 @@
-module Swate.Components.Composite.Authentication.Types
+module ARCitISA.Components.Composite.Authentication.Types
 
 type SignInInformation = {
     GitLabBaseUrl: string
@@ -61,7 +61,7 @@ type GitLabUser = {
 
 type AuthUserDto = {
     Id: int
-    LocalSwateAccountId: string
+    LocalARCitISAAccountId: string
     /// GitLab account shorthand. Used as the git commit author name so commits link to the account.
     Username: string
     Name: string
@@ -74,7 +74,7 @@ type AuthUserDto = {
 
     static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : AuthUserDto = {
         Id = gitLabUser.id
-        LocalSwateAccountId = string gitLabUser.id
+        LocalARCitISAAccountId = string gitLabUser.id
         Username = gitLabUser.username
         Name = gitLabUser.name
         Email = gitLabUser.email

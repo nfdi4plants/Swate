@@ -1,4 +1,4 @@
-module Swate.Components.Composite.Table.Constants
+module ARCitISA.Components.Composite.Table.Constants
 
 module Table =
 

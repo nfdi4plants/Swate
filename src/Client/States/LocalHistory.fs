@@ -118,7 +118,7 @@ module HistoryOrder =
 module ConversionTypes =
     open ARCtrl
     open ARCtrl.Json
-    open Swate.Components.Shared
+    open ARCitISA.Components.Shared
     open Fable.Core
 
     [<RequireQualifiedAccess>]

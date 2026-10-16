@@ -3,9 +3,9 @@ module Renderer.Components.LeftSidebar.Git.GitSidebarPanel
 open Browser.Dom
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 let mutable private dependencyCheckStarted = false
 
@@ -64,7 +64,7 @@ let Main () =
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
 
     let leftSidebarCtx =
-        Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
+        ARCitISA.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let authState = Renderer.Context.AuthStateContext.useAuthStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
@@ -79,7 +79,7 @@ let Main () =
             (fun () ->
                 gitStateCtx.state.PendingPublishRename
                 |> Option.map (fun prompt ->
-                    let mapped: Swate.Components.Page.GitSidebarTypes.GitSidebarPublishRenamePrompt = {
+                    let mapped: ARCitISA.Components.Page.GitSidebarTypes.GitSidebarPublishRenamePrompt = {
                         CurrentName = prompt.CurrentName
                         Message = prompt.Message
                         Owners =
@@ -197,7 +197,7 @@ let Main () =
         let canCancelOperation =
             gitStateCtx.state.BusyOperation |> Option.exists isCancellableBusyOperation
 
-        Swate.Components.Page.GitSidebar.Main(
+        ARCitISA.Components.Page.GitSidebar.Main(
             status = gitStateCtx.state.Status,
             changedFiles = gitStateCtx.state.ChangedFiles,
             branchOptions = gitStateCtx.state.BranchOptions,

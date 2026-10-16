@@ -1,10 +1,10 @@
 module Renderer.Components.MainContent.LandingDraftTarget
 
 open Feliz
-open Swate.Components.Page.Landing
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
+open ARCitISA.Components.Page.Landing
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.FileIOHelper
 open Renderer
 open Renderer.Components.Helper
 

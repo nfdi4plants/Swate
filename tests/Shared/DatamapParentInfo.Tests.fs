@@ -1,4 +1,4 @@
-module Swate.Components.Shared.DatamapParentInfoTests
+module ARCitISA.Components.Shared.DatamapParentInfoTests
 
 #if FABLE_COMPILER
 open Fable.Mocha
@@ -6,7 +6,7 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open ARCtrl
 
 let tests =

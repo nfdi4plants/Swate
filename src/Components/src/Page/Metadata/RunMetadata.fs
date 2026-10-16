@@ -1,13 +1,13 @@
-namespace Swate.Components.Page.Metadata
+namespace ARCitISA.Components.Page.Metadata
 
 open System
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components
-open Swate.Components.Primitive.LayoutComponents
-open Swate.Components.Page.Metadata.FormComponents
-open Swate.Components.Page.Metadata.FormComponents.PersonsInput
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.LayoutComponents
+open ARCitISA.Components.Page.Metadata.FormComponents
+open ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput
 
 [<Erase; Mangle(false)>]
 type RunMetadata =

@@ -1,7 +1,7 @@
-namespace Swate.Components.Composite.Examples
+namespace ARCitISA.Components.Composite.Examples
 
 open System
-open Swate.Components.Composite.Notes.Types
+open ARCitISA.Components.Composite.Notes.Types
 open ARCtrl
 
 module noteSearchTests =

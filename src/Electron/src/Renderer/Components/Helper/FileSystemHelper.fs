@@ -1,8 +1,8 @@
 module Renderer.Components.Helper.FileSystemHelper
 
 open Fable.Core
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 
 type TargetAvailability =
     | Empty

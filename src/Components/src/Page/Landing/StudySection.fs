@@ -1,9 +1,9 @@
-namespace Swate.Components.Page.Landing
+namespace ARCitISA.Components.Page.Landing
 
 open Feliz
-open Swate.Components.Page.Metadata
-open Swate.Components.Page.Metadata.FormComponents
-open Swate.Components.Page.Metadata.FormComponents.PublicationsInput
+open ARCitISA.Components.Page.Metadata
+open ARCitISA.Components.Page.Metadata.FormComponents
+open ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput
 
 [<RequireQualifiedAccess>]
 module StudySection =

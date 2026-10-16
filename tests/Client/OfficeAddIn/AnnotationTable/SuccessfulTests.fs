@@ -7,7 +7,7 @@ open Fable.Mocha
 open ExcelJS.Fable.Excel
 
 open ARCtrl
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 open OfficeInterop
 open ExcelHelper

@@ -1,11 +1,11 @@
-namespace Swate.Components.Page.Metadata.FormComponents.PersonsInput
+namespace ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput
 
 open System
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive.Dialog
-open Swate.Components.Page.Metadata.FormComponents.PersonsInput.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Dialog
+open ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput.Types
 
 [<Erase; Mangle(false)>]
 type PersonSearchDialog =

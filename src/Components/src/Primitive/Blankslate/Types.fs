@@ -1,7 +1,7 @@
-module Swate.Components.Primitive.Blankslate.Types
+module ARCitISA.Components.Primitive.Blankslate.Types
 
 open Fable.Core
-open Swate.Components.Primitive
+open ARCitISA.Components.Primitive
 
 [<StringEnum>]
 [<RequireQualifiedAccess>]

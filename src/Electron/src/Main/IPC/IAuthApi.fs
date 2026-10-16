@@ -2,9 +2,9 @@ module Main.IPC.AuthApi
 
 open Fable.Core
 open Main
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.AuthTypes
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.AuthTypes
 open Main.Auth
 
 let private broadcastAccountsUpdate () =
@@ -65,9 +65,9 @@ let api: IAuthApi = {
                 return Error(exn "Failed to list accounts.")
         }
     rotatePersonalAccessToken =
-        fun (localSwateAccountId: string) -> promise {
+        fun (localARCitISAAccountId: string) -> promise {
             try
-                let! result = AuthService.rotatePersonalAccessToken localSwateAccountId
+                let! result = AuthService.rotatePersonalAccessToken localARCitISAAccountId
 
                 return
                     match result with
@@ -79,18 +79,18 @@ let api: IAuthApi = {
                 return Error(exn "Failed to rotate personal access token.")
         }
     setActiveAccount =
-        fun (localSwateAccountId: string) -> promise {
+        fun (localARCitISAAccountId: string) -> promise {
             try
-                let state = AuthService.setActiveAccount localSwateAccountId
+                let state = AuthService.setActiveAccount localARCitISAAccountId
                 broadcastAccountsUpdate ()
                 return Ok state
             with _ ->
                 return Error(exn "Failed to switch active account.")
         }
     removeAccount =
-        fun (localSwateAccountId: string) -> promise {
+        fun (localARCitISAAccountId: string) -> promise {
             try
-                AuthService.removeAccount localSwateAccountId
+                AuthService.removeAccount localARCitISAAccountId
                 broadcastAccountsUpdate ()
                 return Ok()
             with _ ->

@@ -1,14 +1,14 @@
-namespace Swate.Components.Page
+namespace ARCitISA.Components.Page
 
 open System
 open Browser.Types
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.BaseModal
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.BaseModal
 
-open Swate.Components.Page.GitSidebarTypes
+open ARCitISA.Components.Page.GitSidebarTypes
 
 module private GitSidebarInternal =
 

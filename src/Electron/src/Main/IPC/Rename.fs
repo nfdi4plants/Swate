@@ -8,9 +8,9 @@ open Main.ArcMerge
 open Main.ArcVaultHelper
 open Main.IPC.Delete
 open Main.IPC.FileSystemIO
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.RenamePathRules
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.RenamePathRules
 
 [<RequireQualifiedAccess>]
 module ArcRenameHelper =
@@ -52,7 +52,7 @@ module ArcRenameHelper =
         (arcLocal: ARC)
         =
         promise {
-            match! ARC.LoadAsyncSwate arcPath with
+            match! ARC.LoadAsyncARCitISA arcPath with
             | Error errors ->
                 return
                     Error(
@@ -92,7 +92,7 @@ module ArcRenameHelper =
                                     $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
                             )
                     else
-                        match! ARC.LoadAsyncSwate arcPath with
+                        match! ARC.LoadAsyncARCitISA arcPath with
                         | Error errors ->
                             return
                                 Error(

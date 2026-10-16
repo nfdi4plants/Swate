@@ -13,7 +13,7 @@ module ArcWriteExtensions =
         let path = ArcPathHelper.combine NotesRootFolderName NotesReadmeFileName
         Contract.createCreate (path, DTOType.PlainText, DTO.Text NotesReadmeContent)
 
-    let private swateScaffoldContracts = [|
+    let private arcitisaScaffoldContracts = [|
         ARCtrl.Contract.Git.gitignoreContract
         notesReadmeContract
     |]
@@ -41,7 +41,7 @@ module ArcWriteExtensions =
         /// Hotfix for #618, not fixed in the consumed ARCtrl 3.0.0-beta.12.
         /// Mirrors ARCtrl.GetWriteContracts except that it emits only managed ARC payload contracts instead of
         /// iterating the complete filesystem model, where stale or Git metadata paths could be recreated.
-        member this.GetWriteContractsSwate(?skipUpdateFS: bool) =
+        member this.GetWriteContractsARCitISA(?skipUpdateFS: bool) =
             if not (defaultArg skipUpdateFS false) then
                 this.UpdateFileSystem()
             //let datamapFile = defaultArg datamapFile false
@@ -147,7 +147,7 @@ module ArcWriteExtensions =
             | None -> ()
 
             [|
-                yield! swateScaffoldContracts
+                yield! arcitisaScaffoldContracts
                 yield! collectionGitKeepContracts
 
                 for entry in filemap do
@@ -155,15 +155,15 @@ module ArcWriteExtensions =
                     yield Contract.createCreate (entry.Key, dtoType, dto)
             |]
 
-        /// Hotfix for #618. Writes only contracts selected by GetWriteContractsSwate.
-        member this.TryWriteAsyncSwate(arcPath: string) =
-            this.GetWriteContractsSwate() |> fullFillContractBatchAsync arcPath
+        /// Hotfix for #618. Writes only contracts selected by GetWriteContractsARCitISA.
+        member this.TryWriteAsyncARCitISA(arcPath: string) =
+            this.GetWriteContractsARCitISA() |> fullFillContractBatchAsync arcPath
 
         /// Writes only managed update contracts. This prevents ARC save from overwriting unmanaged text files
         /// such as notes with empty content when ARCtrl falls back to full write contracts.
-        member this.GetUpdateContractsSwate(?skipUpdateFS: bool) =
+        member this.GetUpdateContractsARCitISA(?skipUpdateFS: bool) =
             this.GetUpdateContracts(?skipUpdateFS = skipUpdateFS)
             |> Array.filter (isUnmanagedPlainTextCreateContract >> not)
 
-        member this.TryUpdateAsyncSwate(arcPath: string) =
-            this.GetUpdateContractsSwate() |> fullFillContractBatchAsync arcPath
+        member this.TryUpdateAsyncARCitISA(arcPath: string) =
+            this.GetUpdateContractsARCitISA() |> fullFillContractBatchAsync arcPath

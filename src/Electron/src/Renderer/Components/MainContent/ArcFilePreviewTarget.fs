@@ -4,12 +4,12 @@ open Feliz
 open Renderer.Components.MainContent
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Renderer.Components.Helper
-open Swate.Components.Page.ArcFileEditor.Types
-open Swate.Components.Composite.Widgets.JsonImport.Types
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
+open ARCitISA.Components.Page.ArcFileEditor.Types
+open ARCitISA.Components.Composite.Widgets.JsonImport.Types
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
@@ -90,7 +90,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         prop.key (string (editorKey arcFile requestedView))
         prop.className "swt:contents"
         prop.children [
-            Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
+            ARCitISA.Components.Page.ArcFileEditor.Main.ArcFileEditor(
                 arcFile,
                 setArcFile,
                 pickFilePaths,

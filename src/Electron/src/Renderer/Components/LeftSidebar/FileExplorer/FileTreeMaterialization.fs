@@ -1,8 +1,8 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 
-open Swate.Components.Shared
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Electron.Shared.FileIOTypes
 
 type MaterializedState = {
     ArcScopeId: string option

@@ -1,10 +1,10 @@
-namespace Swate.Components.Composite.NoteSearch.FilterLogic
+namespace ARCitISA.Components.Composite.NoteSearch.FilterLogic
 
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Composite.Notes.Types
-open Swate.Components.Primitive
+open ARCitISA.Components.Composite.Notes.Types
+open ARCitISA.Components.Primitive
 open System
 
 //filters the note list based on the search term and the selected filter options.

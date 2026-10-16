@@ -1,10 +1,10 @@
-namespace Swate.Components.Page.Metadata
+namespace ARCitISA.Components.Page.Metadata
 
 open System
 open Feliz
 open ARCtrl
-open Swate.Components
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Shared
 
 type private LazyComponents =
 

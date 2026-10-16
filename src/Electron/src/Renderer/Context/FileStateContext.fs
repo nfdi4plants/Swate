@@ -3,10 +3,10 @@ module Renderer.Context.FileStateContext
 open System.Collections.Generic
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
 open Renderer
 
 type FileState = {

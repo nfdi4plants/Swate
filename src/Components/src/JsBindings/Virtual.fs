@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace ARCitISA.Components
 
 open Fable.Core
 open Browser.Types

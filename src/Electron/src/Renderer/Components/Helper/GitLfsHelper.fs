@@ -5,8 +5,8 @@
 module Renderer.Components.Helper.GitLfsHelper
 
 open Fable.Core
-open Swate.Components.Shared
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 let private operationId () =
     Renderer.VersionControlApiClient.newOperationId ()

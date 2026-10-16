@@ -7,10 +7,10 @@ open Fable.Core
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.VersionControl
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
 let normalizeRootPath (path: string) =

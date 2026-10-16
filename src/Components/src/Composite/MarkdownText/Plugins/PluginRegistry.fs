@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.MarkdownText.Plugins
+namespace ARCitISA.Components.Composite.MarkdownText.Plugins
 
 [<RequireQualifiedAccess>]
 module PluginRegistry =

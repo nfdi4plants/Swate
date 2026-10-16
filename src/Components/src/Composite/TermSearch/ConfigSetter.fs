@@ -1,14 +1,14 @@
-namespace Swate.Components.Composite.TermSearch
+namespace ARCitISA.Components.Composite.TermSearch
 
-open Swate.Components
+open ARCitISA.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Composite.TermSearch.Context
-open Swate.Components.Primitive
-open Swate.Components
-open Swate.Components.Primitive.Select
-open Swate.Components.Primitive.Select.Types
+open ARCitISA.Components.Composite.TermSearch.Context
+open ARCitISA.Components.Primitive
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Select
+open ARCitISA.Components.Primitive.Select.Types
 
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =

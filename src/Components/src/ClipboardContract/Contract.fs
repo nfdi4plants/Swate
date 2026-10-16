@@ -1,8 +1,8 @@
-module Swate.Components.ClipboardContract.Contract
+module ARCitISA.Components.ClipboardContract.Contract
 
 open global.ARCtrl
-open Swate.Components
-open Swate.Components.ClipboardContract.Types
+open ARCitISA.Components
+open ARCitISA.Components.ClipboardContract.Types
 
 let LineBreaks = [| "\r\n"; "\n"; "\r" |]
 

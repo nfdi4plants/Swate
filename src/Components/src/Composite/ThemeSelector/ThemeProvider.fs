@@ -1,12 +1,12 @@
-namespace Swate.Components.Composite.ThemeSelector
+namespace ARCitISA.Components.Composite.ThemeSelector
 
 open Feliz
 open Fable.Core
 open Browser
 open Fable.React
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Composite.ThemeSelector.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Composite.ThemeSelector.Types
 
 [<Erase; Mangle(false)>]
 type ThemeProvider =
@@ -15,7 +15,7 @@ type ThemeProvider =
     static member ThemeProvider
         (children: ReactElement, ?dataAttribute: string, ?localStorageKey: string, ?enforceTheme: Theme)
         =
-        let localStorageKey = defaultArg localStorageKey "swate-theme-ctx"
+        let localStorageKey = defaultArg localStorageKey "arcitisa-theme-ctx"
         let dataAttribute = defaultArg dataAttribute "data-theme"
         let colorModeAttribute = "data-color-mode"
         let (theme, setTheme) = React.useLocalStorage (localStorageKey, Theme.Auto)

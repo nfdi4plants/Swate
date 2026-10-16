@@ -1,9 +1,9 @@
-module Swate.Components.Page.ArcFileEditor.Types
+module ARCitISA.Components.Page.ArcFileEditor.Types
 
 open ARCtrl
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.Widgets.Types
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.Widgets.Types
 
 type AddRowsTarget =
     | Table of ArcTable

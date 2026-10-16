@@ -1,10 +1,10 @@
-namespace Swate.Components.Composite.ThemeSelector
+namespace ARCitISA.Components.Composite.ThemeSelector
 
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Primitive
-open Swate.Components.Composite.ThemeSelector.Types
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Composite.ThemeSelector.Types
 
 module private ThemeSelectorHelper =
     [<Literal>]

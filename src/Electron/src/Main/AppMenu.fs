@@ -2,8 +2,8 @@ module Main.AppMenu
 
 open Fable.Core
 open Fable.Electron.Main
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
 
 let private showMessage window title message detail messageType = promise {
     let! _ =
@@ -61,13 +61,13 @@ let showReleaseNotes (window: BaseWindow option) =
 
 let createHelpMenu () =
     MenuItem.Options(
-        id = "swate-help",
+        id = "arcitisa-help",
         label = "Help",
         role = Enums.MenuItem.Options.Role.Help,
         submenu =
             U2.Case1 [|
                 MenuItem.Options(
-                    id = "swate-check-for-updates",
+                    id = "arcitisa-check-for-updates",
                     label = "Check for updates ...",
                     click =
                         Main.Bindings.Menu.adaptClick (fun (item, window, _) ->
@@ -86,12 +86,12 @@ let createHelpMenu () =
                         )
                 )
                 MenuItem.Options(
-                    id = "swate-about",
+                    id = "arcitisa-about",
                     label = "About",
                     click = Main.Bindings.Menu.adaptClick (fun (_, window, _) -> showAbout window |> Promise.start)
                 )
                 MenuItem.Options(
-                    id = "swate-release-notes",
+                    id = "arcitisa-release-notes",
                     label = "Show Release Notes",
                     click = Main.Bindings.Menu.adaptClick (fun (_, window, _) -> showReleaseNotes window)
                 )
@@ -103,7 +103,7 @@ let install () =
         match Menu.getApplicationMenu () with
         | Some menu ->
             menu.items
-            |> Array.filter (fun item -> item.role <> Enums.MenuItem.Role.Help && item.id <> "swate-help")
+            |> Array.filter (fun item -> item.role <> Enums.MenuItem.Role.Help && item.id <> "arcitisa-help")
             |> Array.map U2.Case2
         | None ->
             [|

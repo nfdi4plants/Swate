@@ -1,12 +1,12 @@
-module Swate.Components.Composite.Widgets.DataAnnotator.Helper
+module ARCitISA.Components.Composite.Widgets.DataAnnotator.Helper
 
 open System
 open ARCtrl
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.Widgets.DataAnnotator.Types
-open Swate.Components.Composite.Widgets.Types
-open Swate.Components.Composite.DataMapTable.ClipboardTarget
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.Widgets.DataAnnotator.Types
+open ARCitISA.Components.Composite.Widgets.Types
+open ARCitISA.Components.Composite.DataMapTable.ClipboardTarget
 
 let private compareTargets (left: DataTarget) (right: DataTarget) =
     let key =

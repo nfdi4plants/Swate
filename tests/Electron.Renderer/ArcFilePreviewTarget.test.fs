@@ -4,9 +4,9 @@ open Vitest
 open Fable.Core
 open ARCtrl
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
-open Swate.Components.Composite.Widgets.JsonImport.Types
-open Swate.Components.Page.ArcFileEditor.Types
-open Swate.Components.Shared
+open ARCitISA.Components.Composite.Widgets.JsonImport.Types
+open ARCitISA.Components.Page.ArcFileEditor.Types
+open ARCitISA.Components.Shared
 
 
 let private createAssayArcFile (tableNames: string[]) =
@@ -53,7 +53,7 @@ Vitest.describe (
                 let arcFile, _ = createAssayArcFile [| "First"; "Selected"; "Last" |]
 
                 let dragIdsBefore =
-                    Swate.Components.Page.ArcFileEditor.Helper.tableDragIds (arcFile.Tables().Count)
+                    ARCitISA.Components.Page.ArcFileEditor.Helper.tableDragIds (arcFile.Tables().Count)
                     |> Seq.toArray
 
                 let reorderedArcFile = ArcFiles.refreshRef arcFile
@@ -61,7 +61,7 @@ Vitest.describe (
                 let activeAfterReorder = ActiveView.Table 2
 
                 let dragIdsAfterReorder =
-                    Swate.Components.Page.ArcFileEditor.Helper.tableDragIds (reorderedArcFile.Tables().Count)
+                    ARCitISA.Components.Page.ArcFileEditor.Helper.tableDragIds (reorderedArcFile.Tables().Count)
                     |> Seq.toArray
 
                 Vitest.expect(ActiveView.Forward(reorderedArcFile, activeAfterReorder)).toEqual (activeAfterReorder)

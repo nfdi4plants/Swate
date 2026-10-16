@@ -13,11 +13,11 @@ let appSettingsFolderName = "Settings"
 
 open Fable.Electron.Main
 
-/// The name of the user data folder from the time the app was called Swate. Electron derives its
+/// The name of the user data folder from the time the app was called ARCitISA. Electron derives its
 /// default user data folder from the product name, so the rename to ARCitISA would otherwise
 /// start every user with empty settings, signed-out accounts and a cleared browser profile.
 [<Literal>]
-let legacyUserDataFolderName = "Swate"
+let legacyUserDataFolderName = "ARCitISA"
 
 /// Keeps the user data and session data folders where they were before the rename. It has to run
 /// before the app is ready. A user-data-dir switch on the command line (an isolated test profile,
@@ -35,7 +35,7 @@ let pinLegacyUserDataPath () =
 
 let getSettingsRootPath () =
     let userDataPath = app.getPath Enums.App.GetPath.Name.UserData
-    /// Something like: C:\Users\Kevin\AppData\Roaming\Swate\Settings
+    /// Something like: C:\Users\Kevin\AppData\Roaming\ARCitISA\Settings
     let settingsRootPath = join [| userDataPath; appSettingsFolderName |]
 
     mkdirSync settingsRootPath (MkdirOptions(recursive = true))

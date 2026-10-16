@@ -1,15 +1,15 @@
-namespace Swate.Components.Composite.Template
+namespace ARCitISA.Components.Composite.Template
 
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components
-open Swate.Components.Composite.Template.Context
-open Swate.Components.Primitive
-open Swate.Components.Primitive.ComboBox
-open Swate.Components.Primitive.Select
-open Swate.Components.Primitive.Select.Types
-open Swate.Components.Composite.Template.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Template.Context
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.ComboBox
+open ARCitISA.Components.Primitive.Select
+open ARCitISA.Components.Primitive.Select.Types
+open ARCitISA.Components.Composite.Template.Types
 
 module private TemplateMocks =
 

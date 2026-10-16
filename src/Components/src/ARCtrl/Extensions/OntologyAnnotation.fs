@@ -2,7 +2,7 @@
 module ARCtrl.OntologyAnnotationExtensions
 
 open ARCtrl
-open Swate.Components
+open ARCitISA.Components
 
 module OntologyAnnotationHelper =
 

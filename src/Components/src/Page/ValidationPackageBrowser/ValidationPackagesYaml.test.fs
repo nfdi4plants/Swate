@@ -1,8 +1,8 @@
-module internal Swate.Components.Tests.ValidationPackageBrowser.ValidationPackagesYaml
+module internal ARCitISA.Components.Tests.ValidationPackageBrowser.ValidationPackagesYaml
 
 open ARCtrl.ValidationPackages
 open ARCtrl.Yaml
-open Swate.Components.Page.ValidationPackageBrowser.ValidationPackagesYaml
+open ARCitISA.Components.Page.ValidationPackageBrowser.ValidationPackagesYaml
 open Vitest
 
 let private sampleConfig () =

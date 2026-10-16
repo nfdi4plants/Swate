@@ -4,14 +4,14 @@ open System
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Swate.Components.Shared
-open Swate.Components.Shared.ProvenanceGraph.BuildIndex
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.DTOs.NoteSearchDto
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Shared.ProvenanceGraph.BuildIndex
+open ARCitISA.Electron.Shared
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
 open Main
 open Main.Bindings
@@ -20,7 +20,7 @@ open Main.ArcVaultHelper
 open Main.FileImportAuthorization
 open Main.IPC.Delete
 open Main.IPC.Rename
-open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
+open ARCitISA.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 open Main.VersionControl
 open VersionControlService.Abstractions
@@ -139,7 +139,7 @@ let private reportArcOpenError
         try
             do! showArcOpenError window arcPath originalError
         with dialogError ->
-            swatelogfn event.sender.id "Failed to show ARC-open error dialog: %s" dialogError.Message
+            mainlogfn event.sender.id "Failed to show ARC-open error dialog: %s" dialogError.Message
 
         return Error originalError
     }

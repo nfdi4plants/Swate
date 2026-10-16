@@ -1,10 +1,10 @@
-namespace Swate.Components.Primitive.Select
+namespace ARCitISA.Components.Primitive.Select
 
 open Fable.Core
 open Feliz
 open Types
-open Swate.Components
-open Swate.Components.Primitive.Select.Context
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Select.Context
 
 module private SingleSelectHelper =
 

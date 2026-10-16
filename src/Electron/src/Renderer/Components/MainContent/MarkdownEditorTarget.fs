@@ -1,11 +1,11 @@
 module Renderer.Components.MainContent.MarkdownEditorTargetView
 
 open Feliz
-open Swate.Components.Composite.MarkdownText
-open Swate.Components.Composite.MarkdownText.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Composite.MarkdownText
+open ARCitISA.Components.Composite.MarkdownText.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
 
 [<ReactComponent(true)>]
 let MarkdownEditorTarget (content: string) =

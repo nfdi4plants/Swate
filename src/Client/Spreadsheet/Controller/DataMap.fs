@@ -2,8 +2,8 @@ module Spreadsheet.Controller.DataMap
 
 
 open ARCtrl
-open Swate.Components
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Shared
 
 
 let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -99,6 +99,6 @@ let addDataAnnotation
         dtx.FilePath <- Some data.fileName
         dtx.Selector <- Some selector
         dtx.Format <- Some data.fileType
-        dtx.SelectorFormat <- Some Swate.Components.Shared.URLs.Data.SelectorFormat.csv
+        dtx.SelectorFormat <- Some ARCitISA.Components.Shared.URLs.Data.SelectorFormat.csv
 
     { state with ArcFile = state.ArcFile }

@@ -1,12 +1,12 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.VersionControlTypes
-open Swate.Components.Page.ArcFileEditor.Types
-open Swate.Components.Page.GitComparison.GitPagedDiffTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Page.ArcFileEditor.Types
+open ARCitISA.Components.Page.GitComparison.GitPagedDiffTypes
 
 [<RequireQualifiedAccess>]
 type LeftSidebarPage =

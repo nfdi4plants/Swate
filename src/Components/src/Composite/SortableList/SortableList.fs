@@ -1,9 +1,9 @@
-namespace Swate.Components.Composite.SortableList
+namespace ARCitISA.Components.Composite.SortableList
 
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.JsBindings
+open ARCitISA.Components
+open ARCitISA.Components.JsBindings
 open Types
 
 [<Erase; Mangle(false)>]

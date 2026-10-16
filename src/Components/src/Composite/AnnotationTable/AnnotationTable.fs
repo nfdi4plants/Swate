@@ -1,12 +1,12 @@
-namespace Swate.Components.Composite.AnnotationTable
+namespace ARCitISA.Components.Composite.AnnotationTable
 
-open Swate.Components
-open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Composite.Table
-open Swate.Components.Composite.Table.Types
-open Swate.Components.Composite.AnnotationTable
-open Swate.Components.Composite.AnnotationTable.Types
-open Swate.Components.Composite.AnnotationTable.Context
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.ContextMenu
+open ARCitISA.Components.Composite.Table
+open ARCitISA.Components.Composite.Table.Types
+open ARCitISA.Components.Composite.AnnotationTable
+open ARCitISA.Components.Composite.AnnotationTable.Types
+open ARCitISA.Components.Composite.AnnotationTable.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz

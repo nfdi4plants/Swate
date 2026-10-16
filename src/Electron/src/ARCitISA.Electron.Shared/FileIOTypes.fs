@@ -1,8 +1,8 @@
-module Swate.Electron.Shared.FileIOTypes
+module ARCitISA.Electron.Shared.FileIOTypes
 
 open System.Collections.Generic
 open Fable.Core
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 type FileEntry = {
     name: string

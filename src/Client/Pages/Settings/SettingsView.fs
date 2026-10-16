@@ -8,9 +8,9 @@ open Messages
 
 open Feliz
 
-open Swate.Components
-open Swate.Components.Composite.ThemeSelector.Context
-open Swate.Components.Composite.ThemeSelector.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.ThemeSelector.Context
+open ARCitISA.Components.Composite.ThemeSelector.Types
 
 type Settings =
 
@@ -187,7 +187,7 @@ type Settings =
         Components.Forms.Generic.BoxedField(
             "Term Search Configuration",
             content = [
-                Swate.Components.Composite.TermSearch.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
+                ARCitISA.Components.Composite.TermSearch.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
             ]
         )
 
@@ -210,16 +210,4 @@ type Settings =
             Settings.SearchConfig(model, dispatch)
 
             Settings.ActivityLog(model)
-
-        //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
-        //    toggleRgbModeElement model dispatch
-
-        //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
-        //customXmlSettings model dispatch
-
-        //Bulma.label "Advanced Settings"
-        //if model.PageState.IsExpert then
-        //    swateCore model dispatch
-        //else
-        //    swateExperts model dispatch
         ]
