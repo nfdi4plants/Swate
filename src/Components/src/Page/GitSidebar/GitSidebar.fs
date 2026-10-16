@@ -733,7 +733,11 @@ type GitSidebar =
                                                     prop.className
                                                         "swt:iconify swt:fluent--arrow-up-20-regular swt:size-3 swt:shrink-0"
                                                 ]
-                                                Html.span [ prop.ariaHidden true; prop.text props.Status.Ahead ]
+                                                Html.span [
+                                                    prop.testId "GitSidebarAheadCount"
+                                                    prop.ariaHidden true
+                                                    prop.text props.Status.Ahead
+                                                ]
                                                 Html.span [ prop.className "swt:sr-only"; prop.text label ]
                                             ]
                                         ]
@@ -752,7 +756,11 @@ type GitSidebar =
                                                     prop.className
                                                         "swt:iconify swt:fluent--arrow-down-20-regular swt:size-3 swt:shrink-0"
                                                 ]
-                                                Html.span [ prop.ariaHidden true; prop.text props.Status.Behind ]
+                                                Html.span [
+                                                    prop.testId "GitSidebarBehindCount"
+                                                    prop.ariaHidden true
+                                                    prop.text props.Status.Behind
+                                                ]
                                                 Html.span [ prop.className "swt:sr-only"; prop.text label ]
                                             ]
                                         ]
@@ -1176,8 +1184,8 @@ type GitSidebar =
                     Html.div [
                         prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:gap-2"
                         prop.children [
-                            // Save All keeps its place and style. Clicking a row marks it, so a click on
-                            // the old spot of the button must not save only the viewed file.
+                            // Save All keeps the left edge and the filled style. Clicking a row marks it,
+                            // so the outlined Save Selected reads as the second choice.
                             GitSidebar.CommitSaveButton(
                                 "GitSidebarSaveAllButton",
                                 "Save All Changes",

@@ -282,8 +282,8 @@ export const ChangedFiles: Story = {
       "title",
       "notes/protocol-draft.md",
     );
-    await expect(canvas.getByTestId("GitSidebarAheadBadge")).toHaveTextContent("2");
-    await expect(canvas.getByTestId("GitSidebarBehindBadge")).toHaveTextContent("1");
+    await expect(canvas.getByTestId("GitSidebarAheadCount")).toHaveTextContent(/^2$/);
+    await expect(canvas.getByTestId("GitSidebarBehindCount")).toHaveTextContent(/^1$/);
     await expect(
       canvas.getByTestId("GitSidebarChangedFilesVirtualContent"),
     ).toBeInTheDocument();
