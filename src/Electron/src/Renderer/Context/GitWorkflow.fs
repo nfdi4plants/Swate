@@ -24,6 +24,15 @@ type GitRefreshState =
     | Idle
     | Loading
 
+/// Where the read of the stored "Upload right away" value stands for the current ARC. The first
+/// refresh that reaches an open session starts the read. The answer applies only while the state is
+/// Pending, so it never overwrites a change by the user (Settled) or a new ARC (back to NotStarted).
+[<RequireQualifiedAccess>]
+type UploadRightAwayLoad =
+    | NotStarted
+    | Pending
+    | Settled
+
 [<RequireQualifiedAccess>]
 type GitBusyOperation =
     | Refreshing
@@ -177,6 +186,12 @@ type GitState = {
     /// pages it read add up to this size.
     DiffIndexingLimitMb: int
     DownloadLargeFiles: bool
+    /// The "Upload right away" checkbox of the sidebar. The main process holds the value in the
+    /// session of the open ARC, so it survives a renderer reload. This copy keeps the checkbox
+    /// instant and survives the unmount of the sidebar panel. It resets with the ARC, like the LFS
+    /// settings above, and the first refresh of the ARC reads the stored value.
+    UploadRightAway: bool
+    UploadRightAwayLoad: UploadRightAwayLoad
     RepositoryAvailability: GitRepositoryAvailability
     RefreshState: GitRefreshState
     RefreshRequestId: int
@@ -240,6 +255,8 @@ type GitState = {
         LfsAutoTrackThresholdMb = 1
         DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
         DownloadLargeFiles = false
+        UploadRightAway = true
+        UploadRightAwayLoad = UploadRightAwayLoad.NotStarted
         RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
         RefreshRequestId = 0
@@ -598,6 +615,8 @@ type Msg =
     | ExternalChangesDetected
     | ExternalRefreshDue of generation: int
     | SidebarVisibilityChanged of bool
+    | UploadRightAwayChanged of bool
+    | UploadRightAwayLoaded of arcSessionId: int * value: bool
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | SilentRefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested
@@ -671,6 +690,10 @@ type GitDependencies = {
     getStoragePolicySettings:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, string>>
     setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, string>>
+    /// The checkbox value the main process holds for the open ARC. These two calls are not
+    /// operations: they take no operation id and the main process runs them without a lock.
+    getUploadRightAway: unit -> JS.Promise<Result<OperationResultDto<bool>, string>>
+    setUploadRightAway: bool -> JS.Promise<Result<OperationResultDto<unit>, string>>
     loadConflictPage: ConflictSessionSummaryDto -> string -> string -> JS.Promise<Result<PageState, string>>
     /// Replaces the page state with the result of the function, applied to the page state the
     /// app holds when the update runs.
@@ -744,7 +767,12 @@ let busyNoticeFromOperation =
 let currentRunStatus (model: GitState) =
     match model.CurrentProgress with
     | Some progress -> Some(GitSidebarRunStatus.Progress progress)
-    | None -> model.BusyNotice |> Option.map GitSidebarRunStatus.Busy
+    | None ->
+        match model.BusyNotice, model.BusyOperation with
+        | Some notice, _ -> Some(GitSidebarRunStatus.Busy notice)
+        // Only a silent refresh runs without notice text.
+        | None, Some _ -> Some GitSidebarRunStatus.BusyWithoutNotice
+        | None, None -> None
 
 let private countOrZero (value: int option) = value |> Option.defaultValue 0
 
@@ -1247,6 +1275,66 @@ let private applyPageChangeCmd (setPageState: PageState option -> unit) =
 let private reportErrorCmd (deps: GitDependencies) (title: string) (message: string) : Cmd<Msg> = [
     fun _dispatch -> deps.reportError { Title = title; Message = message }
 ]
+
+/// The checkbox is a convenience. The update logs a failed call and never shows it to the user.
+let private logUploadRightAwayFailure (action: string) (detail: string) =
+    Browser.Dom.console.error ($"Could not {action} the Upload right away choice: {detail}")
+
+let private failureOfResult (result: Result<OperationResultDto<'T>, string>) =
+    match result with
+    | Error message -> Some message
+    | Ok(OperationResultDto.Failed failure) -> Some failure.Message
+    | Ok _ -> None
+
+/// Hands the new checkbox value to the main process. The model already shows it.
+let private storeUploadRightAwayCmd (deps: GitDependencies) (value: bool) : Cmd<Msg> =
+    Cmd.ofEffect (fun _ ->
+        promise {
+            try
+                let! result = deps.setUploadRightAway value
+                failureOfResult result |> Option.iter (logUploadRightAwayFailure "store")
+            with err ->
+                logUploadRightAwayFailure "store" (string err)
+        }
+        |> Promise.start
+    )
+
+/// Reads the value the main process holds for the open ARC. The answer carries the ARC session
+/// id, so the update drops a read that finishes after the ARC changed.
+let private loadUploadRightAwayCmd (deps: GitDependencies) (arcSessionId: int) : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        promise {
+            try
+                let! result = deps.getUploadRightAway ()
+
+                match result with
+                | Ok(OperationResultDto.Succeeded outcome)
+                | Ok(OperationResultDto.PartiallySucceeded(outcome, _)) ->
+                    dispatch (UploadRightAwayLoaded(arcSessionId, outcome.Value))
+                // A failed result means the main process holds no value, so the checkbox keeps its own.
+                | Ok(OperationResultDto.Failed _) -> ()
+                | Error message -> logUploadRightAwayFailure "load" message
+            with err ->
+                logUploadRightAwayFailure "load" (string err)
+        }
+        |> Promise.start
+    )
+
+/// The first refresh of an ARC that reaches an open session starts the read of the stored
+/// checkbox value. Later refreshes of the same ARC do not read again, because the load has left NotStarted.
+let private startUploadRightAwayLoad
+    (deps: GitDependencies)
+    (refreshResult: GitRefreshResult)
+    (model: GitState)
+    : GitState * Cmd<Msg> =
+    match model.UploadRightAwayLoad, refreshResult.Session with
+    | UploadRightAwayLoad.NotStarted, Ok _ ->
+        {
+            model with
+                UploadRightAwayLoad = UploadRightAwayLoad.Pending
+        },
+        loadUploadRightAwayCmd deps model.ArcSessionId
+    | _ -> model, Cmd.none
 
 let private titleForWriteRequest =
     function
@@ -4578,6 +4666,14 @@ let private missingRepositoryModel (model: GitState) = {
         RepositoryAvailability = GitRepositoryAvailability.MissingRepository
 }
 
+/// Opening the Git tab refreshes silently. For an ARC without a repository that refresh fails
+/// every time, and clearing the page then would close whatever page the main area shows. The
+/// page is cleared only when the model learns about the missing repository.
+let private clearPageOnFirstMissingCmd (setPageState: PageState option -> unit) (model: GitState) =
+    match model.RepositoryAvailability with
+    | GitRepositoryAvailability.MissingRepository -> Cmd.none
+    | GitRepositoryAvailability.Ready -> applyPageChangeCmd setPageState GitPageChange.Clear
+
 let private clearBusy (model: GitState) = {
     model with
         BusyOperation = None
@@ -4706,6 +4802,13 @@ let private updateCore
     match msg with
     | ResetWorkflow -> resetFor model, Cmd.none
     | DiffPageMsg diffMsg -> GitDiffPageLoader.update deps diffMsg model
+    // A silent refresh has no notice text. Progress from another source, such as the text diff
+    // scan, would otherwise show the progress banner that the silent refresh avoids.
+    | SetCurrentProgress(Some _) when
+        model.BusyOperation = Some GitBusyOperation.Refreshing
+        && model.BusyNotice.IsNone
+        ->
+        model, Cmd.none
     | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
@@ -4786,14 +4889,43 @@ let private updateCore
                 ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
         },
         Cmd.none
-    | SidebarVisibilityChanged true when model.ExternalChangesSeen ->
-        {
+    | SidebarVisibilityChanged true ->
+        let nextModel = {
             model with
                 SidebarVisible = true
                 ExternalChangesSeen = false
+        }
+
+        // Without an ARC the silent refresh would reset the model, including a clone that runs
+        // from the DataHub browser. A running refresh would be replaced, and its errors would
+        // no longer reach the user. The running refresh shows the state when it finishes, and an
+        // ARC change starts its own refresh, so the flag is cleared in both cases.
+        if
+            model.CurrentArcPath.IsNone
+            || model.BusyOperation = Some GitBusyOperation.Refreshing
+        then
+            nextModel, Cmd.none
+        else
+            nextModel, Cmd.ofMsg RefreshRequestedSilently
+    | UploadRightAwayChanged value ->
+        {
+            model with
+                UploadRightAway = value
+                // The user's choice is newer than anything a read of the stored value returns.
+                UploadRightAwayLoad = UploadRightAwayLoad.Settled
         },
-        Cmd.ofMsg RefreshRequested
-    | SidebarVisibilityChanged true -> { model with SidebarVisible = true }, Cmd.none
+        storeUploadRightAwayCmd deps value
+    | UploadRightAwayLoaded(arcSessionId, value) when
+        arcSessionId = model.ArcSessionId
+        && model.UploadRightAwayLoad = UploadRightAwayLoad.Pending
+        ->
+        {
+            model with
+                UploadRightAway = value
+                UploadRightAwayLoad = UploadRightAwayLoad.Settled
+        },
+        Cmd.none
+    | UploadRightAwayLoaded _ -> model, Cmd.none
     | ExternalChangesDetected when not model.SidebarVisible ->
         {
             model with
@@ -4894,6 +5026,8 @@ let private updateCore
             model
             |> withBusyOperation (Some GitBusyOperation.Refreshing)
             |> startRefreshRequest requestId
+            // No notice text, so the sidebar shows no banner that pushes its content down.
+            |> fun state -> { state with BusyNotice = None }
 
         let cmd =
             Cmd.OfPromise.either
@@ -4919,7 +5053,7 @@ let private updateCore
             reportErrorCmd deps "Could not refresh Git state" message
         ]
     | RefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.exists isMissingRepository ->
-        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
+        missingRepositoryModel model, clearPageOnFirstMissingCmd setPageState model
     | RefreshCompleted(_, Ok refreshResult) ->
         let nextModel = model |> applyRefreshResult refreshResult |> clearBusy
 
@@ -4934,11 +5068,13 @@ let private updateCore
                 Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
             | None -> Cmd.none
 
-        {
-            nextModel with
-                PendingPublishAfterRefresh = false
-        },
-        cmd
+        let loadingModel, loadCmd =
+            startUploadRightAwayLoad deps refreshResult {
+                nextModel with
+                    PendingPublishAfterRefresh = false
+            }
+
+        loadingModel, Cmd.batch [ cmd; loadCmd ]
     | SilentRefreshCompleted(requestId, _) when requestId <> model.RefreshRequestId -> model, Cmd.none
     | SilentRefreshCompleted(_, Error _) ->
         {
@@ -4947,7 +5083,7 @@ let private updateCore
         },
         Cmd.none
     | SilentRefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.exists isMissingRepository ->
-        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
+        missingRepositoryModel model, clearPageOnFirstMissingCmd setPageState model
     | SilentRefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.isSome ->
         {
             clearBusy model with
@@ -4957,17 +5093,22 @@ let private updateCore
     | SilentRefreshCompleted(_, Ok refreshResult) ->
         let nextModel = model |> applyRefreshResult refreshResult |> clearBusy
 
-        {
-            nextModel with
-                ErrorNotice = model.ErrorNotice
-                WarningNotice = model.WarningNotice
-                PendingRefreshWarningNotice = model.PendingRefreshWarningNotice
-                PendingPublishAfterRefresh = false
-        },
-        (if nextModel.PendingPublishAfterRefresh then
-             Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
-         else
-             Cmd.none)
+        let loadingModel, loadCmd =
+            startUploadRightAwayLoad deps refreshResult {
+                nextModel with
+                    ErrorNotice = model.ErrorNotice
+                    WarningNotice = model.WarningNotice
+                    PendingRefreshWarningNotice = model.PendingRefreshWarningNotice
+                    PendingPublishAfterRefresh = false
+            }
+
+        let publishCmd =
+            if nextModel.PendingPublishAfterRefresh then
+                Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
+            else
+                Cmd.none
+
+        loadingModel, Cmd.batch [ publishCmd; loadCmd ]
     | InitRepositoryRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
     | InitRepositoryRequested ->
         let nextModel =

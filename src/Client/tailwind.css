@@ -1,4 +1,5 @@
 @import "tailwindcss" prefix(swt);
+@import "../Components/src/markdown-theme.css";
 @source "./output/";
 @plugin "@tailwindcss/typography";
 

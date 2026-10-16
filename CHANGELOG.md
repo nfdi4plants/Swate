@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.6.1 - 2026-10-16
+
+### 🔄 Changed
+
+- When files are marked in the git sidebar, a "Save Selected Changes" button appears next to "Save All Changes". #1392, #1423 (by @caroott)
+- Saving without uploading is now the "Upload right away" checkbox under the save buttons, checked by default. #1423 (by @caroott)
+- The git sidebar refreshes itself whenever you open it. #1423 (by @caroott)
+- The git sidebar shows file names before their folder and uses the usual arrows for ahead, behind, download and upload. #1423 (by @caroott)
+
+### 🐛 Fixed
+
+- Markdown files and the release notes follow the Swate theme instead of the system's light or dark mode. #1418, #1423 (by @caroott)
+
 ## 2.6.0 - 2026-10-15
 
 ### ✨ Added

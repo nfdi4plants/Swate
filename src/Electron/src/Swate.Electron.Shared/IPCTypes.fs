@@ -149,6 +149,11 @@ type IVersionControlApi = {
     getStoragePolicySettings:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, exn>>
     setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    /// The "Upload right away" checkbox the open session of the calling window holds in memory.
+    /// Fails when no session is open. The call is not a tracked operation and takes no lock.
+    getUploadRightAway: unit -> JS.Promise<Result<OperationResultDto<bool>, exn>>
+    /// Stores the checkbox value in the open session. Fails when no session is open.
+    setUploadRightAway: bool -> JS.Promise<Result<OperationResultDto<unit>, exn>>
     setPathStoragePolicy: PathStoragePolicyRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
     pruneStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     deduplicateStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>

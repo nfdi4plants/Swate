@@ -79,6 +79,12 @@ let getStoragePolicySettings (dto: OperationRequestDto) =
 let setStoragePolicySettings (dto: StoragePolicySettingsRequestDto) =
     call (fun () -> api.setStoragePolicySettings dto)
 
+let getUploadRightAway () =
+    call (fun () -> api.getUploadRightAway ())
+
+let setUploadRightAway (value: bool) =
+    call (fun () -> api.setUploadRightAway value)
+
 let setPathStoragePolicy (dto: PathStoragePolicyRequestDto) =
     call (fun () -> api.setPathStoragePolicy dto)
 

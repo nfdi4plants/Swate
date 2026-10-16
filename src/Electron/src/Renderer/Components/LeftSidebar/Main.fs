@@ -80,7 +80,10 @@ let Main (leftSidebarTarget: LeftSidebarPage) =
             "swt:max-w-full"
             "swt:flex-col"
             "swt:overflow-hidden"
-            "swt:p-4"
+            match leftSidebarTarget with
+            | LeftSidebarPage.FileExplorer -> "swt:p-4"
+            // The git sidebar pads its own sections, so a wrapper padding would double the gap to the panel edge.
+            | LeftSidebarPage.Git -> ()
         ]
         prop.children [|
             match leftSidebarTarget with

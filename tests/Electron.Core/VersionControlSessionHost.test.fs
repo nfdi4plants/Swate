@@ -234,7 +234,7 @@ Vitest.describe (
 
                     Vitest.expect(moved).toEqual (Ok())
 
-                    Vitest.expect(fixture.Host.TryGetSession fixture.RepoRoot).toEqual None
+                    Vitest.expect((fixture.Host.TryGetSession fixture.RepoRoot).IsNone).toBe true
                     Vitest.expect(fixture.Runtime.Bindings.TryFind fixture.RepoRoot).toEqual None
 
                     let moved =
@@ -1109,6 +1109,88 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a settings call that finishes after a checkbox write keeps the checkbox value",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "settings-after-checkbox" |]
+                    let failingRoot = join [| fixture.Root; "settings-after-checkbox-failing" |]
+
+                    for folder in [ coreOnlyRoot; failingRoot ] do
+                        Main.Bindings.Filesystem.mkdirSync
+                            folder
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let gate, releaseGate = deferred ()
+                    let mutable calls = 0
+
+                    let storagePolicy: StoragePolicyService = {
+                        SetPathPolicy =
+                            fun _ _ _ -> async {
+                                return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake")
+                            }
+                        GetSettings =
+                            fun _ -> async {
+                                return
+                                    OperationResult.succeeded {
+                                        AutoPolicyThresholdMb = Some 1
+                                        MaterializeLargeObjects = false
+                                    }
+                            }
+                        SetSettings =
+                            fun _ _ -> async {
+                                calls <- calls + 1
+
+                                // The push of the defaults at open answers at once. The
+                                // explicit change waits, so the checkbox write lands during it.
+                                if calls > 1 then
+                                    do! Async.AwaitPromise gate
+
+                                return OperationResult.succeeded ()
+                            }
+                    }
+
+                    let fakeRuntime =
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy) None
+
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        let! opened =
+                            fakeHost.OpenSession(coreOnlyRoot, detached "open-before-checkbox-write")
+                            |> Async.StartAsPromise
+
+                        expectValue "open before the settings change" opened |> ignore
+
+                        let changing =
+                            fakeHost.SetSettings(
+                                coreOnlyRoot,
+                                {
+                                    AutoTrackThresholdMb = 9
+                                    DownloadLargeFiles = true
+                                    DiffIndexingLimitMb = 2048
+                                },
+                                detached "settings-during-checkbox-write"
+                            )
+                            |> Async.StartAsPromise
+
+                        expectValue "clear the checkbox" (fakeHost.SetUploadRightAway(coreOnlyRoot, false))
+                        |> ignore
+
+                        releaseGate ()
+                        let! changed = changing
+                        expectValue "settings change" changed |> ignore
+
+                        Vitest.expect((fakeHost.GetSettings coreOnlyRoot).AutoTrackThresholdMb).toBe 9
+
+                        Vitest.expect(expectValue "read the checkbox" (fakeHost.GetUploadRightAway coreOnlyRoot)).toBe
+                            false
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
             "the first call after a partial open reports the settings failure once",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -1622,6 +1704,61 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "the upload right away choice starts checked, round-trips and starts checked again in a new session",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 92 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 92)
+
+                    let! opened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-upload-choice")
+                        |> Async.StartAsPromise
+
+                    expectValue "open" opened |> ignore
+
+                    let! initial = api.getUploadRightAway ()
+                    Vitest.expect((expectDtoValue "get initial choice" initial).Value).toBe true
+
+                    let! cleared = api.setUploadRightAway false
+                    expectDtoValue "set choice" cleared |> ignore
+
+                    let! stored = api.getUploadRightAway ()
+                    Vitest.expect((expectDtoValue "get stored choice" stored).Value).toBe false
+
+                    do! fixture.Host.CloseSession fixture.RepoRoot |> Async.StartAsPromise
+
+                    let! reopened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "reopen-upload-choice")
+                        |> Async.StartAsPromise
+
+                    expectValue "reopen" reopened |> ignore
+
+                    let! afterReopen = api.getUploadRightAway ()
+                    Vitest.expect((expectDtoValue "get choice after reopen" afterReopen).Value).toBe true
+                })
+        )
+
+        Vitest.test (
+            "the upload right away calls fail without opening a session when none is open",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 93 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 93)
+
+                    let! read = api.getUploadRightAway ()
+                    let! write = api.setUploadRightAway false
+
+                    Vitest.expect((expectDtoFailure "get without session" read).Code).toBe
+                        VersionControlCodes.SessionUnavailable
+
+                    Vitest.expect((expectDtoFailure "set without session" write).Code).toBe
+                        VersionControlCodes.SessionUnavailable
+
+                    Vitest.expect((fixture.Host.TryGetSession fixture.RepoRoot).IsNone).toBe true
+                })
+        )
+
+        Vitest.test (
             "a stale workspace version is refused structurally before anything changes",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -1833,6 +1970,9 @@ Vitest.describe (
 
                     expectDtoValue "set before bind" changed |> ignore
 
+                    let! cleared = api.setUploadRightAway false
+                    expectDtoValue "clear the upload choice before bind" cleared |> ignore
+
                     let! bound =
                         api.bindWorkspace {
                             OperationId = "bind-with-settings"
@@ -1846,6 +1986,9 @@ Vitest.describe (
                     let settings = expectDtoValue "get after bind" current
                     Vitest.expect(settings.Value.AutoPolicyThresholdMb).toEqual (Some 9)
                     Vitest.expect(settings.Value.MaterializeLargeObjects).toBe true
+
+                    let! uploadChoice = api.getUploadRightAway ()
+                    Vitest.expect((expectDtoValue "get the upload choice after bind" uploadChoice).Value).toBe false
                 })
         )
 
