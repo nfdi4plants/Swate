@@ -258,8 +258,12 @@ let private withMutatingSessionUsingRefreshPredicate
 
                                     let mappedResult = Ok(Mappings.result mapValue result)
 
+                                    // A version control operation can change large-object state without a
+                                    // watched file event, so the shared listing is renewed on the next read.
+                                    vault.LargeObjectMetadata.Invalidate()
+
                                     if shouldRefresh mappedResult then
-                                        do! vault.ResetFileTreeToRoot()
+                                        do! vault.RefreshLoadedFileTree()
 
                                     return result
                                 })
@@ -656,7 +660,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                                 )
 
                                             if resultChangedState result then
-                                                do! vault.ResetFileTreeToRoot()
+                                                vault.LargeObjectMetadata.Invalidate()
+                                                do! vault.RefreshLoadedFileTree()
 
                                             return bound
                                         })

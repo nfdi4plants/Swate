@@ -47,6 +47,9 @@ let private createObjectState path =
 let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
     FileTreeCreator.withFileEntriesLfsMetadata "/repo" (Map.ofList objects) entries
 
+let private enrichFromRepository (repoPath: string) (entries: FileEntry[]) =
+    FileTreeCreator.LargeObjectMetadataCache().Enrich(repoPath, entries, fun () -> true)
+
 type private TempRepositoryContext = { RootPath: string; RepoPath: string }
 
 let private createTempDirectoryAsync () : Fable.Core.JS.Promise<string> =
@@ -219,10 +222,7 @@ Vitest.describe (
                         let! downloadedEntry = FileTreeCreator.getFileEntry downloadedFilePath
 
                         let! enrichedEntries =
-                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [|
-                                pointerEntry
-                                downloadedEntry
-                            |]
+                            enrichFromRepository context.RepoPath [| pointerEntry; downloadedEntry |]
 
                         let pointerEntry = enrichedEntries.[0]
                         let downloadedEntry = enrichedEntries.[1]
@@ -330,8 +330,7 @@ Vitest.describe (
 
                         let! entry = FileTreeCreator.getFileEntry untrackedLfsPath
 
-                        let! enrichedEntries =
-                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
+                        let! enrichedEntries = enrichFromRepository context.RepoPath [| entry |]
 
                         let enrichedEntry = enrichedEntries.[0]
 
@@ -531,10 +530,40 @@ Vitest.describe (
                         Vitest.expect(names |> Array.contains "dataset").toBe (true)
                         Vitest.expect(names |> Array.contains "file-0000.txt").toBe (false)
                         Vitest.expect(vault.fileTreeDirectoryHasMore.[""]).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
 
                         tree.Values
                         |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject).toEqual (None))
+                    })
+            }
+        )
+
+        Vitest.test (
+            "a prefix read reports more entries only when an accepted entry follows",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let studiesPath = join [| rootPath; "studies" |]
+                        do! createDirectoryAtAsync studiesPath
+
+                        for name in [ "entry-0.txt"; "entry-1.txt"; ".~$locked.xlsx" ] do
+                            do! writeUtf8FileAsync (join [| studiesPath; name |]) "entry"
+
+                        // The ignored Office lock file must not count as a further entry.
+                        let! exactPage = FileTreeCreator.readFileTreeDirectoryPrefix rootPath "studies" 2
+
+                        Vitest.expect(exactPage.Entries |> Array.map _.name |> Array.sort).toEqual [|
+                            "entry-0.txt"
+                            "entry-1.txt"
+                        |]
+
+                        Vitest.expect(exactPage.HasMore).toBe false
+
+                        do! writeUtf8FileAsync (join [| studiesPath; "entry-2.txt" |]) "entry"
+
+                        let! partialPage = FileTreeCreator.readFileTreeDirectoryPrefix rootPath "studies" 2
+                        Vitest.expect(partialPage.Entries.Length).toBe 2
+                        Vitest.expect(partialPage.HasMore).toBe true
                     })
             }
         )
@@ -576,13 +605,14 @@ Vitest.describe (
                     }
 
                 let cursor: FileTreeCreator.FileTreeDirectoryCursor = {
+                    DirectoryPath = "arc/studies"
                     Directory = directory
                     Lookahead = None
                 }
 
-                let! first = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
-                let! second = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
-                let! final = FileTreeCreator.readFileTreeDirectoryCursorPage "arc/studies" cursor 2
+                let! first = FileTreeCreator.readFileTreeDirectoryCursorPage cursor 2
+                let! second = FileTreeCreator.readFileTreeDirectoryCursorPage cursor 2
+                let! final = FileTreeCreator.readFileTreeDirectoryCursorPage cursor 2
 
                 let names =
                     Array.concat [ first.Entries; second.Entries; final.Entries ]
@@ -595,7 +625,45 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "ten thousand directory entries are paginated without loading everything at once",
+            "a prefix read with more entries hands over its open listing for the next page",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let studiesPath = join [| rootPath; "studies" |]
+                        do! createDirectoryAtAsync studiesPath
+
+                        for index in 0..249 do
+                            do! writeUtf8FileAsync (join [| studiesPath; sprintf "study-%03d" index |]) "study"
+
+                        let! first, cursor =
+                            FileTreeCreator.readFileTreeDirectoryPrefixWithCursor rootPath "studies" 100
+
+                        Vitest.expect(first.HasMore).toBe true
+                        Vitest.expect(cursor.IsSome).toBe true
+
+                        let allPaths = ResizeArray(first.Entries |> Array.map _.path)
+                        let mutable hasMore = first.HasMore
+
+                        while hasMore do
+                            let! page = FileTreeCreator.readFileTreeDirectoryCursorPage cursor.Value 100
+                            allPaths.AddRange(page.Entries |> Array.map _.path)
+                            hasMore <- page.HasMore
+
+                        do! cursor.Value.Directory.close ()
+                        Vitest.expect(allPaths |> Seq.distinct |> Seq.length).toBe 250
+
+                        let! complete, completeCursor =
+                            FileTreeCreator.readFileTreeDirectoryPrefixWithCursor rootPath "studies" 250
+
+                        Vitest.expect(complete.HasMore).toBe false
+                        Vitest.expect(completeCursor.IsNone).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "ten thousand directory entries are read in bounded prefixes",
             TestOptions(timeout = 120000),
             fun () -> promise {
                 do!
@@ -606,31 +674,27 @@ Vitest.describe (
                         for index in 0..9999 do
                             do! writeUtf8FileAsync (join [| studiesPath; sprintf "study-%05d" index |]) "study"
 
-                        let! directoryPath, cursor = FileTreeCreator.openFileTreeDirectoryCursor rootPath "studies"
+                        let! first = FileTreeCreator.readFileTreeDirectoryPrefix rootPath "studies" 100
+                        Vitest.expect(first.Entries.Length).toBe 100
+                        Vitest.expect(first.HasMore).toBe true
 
-                        try
-                            let! first = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
-                            Vitest.expect(first.Entries.Length).toBe 100
-                            Vitest.expect(first.HasMore).toBe true
+                        let! almostComplete = FileTreeCreator.readFileTreeDirectoryPrefix rootPath "studies" 9999
+                        Vitest.expect(almostComplete.Entries.Length).toBe 9999
+                        Vitest.expect(almostComplete.HasMore).toBe true
 
-                            let allPaths = ResizeArray(first.Entries |> Array.map _.path)
-                            let mutable hasMore = first.HasMore
+                        let! complete = FileTreeCreator.readFileTreeDirectoryPrefix rootPath "studies" 10000
+                        Vitest.expect(complete.Entries.Length).toBe 10000
 
-                            while hasMore do
-                                let! page = FileTreeCreator.readFileTreeDirectoryCursorPage directoryPath cursor 100
-                                allPaths.AddRange(page.Entries |> Array.map _.path)
-                                hasMore <- page.HasMore
+                        Vitest.expect(complete.Entries |> Array.map _.path |> Array.distinct |> Array.length).toBe
+                            10000
 
-                            Vitest.expect(allPaths.Count).toBe 10000
-                            Vitest.expect(allPaths |> Seq.distinct |> Seq.length).toBe 10000
-                        finally
-                            cursor.Directory.close () |> Promise.start
+                        Vitest.expect(complete.HasMore).toBe false
                     })
             }
         )
 
         Vitest.test (
-            "startup root loading is bounded and reuses its cursor through completion",
+            "startup root loading is bounded and continues its listing through completion",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!

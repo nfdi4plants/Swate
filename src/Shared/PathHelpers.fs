@@ -231,7 +231,26 @@ module ArcEntityPathRules =
         else
             None
 
-    let private isAddZoneSegment segment = (tryParseZone segment).IsSome
+    let isAddZoneSegment segment = (tryParseZone segment).IsSome
+
+    /// Root-level license files that ARCtrl reads into ARC.License.
+    let licenseFileNames =
+        ARCtrl.ArcPathHelper.LICENSEFileName
+        :: ARCtrl.ArcPathHelper.alternativeLICENSEFileNames
+
+    /// Root-level files that ARCtrl reads into the ARC model. Loading and watching share this set.
+    let structuralRootFileNames =
+        ARCtrl.ArcPathHelper.InvestigationFileName :: licenseFileNames
+
+    /// True for root-level names that carry ARC metadata: the structural files and the add zones.
+    let isStructuralRootName (name: string) =
+        PathHelpers.pathMatchesAny structuralRootFileNames name || isAddZoneSegment name
+
+    /// True for an ARC-relative path that addresses a root-level license file.
+    let isLicensePath (relativePath: string) =
+        match relativePath |> PathHelpers.normalizeCanonicalRelativePath |> splitPathSegments with
+        | [| fileName |] -> PathHelpers.pathMatchesAny licenseFileNames fileName
+        | _ -> false
 
     let private classifyStructuralArcPath =
         function

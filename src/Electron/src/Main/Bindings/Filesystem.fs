@@ -25,6 +25,7 @@ type Stats =
     abstract member isFile: unit -> bool
     abstract member isSymbolicLink: unit -> bool
     abstract member size: float
+    abstract member mtimeMs: float
 
 type Dirent =
     abstract member name: string
@@ -36,6 +37,10 @@ type Directory =
     /// Resolves to null after the directory iterator has been exhausted.
     abstract member read: unit -> JS.Promise<Dirent>
     abstract member close: unit -> JS.Promise<unit>
+
+/// Returns the Node.js system error code of a filesystem failure, such as ENOENT.
+[<Emit("(typeof $0?.code === 'string' ? $0.code : undefined)")>]
+let tryGetNodeErrorCode (error: exn) : string option = jsNative
 
 [<Import("mkdirSync", "fs")>]
 let mkdirSync (path: string) (options: MkdirOptions) : unit = jsNative

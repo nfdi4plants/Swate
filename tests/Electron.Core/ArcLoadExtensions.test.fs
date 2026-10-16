@@ -105,6 +105,26 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "discovers the root license files that ARCtrl reads into the ARC",
+            fun () -> promise {
+                let readDirectory path _ =
+                    if PathHelpers.normalizePath path = PathHelpers.normalizePath "C:/arc" then
+                        JS.Constructors.Promise.resolve [|
+                            file "isa.investigation.xlsx"
+                            file "LICENSE.md"
+                            file "README.md"
+                            directory "LICENSE"
+                        |]
+                    else
+                        JS.Constructors.Promise.resolve [||]
+
+                let! paths = discoverStructuralArcFilePathsWithAsync readDirectory "C:/arc"
+
+                Vitest.expect(paths).toEqual ([| "LICENSE.md"; "isa.investigation.xlsx" |])
+            }
+        )
+
+        Vitest.test (
             "propagates an entity directory read failure",
             fun () -> promise {
                 let entityPath =

@@ -177,12 +177,6 @@ type OpenArcRootRenamePlan = {
 let private resolveAbsolutePath (pathValue: string) =
     pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
 
-let private tryGetNodeErrorCode (error: exn) : string option =
-    try
-        error?code |> unbox<string> |> Option.ofObj
-    with _ ->
-        None
-
 let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
     let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
 
@@ -216,7 +210,7 @@ let private renameWithRetriesAsync
 
             return Ok()
         with renameError ->
-            let errorCode = tryGetNodeErrorCode renameError
+            let errorCode = Filesystem.tryGetNodeErrorCode renameError
 
             if attemptIndex < retryDelaysMs.Length - 1 && isTransientRenameError errorCode then
                 return! attempt (attemptIndex + 1)
@@ -227,7 +221,7 @@ let private renameWithRetriesAsync
     attempt 0
 
 let private mapArcRootRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
-    match tryGetNodeErrorCode renameError with
+    match Filesystem.tryGetNodeErrorCode renameError with
     | Some "EPERM"
     | Some "EACCES" ->
         exn

@@ -50,7 +50,9 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(arcNotOpenError ())
     }
 
-/// Keeps cursor invalidation and parent refreshes inside the loaded-watcher suspension.
+/// Runs a File Explorer mutation inside the loaded-watcher suspension, then applies it to the tree:
+/// the affected paths directly, because a large parent's refresh may not reach them, and the loaded
+/// parents through a refresh.
 let private withFileTreeMutation
     (vault: ArcVault)
     (affectedPaths: string list)
@@ -58,13 +60,15 @@ let private withFileTreeMutation
     (mutate: unit -> JS.Promise<Result<unit, exn>>)
     =
     vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-        do! vault.InvalidateFileTreeDirectoryCursors(Seq.append affectedPaths parentPaths)
         let! result = mutate ()
 
         match result with
         | Ok() ->
+            do! vault.ReconcileFileTreePaths affectedPaths
+
             for parentPath in parentPaths |> List.distinctBy PathHelpers.normalizeForComparison do
-                do! vault.RefreshFileTreeDirectory parentPath
+                let! _ = vault.RefreshFileTreeDirectoryIfLoaded parentPath
+                ()
         | Error _ -> ()
 
         return result

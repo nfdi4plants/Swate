@@ -35,29 +35,12 @@ let isPermanentFileWatcherPathIgnored (arcPath: string) (path: string) =
                 (PathHelpers.normalizeCanonicalRelativePath relativePath)
                     .Split([| '/' |], System.StringSplitOptions.RemoveEmptyEntries)
 
+            // The permanent watcher observes ARC metadata only. The root and payload folders shown in
+            // File Explorer are observed by the loaded-directory watchers.
             match segments with
             | [||] -> false
-            | [| rootName |] ->
-                let structuralRootNames = [
-                    ARCtrl.ArcPathHelper.InvestigationFileName
-                    ARCtrl.ArcPathHelper.StudiesFolderName
-                    ARCtrl.ArcPathHelper.AssaysFolderName
-                    ARCtrl.ArcPathHelper.WorkflowsFolderName
-                    ARCtrl.ArcPathHelper.RunsFolderName
-                    ".gitattributes"
-                    "README.md"
-                ]
-
-                PathHelpers.pathMatchesAny structuralRootNames rootName |> not
-            | [| zoneName; _ |] ->
-                let zoneNames = [
-                    ARCtrl.ArcPathHelper.StudiesFolderName
-                    ARCtrl.ArcPathHelper.AssaysFolderName
-                    ARCtrl.ArcPathHelper.WorkflowsFolderName
-                    ARCtrl.ArcPathHelper.RunsFolderName
-                ]
-
-                PathHelpers.pathMatchesAny zoneNames zoneName |> not
+            | [| rootName |] -> not (ArcEntityPathRules.isStructuralRootName rootName)
+            | [| zoneName; _ |] -> not (ArcEntityPathRules.isAddZoneSegment zoneName)
             | _ -> ArcEntityPathRules.tryParseCanonicalArcFileTarget relativePath |> Option.isNone
 
 let private captureWatcherReadiness (onError: exn -> unit) (watcher: Chokidar.IWatcher) =
@@ -132,3 +115,68 @@ let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) (o
         )
 
     watcher, captureWatcherReadiness onError watcher
+
+/// Polling interval of the ARC root observation.
+let rootDirectoryPollIntervalMilliseconds = 500
+
+/// Observes a directory through its modification time, which changes whenever a direct child is
+/// added, removed or renamed. Only stat calls are made, so no handle stays open on the directory:
+/// a native watcher on the ARC root would keep Windows from moving the ARC folder or its items.
+/// onChange returns whether it handled the change; an unhandled change keeps the previous baseline, so
+/// it is reported again by the next poll instead of being lost.
+/// Returns the stop function and a readiness promise that settles once the baseline is taken.
+let createDirectoryModificationPoller
+    (directoryPath: string)
+    (intervalMilliseconds: int)
+    (onChange: unit -> bool)
+    (onError: exn -> unit)
+    =
+    let mutable stopped = false
+    let mutable timeout: int option = None
+    let mutable lastModified: float option = None
+
+    let poll () = promise {
+        try
+            let! stats = Filesystem.statAsync directoryPath
+
+            match lastModified with
+            | Some previous when previous <> stats.mtimeMs ->
+                if not stopped && onChange () then
+                    lastModified <- Some stats.mtimeMs
+            | Some _ -> ()
+            | None -> lastModified <- Some stats.mtimeMs
+
+            return Ok()
+        with error ->
+            if not stopped then
+                onError error
+
+            return Error error
+    }
+
+    let rec schedule () =
+        if not stopped then
+            timeout <-
+                Some(
+                    JS.setTimeout
+                        (fun () -> poll () |> Promise.map (fun _ -> schedule ()) |> Promise.start)
+                        intervalMilliseconds
+                )
+
+    let ready = promise {
+        let! baseline = poll ()
+
+        match baseline with
+        | Ok() -> schedule ()
+        | Error _ -> ()
+
+        return baseline
+    }
+
+    let stop () =
+        stopped <- true
+        timeout |> Option.iter JS.clearTimeout
+        timeout <- None
+        JS.Constructors.Promise.resolve ()
+
+    stop, ready

@@ -35,6 +35,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "permanent watcher observes the root files ARCtrl loads and leaves other root entries to File Explorer",
+            fun () ->
+                let rootPath = "C:/arc"
+
+                for structuralName in
+                    [
+                        "isa.investigation.xlsx"
+                        "LICENSE"
+                        "LICENSE.md"
+                        "LICENSE.txt"
+                        "assays"
+                    ] do
+                    Vitest
+                        .expect(isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/{structuralName}")
+                        .toBe (false)
+
+                for payloadName in [ "README.md"; "notes"; "raw-data.csv" ] do
+                    Vitest.expect(isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/{payloadName}").toBe (true)
+        )
+
+        Vitest.test (
             "temporary import directory name matches the watcher ignore convention",
             fun () ->
                 let directoryName = ArcFileSystemHelper.createTemporaryImportDirectoryName ()

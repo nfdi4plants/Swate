@@ -64,13 +64,14 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "loads directory pages only for new or incomplete directories",
+            "expanding loads only directories that were never read",
             fun () ->
                 let paging = Map.ofList [ "assays/complete", false; "assays/incomplete", true ]
 
-                Vitest.expect(shouldLoadNextDirectoryPage "assays/new" paging).toBe true
-                Vitest.expect(shouldLoadNextDirectoryPage "assays\\incomplete" paging).toBe true
-                Vitest.expect(shouldLoadNextDirectoryPage "assays/complete" paging).toBe false
+                Vitest.expect(needsInitialDirectoryLoad "assays/new" paging).toBe true
+                // Expanding again shows the loaded pages; further pages stay behind "Load more".
+                Vitest.expect(needsInitialDirectoryLoad "assays\\incomplete" paging).toBe false
+                Vitest.expect(needsInitialDirectoryLoad "assays/complete" paging).toBe false
         )
 
         Vitest.test (

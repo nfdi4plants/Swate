@@ -843,7 +843,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "File Explorer enriches every page and shares fresh object metadata across a watcher batch",
+            "File Explorer shares one large-object listing until a file change or invalidation renews it",
             fun () -> promise {
                 let! root = createTempDirectoryAsync "swate-file-tree-objects-"
                 let workspace = join [| root; "workspace" |]
@@ -912,22 +912,21 @@ Vitest.describe (
                     |> Seq.filter (fun entry -> entry.name.StartsWith "file-")
                     |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject.IsSome).toBe true)
 
+                    // Further pages and refreshes reuse the shared repository-wide listing.
                     do! vault.LoadNextFileTreeDirectoryPage ""
                     Vitest.expect(vault.fileTree.Count).toBe 113
-                    Vitest.expect(listings).toBe 2
 
                     for name in names do
                         Vitest.expect((entryAt name).largeObject.IsSome).toBe true
 
                     Vitest.expect((entryAt "ordinary.txt").largeObject.IsNone).toBe true
 
-                    let! prefix = Main.FileTreeCreator.readFileTreeDirectoryPrefix workspace "nested" 100
-                    Vitest.expect(prefix.Entries.[0].largeObject.IsSome).toBe true
-                    Vitest.expect(listings).toBe 3
+                    do! vault.RefreshFileTreeDirectory "nested"
+                    Vitest.expect((entryAt "nested/object.dat").largeObject.IsSome).toBe true
+                    do! vault.RefreshFileTreeDirectory ""
+                    Vitest.expect(listings).toBe 1
 
-                    let! _ = Main.FileTreeCreator.getFileEntriesWithLfsMetadata workspace [| entryAt "nested" |]
-
-                    Vitest.expect(listings).toBe 3
+                    // A watcher batch with changed files renews the listing once for the whole batch.
                     objects <- objects |> Array.map (fun state -> { state with IsMaterialized = true })
 
                     let events =
@@ -936,18 +935,28 @@ Vitest.describe (
                         |> Array.toList
 
                     do! vault.ApplyWatcherFileTreeEvents events
-                    Vitest.expect(listings).toBe 4
+                    Vitest.expect(listings).toBe 2
 
                     for name in names.[0..1] do
                         let state = (entryAt name).largeObject |> Option.get
                         Vitest.expect(state.IsMaterialized).toBe true
 
+                    // Invalidation, for example after a version control operation, renews it on the next read.
                     objects <- [||]
+                    vault.LargeObjectMetadata.Invalidate()
                     do! vault.RefreshFileTreeDirectory ""
-                    Vitest.expect(listings).toBe 5
+                    Vitest.expect(listings).toBe 3
 
                     vault.fileTree.Values
+                    |> Seq.filter (fun entry ->
+                        Swate.Components.Shared.PathHelpers.pathsEqual (dirname entry.path) workspace
+                    )
                     |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject.IsNone).toBe true)
+
+                    // A stopped vault never reopens the version control session for metadata.
+                    do! vault.StopFileWatcher()
+                    let! _ = vault.WithLargeObjectMetadata(workspace, [| entryAt "ordinary.txt" |])
+                    Vitest.expect(listings).toBe 3
 
                     do! cleanup ()
                 with error ->
@@ -2005,7 +2014,9 @@ Vitest.describe (
                     do! vault.RefreshFileTreeDirectory "dataset"
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
                     Vitest.expect(vault.isBusyWriting).toBe false
-                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
+
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset").toBe
+                        true
 
                     let running =
                         api.restorePaths {
@@ -2019,7 +2030,9 @@ Vitest.describe (
                     expectDtoFailure "stale restore" result |> ignore
                     Vitest.expect(vault.isBusyWriting).toBe false
                     Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
-                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
+
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset").toBe
+                        true
                 })
         )
 
@@ -2240,7 +2253,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "an explicit bind persists before opening and resets the tree before watcher restoration",
+            "an explicit bind persists before opening and keeps loaded directories through watcher restoration",
             fun () ->
                 withFixture (fun fixture -> promise {
                     let workspace = join [| fixture.Root; "explicit-unbound-bind" |]
@@ -2259,7 +2272,11 @@ Vitest.describe (
                         let vault = registerVault 93 workspace
                         do! vault.EnsureInitialFileTreeRootPage workspace |> Promise.map ignore
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
+
+                        Vitest
+                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
+                            .toBe
+                            true
 
                         clearMock watchMock
                         let targetLocation = "https://example.invalid/explicit-bind.git"
@@ -2286,11 +2303,16 @@ Vitest.describe (
                             )
                             .toEqual (Some targetLocation)
 
-                        // Resetting while the mutation is active clears loaded-directory coverage,
-                        // so restoration has no directories for which to create a replacement watcher.
-                        Vitest.expect(mockCallCount watchMock).toBe 0
-                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone).toBe true
+                        // The bind refreshes the loaded tree instead of resetting it, so restoration creates a
+                        // replacement watcher for dataset. The root is polled and needs no native watcher.
+                        Vitest.expect(mockCallCount watchMock).toBe 1
+                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "").toBe true
+
+                        Vitest
+                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
+                            .toBe
+                            true
                     finally
                         providerEvents.Clear()
                         bindInvocations.Clear()
@@ -2345,11 +2367,11 @@ Vitest.describe (
                                 "first restore mutation to start"
                                 (fun () ->
                                     fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |]
-                                    && vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone
+                                    && vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty
                                 )
 
                         Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
-                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty).toBe true
 
                         let second =
                             api.restorePaths {
@@ -2378,8 +2400,12 @@ Vitest.describe (
                         Vitest.expect(failure.Category).toEqual FailureCategoryDto.Canceled
                         Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
                         Vitest.expect(vault.isBusyWriting).toBe false
-                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone).toBe true
+                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+
+                        Vitest
+                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
+                            .toBe
+                            true
                     finally
                         restoreGates.Clear()
                         restoreInvocations.Clear()
@@ -2423,7 +2449,7 @@ Vitest.describe (
                                 "first mutation before bind to start"
                                 (fun () ->
                                     fakeHost.RunningMutationIdsForWindow 92 = [| "restore-before-bind" |]
-                                    && vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone
+                                    && vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty
                                 )
 
                         let bind =

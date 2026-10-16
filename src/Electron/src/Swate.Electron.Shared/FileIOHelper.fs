@@ -233,22 +233,6 @@ let tryGetExistingArcEntityTargetRef (targetSources: seq<string * string * (stri
     tryGetExistingArcEntityTargetMatch targetSources path
     |> Option.map (fun (target, _, _) -> target)
 
-let createAvailableArcEntityTargets
-    (targetSources: seq<string * string * (string -> 'Target)>)
-    (fileEntries: seq<FileEntry>)
-    =
-    fileEntries
-    |> Seq.choose (fun entry ->
-        if entry.isDirectory then
-            None
-        else
-            tryGetExistingArcEntityTargetMatch targetSources entry.path
-    )
-    |> Seq.distinctBy (fun (target, _, _) -> target)
-    |> Seq.sortBy (fun (_, name, sortOrder) -> sortOrder, name.ToLowerInvariant())
-    |> Seq.map (fun (target, _, _) -> target)
-    |> ResizeArray
-
 let combineMany = ARCtrl.ArcPathHelper.combineMany
 
 let tryGetArcFilePath (arcRootPath: ArcRootPath) (arcFile: ArcFiles) =

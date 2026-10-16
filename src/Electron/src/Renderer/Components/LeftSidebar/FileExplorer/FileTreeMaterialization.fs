@@ -21,10 +21,12 @@ let dematerialize path state = {
         Paths = state.Paths.Remove(PathHelpers.normalizePath path)
 }
 
-let shouldLoadNextDirectoryPage path (directoryHasMore: Map<string, bool>) =
+/// A directory without paging metadata has never been read. Expanding it loads its first page;
+/// expanding it again shows the pages that are already loaded, and further pages stay behind "Load more".
+let needsInitialDirectoryLoad path (directoryHasMore: Map<string, bool>) =
     directoryHasMore
-    |> Map.tryFind (PathHelpers.normalizeCanonicalRelativePath path)
-    |> Option.defaultValue true
+    |> Map.containsKey (PathHelpers.normalizeCanonicalRelativePath path)
+    |> not
 
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ArcVault
+open Main.LoadedDirectoryWatcher
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Swate.Components.Shared
@@ -69,8 +70,30 @@ let private containsPath path (vault: ArcVault) =
     vault.fileTree.Values
     |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path path)
 
-let private loadedDirectoryWatcher (vault: ArcVault) =
-    vault.LoadedDirectoryWatcherController.Current.Watcher
+let private directoryWatcher (directory: string) (vault: ArcVault) =
+    match vault.LoadedDirectoryWatcherController.Current.Watchers.TryFind directory with
+    | Some(NativeWatcher watcher) -> Some watcher
+    | _ -> None
+
+let private isDirectoryCovered (directory: string) (vault: ArcVault) =
+    vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey directory
+
+let private nativeWatcherCount (vault: ArcVault) =
+    vault.LoadedDirectoryWatcherController.Current.Watchers
+    |> Map.filter (fun _ observer ->
+        match observer with
+        | NativeWatcher _ -> true
+        | ModificationPoller _ -> false
+    )
+    |> Map.count
+
+let private hasNoDirectoryWatchers (vault: ArcVault) =
+    vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty
+
+let private retireDirectoryWatchers (vault: ArcVault) = promise {
+    for observer in vault.LoadedDirectoryWatcherController.RetireWatchers() do
+        do! observer.Close()
+}
 
 [<Emit("Object.entries($0.getWatched()).flatMap(([directory, names]) => names.map(name => `${directory}/${name}`))")>]
 let private watchedPaths (_watcher: Main.Bindings.Chokidar.IWatcher) : string[] = jsNative
@@ -158,7 +181,7 @@ Vitest.describe (
     "loaded FileTree directory watching",
     fun () ->
         Vitest.test (
-            "refreshing after save preserves loaded descendants and continues the existing directory cursor",
+            "refreshing the loaded tree keeps loaded descendants, loaded pages and directory watchers",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
@@ -167,109 +190,64 @@ Vitest.describe (
                         do! vault.LoadNextFileTreeDirectoryPage "dataset"
                         do! vault.LoadNextFileTreeDirectoryPage "dataset"
                         do! vault.RefreshFileTreeDirectory "dataset/nested"
-                        let cursor = vault.FileTreeDirectoryCursors.["dataset"]
-                        let watcher = loadedDirectoryWatcher vault
+                        let watcher = (directoryWatcher "dataset" vault).Value
                         let loadedPaths = vault.fileTree.Keys |> Set.ofSeq
+
+                        let directChildCount () =
+                            vault.fileTree.Values
+                            |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) datasetPath)
+                            |> Seq.length
 
                         do! vault.RefreshLoadedFileTree()
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe true
-                        Vitest.expect(vault.FileTreeDirectoryCursors.["dataset"]).toBe cursor
-                        Vitest.expect(loadedDirectoryWatcher vault).toEqual watcher
+                        Vitest.expect(isSameWatcher watcher (directoryWatcher "dataset" vault).Value).toBe true
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
                         Vitest.expect(Set.isSubset loadedPaths (vault.fileTree.Keys |> Set.ofSeq)).toBe true
                         Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe true
+                        // The refresh keeps both loaded pages instead of shrinking the directory to one page.
+                        Vitest.expect(directChildCount ()).toBeGreaterThanOrEqual 200
 
                         do! vault.LoadNextFileTreeDirectoryPage "dataset"
 
-                        let directChildCount =
-                            vault.fileTree.Values
-                            |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) datasetPath)
-                            |> Seq.length
-
-                        Vitest.expect(directChildCount).toBe 252
+                        Vitest.expect(directChildCount ()).toBe 252
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe false
                     })
             }
         )
 
         Vitest.test (
-            "fresh snapshot publication waits for cursor closure and uses the latest tree and paging metadata",
+            "a directory created again at a removed path is loaded from scratch",
             TestOptions(timeout = 15000),
             fun () -> promise {
-                let mutable inspectPublication: unit -> unit = ignore
-
-                let window =
-                    recordingWindow (fun (args: obj[]) ->
-                        if args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate") then
-                            inspectPublication ()
-                    )
-
                 do!
-                    withLoadedDirectoryFixtureUsingWindow
-                        window
-                        (fun vault rootPath datasetPath _ -> promise {
-                            let closeStarted, signalCloseStarted = TestHelpers.deferred ()
-                            let closeGate, releaseClose = TestHelpers.deferred ()
-                            let lateChildPath = join [| datasetPath; "loaded-during-cursor-close.txt" |]
-                            let publications = ResizeArray<bool * bool>()
+                    withLoadedDirectoryFixture (fun vault rootPath _ nestedPath -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        do! vault.LoadNextFileTreeDirectoryPage "dataset/nested"
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset/nested"]).toBe false
 
-                            inspectPublication <-
-                                fun () ->
-                                    publications.Add(
-                                        vault.fileTreeDirectoryHasMore.[""],
-                                        containsPath lateChildPath vault
-                                    )
+                        let movedPath = join [| rootPath; "moved-nested" |]
 
-                            let directory =
-                                { new Directory with
-                                    member _.read() =
-                                        JS.Constructors.Promise.resolve (unbox null)
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                do! renameAsync nestedPath movedPath
+                                do! vault.RefreshFileTreeDirectory "dataset"
+                            })
 
-                                    member _.close() =
-                                        signalCloseStarted ()
-                                        closeGate
-                                }
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "dataset/nested").toBe false
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsNone).toBe true
 
-                            vault.FileTreeDirectoryCursors.[""] <- {
-                                Directory = directory
-                                Lookahead = None
-                            }
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                do! renameAsync movedPath nestedPath
+                                do! vault.RefreshFileTreeDirectory "dataset"
+                            })
 
-                            vault.fileTreeDirectoryHasMore.[""] <- true
-
-                            let refresh = vault.RefreshFileTreeDirectory ""
-
-                            try
-                                do! closeStarted
-                                Vitest.expect(vault.fileTreeDirectoryHasMore.[""]).toBe false
-                                Vitest.expect(publications.Count).toBe 0
-
-                                let latestTree =
-                                    System.Collections.Generic.Dictionary<string, FileEntry>(vault.fileTree)
-
-                                latestTree.[lateChildPath] <-
-                                    FileEntry.create (basename lateChildPath, lateChildPath, false)
-
-                                vault.fileTree <- latestTree
-                            finally
-                                releaseClose ()
-
-                            do! refresh
-                            Vitest.expect(publications.ToArray()).toEqual [| false, true |]
-                            Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
-
-                            let! rendererSnapshot = vault.GetRendererFileTreeSnapshot()
-                            Vitest.expect(rendererSnapshot.directoryHasMore.[""]).toBe false
-
-                            Vitest
-                                .expect(rendererSnapshot.entries.ContainsKey("dataset/loaded-during-cursor-close.txt"))
-                                .toBe
-                                true
-
-                            Vitest.expect(rendererSnapshot.entries.ContainsKey("dataset")).toBe true
-                        })
+                        do! vault.LoadNextFileTreeDirectoryPage "dataset/nested"
+                        Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe true
+                    })
             }
         )
 
@@ -433,7 +411,8 @@ Vitest.describe (
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsNone).toBe true
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe true
                         Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe false
 
@@ -441,12 +420,18 @@ Vitest.describe (
                             waitUntil
                                 "dataset watcher readiness"
                                 (fun () ->
-                                    isWatchedPath rootPath "dataset/existing.txt" (loadedDirectoryWatcher vault).Value
+                                    isWatchedPath
+                                        rootPath
+                                        "dataset/existing.txt"
+                                        (directoryWatcher "dataset" vault).Value
                                 )
 
                         Vitest
                             .expect(
-                                isWatchedPath rootPath "dataset/nested/deep.txt" (loadedDirectoryWatcher vault).Value
+                                isWatchedPath
+                                    rootPath
+                                    "dataset/nested/deep.txt"
+                                    (directoryWatcher "dataset" vault).Value
                             )
                             .toBe
                             false
@@ -465,7 +450,7 @@ Vitest.describe (
                                     isWatchedPath
                                         rootPath
                                         "dataset/nested/deep.txt"
-                                        (loadedDirectoryWatcher vault).Value
+                                        (directoryWatcher "dataset/nested" vault).Value
                                 )
                     })
             }
@@ -515,7 +500,29 @@ Vitest.describe (
                         Vitest.expect(containsPath rootFilePath vault).toBe false
                         do! vault.RefreshFileTreeDirectory ""
                         Vitest.expect(containsPath rootFilePath vault).toBe true
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "").toBe false
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "").toBe true
+                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "").toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
+            "the root watcher discovers external root changes without a refresh",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath _ _ -> promise {
+                        do! vault.EnsureLoadedDirectoryWatcherCoverage()
+                        Vitest.expect(isDirectoryCovered "" vault).toBe true
+                        // The root is polled, so no native watcher holds a handle on it.
+                        Vitest.expect((directoryWatcher "" vault).IsNone).toBe true
+
+                        let rootFilePath = join [| rootPath; "external-root.txt" |]
+                        do! writeFileAsync rootFilePath "root" TextEncoding.Utf8
+                        do! waitUntil "root watcher addition" (fun () -> containsPath rootFilePath vault)
+
+                        do! rmAsync rootFilePath (RmOptions())
+                        do! waitUntil "root watcher deletion" (fun () -> not (containsPath rootFilePath vault))
                     })
             }
         )
@@ -545,60 +552,53 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "major reset and later expansion serialize without stale overwrite",
+            "refreshing the loaded tree after a version control change keeps surviving scopes and forgets removed ones",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
                     withLoadedDirectoryFixture (fun vault _ datasetPath nestedPath -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
                         do! vault.RefreshFileTreeDirectory "dataset/nested"
+                        let checkedOutPath = join [| datasetPath; "checked-out.txt" |]
 
-                        let reset = vault.ResetFileTreeToRoot()
-                        let laterExpansion = vault.RefreshFileTreeDirectory "dataset"
-                        do! reset
-                        do! laterExpansion
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                do! rmAsync nestedPath (RmOptions(recursive = true, force = true))
+                                do! writeFileAsync checkedOutPath "checked out" TextEncoding.Utf8
+                                do! vault.RefreshLoadedFileTree()
+                            })
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe true
-                        Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe false
-
-                        do! vault.ResetFileTreeToRoot()
-                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
-                        Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe false
+                        Vitest.expect(containsPath checkedOutPath vault).toBe true
+                        Vitest.expect(containsPath nestedPath vault).toBe false
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsNone).toBe true
                     })
             }
         )
 
         Vitest.test (
-            "overlapping major reset requests share one root reset",
+            "refreshing a vanished loaded directory forgets it instead of failing",
             TestOptions(timeout = 15000),
             fun () -> promise {
-                let mutable publications = 0
-                let window = recordingWindow (fun _ -> publications <- publications + 1)
-
                 do!
-                    withLoadedDirectoryFixtureUsingWindow
-                        window
-                        (fun vault _ _ _ -> promise {
-                            do! vault.RefreshFileTreeDirectory "dataset"
-                            publications <- 0
+                    withLoadedDirectoryFixture (fun vault _ _ nestedPath -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        do! vault.RefreshFileTreeDirectory "dataset/nested"
 
-                            let resetGate, releaseReset = TestHelpers.deferred ()
-                            vault.FileTreeUpdateTail <- resetGate
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                do! rmAsync nestedPath (RmOptions(recursive = true, force = true))
+                                do! vault.RefreshFileTreeDirectory "dataset/nested"
+                            })
 
-                            let firstReset = vault.ResetFileTreeToRoot()
-                            let secondReset = vault.ResetFileTreeToRoot()
-                            releaseReset ()
-
-                            do! firstReset
-                            do! secondReset
-
-                            Vitest.expect(publications).toBe 1
-                            Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                            Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
-                        })
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "dataset/nested").toBe false
+                        Vitest.expect(containsPath nestedPath vault).toBe false
+                        Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe false
+                    })
             }
         )
 
@@ -622,7 +622,7 @@ Vitest.describe (
                                         isWatchedPath
                                             rootPath
                                             "dataset/existing.txt"
-                                            (loadedDirectoryWatcher vault).Value
+                                            (directoryWatcher "dataset" vault).Value
                                     )
 
                             publications <- 0
@@ -663,7 +663,7 @@ Vitest.describe (
                                     isWatchedPath
                                         rootPath
                                         "dataset/nested/deep.txt"
-                                        (loadedDirectoryWatcher vault).Value
+                                        (directoryWatcher "dataset/nested" vault).Value
                                 )
 
                         let datasetFile = join [| datasetPath; "dataset-event.txt" |]
@@ -695,8 +695,7 @@ Vitest.describe (
                         window
                         (fun vault _ _ _ -> promise {
                             do! vault.RefreshFileTreeDirectory "dataset"
-                            do! (loadedDirectoryWatcher vault).Value.close ()
-                            vault.LoadedDirectoryWatcherController.RetireWatcher() |> ignore
+                            do! retireDirectoryWatchers vault
                             publications <- 0
 
                             let firstRefreshGate, releaseFirstRefresh = TestHelpers.deferred ()
@@ -753,8 +752,7 @@ Vitest.describe (
                         (fun vault _ datasetPath _ -> promise {
                             vaultUnderTest <- Some vault
                             do! vault.RefreshFileTreeDirectory "dataset"
-                            do! (loadedDirectoryWatcher vault).Value.close ()
-                            vault.LoadedDirectoryWatcherController.RetireWatcher() |> ignore
+                            do! retireDirectoryWatchers vault
 
                             firstPath <- join [| datasetPath; "race-first.txt" |]
                             intermediatePath <- join [| datasetPath; "race-intermediate.txt" |]
@@ -776,30 +774,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "major reset invalidates pending loaded-directory follow-up work",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-
-                        let refreshGate, releaseRefresh = TestHelpers.deferred ()
-                        vault.FileTreeUpdateTail <- refreshGate
-                        vault.QueueLoadedDirectoryRefresh "dataset"
-
-                        let reset = vault.ResetFileTreeToRoot()
-                        vault.QueueLoadedDirectoryRefresh "dataset"
-                        releaseRefresh ()
-                        do! reset
-
-                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
-                        Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe false
-                    })
-            }
-        )
-
-        Vitest.test (
             "watcher suspension restores exactly once and preserves operation outcomes",
             TestOptions(timeout = 15000),
             fun () -> promise {
@@ -809,10 +783,14 @@ Vitest.describe (
                     withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
 
+                        // Restoration creates one native watcher per loaded directory; the root is polled.
+                        let coveredDirectoryCount = nativeWatcherCount vault
+                        Vitest.expect(coveredDirectoryCount).toBe 1
+
                         let successWatcherCount = invocationCount watchMock
                         let! result = vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise { return 42 })
                         Vitest.expect(result).toBe 42
-                        Vitest.expect(invocationCount watchMock).toBe (successWatcherCount + 1)
+                        Vitest.expect(invocationCount watchMock).toBe (successWatcherCount + coveredDirectoryCount)
 
                         let operationError = exn "Expected operation failure."
                         let operationFailureWatcherCount = invocationCount watchMock
@@ -827,7 +805,10 @@ Vitest.describe (
                             capturedOperationError <- Some error
 
                         Vitest.expect(capturedOperationError.Value).toBe operationError
-                        Vitest.expect(invocationCount watchMock).toBe (operationFailureWatcherCount + 1)
+
+                        Vitest
+                            .expect(invocationCount watchMock)
+                            .toBe (operationFailureWatcherCount + coveredDirectoryCount)
                     })
             }
         )
@@ -842,6 +823,7 @@ Vitest.describe (
                     withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
 
+                        let coveredDirectoryCount = nativeWatcherCount vault
                         let watcherCount = invocationCount watchMock
                         let operationError = exn "Expected synchronous operation failure."
                         let mutable capturedOperationError: exn option = None
@@ -852,8 +834,8 @@ Vitest.describe (
                             capturedOperationError <- Some error
 
                         Vitest.expect(capturedOperationError.Value).toBe operationError
-                        Vitest.expect(invocationCount watchMock).toBe (watcherCount + 1)
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect(invocationCount watchMock).toBe (watcherCount + coveredDirectoryCount)
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
@@ -869,13 +851,13 @@ Vitest.describe (
 
                         do!
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 do! writeFileAsync addedPath "suspended" TextEncoding.Utf8
                                 Vitest.expect(containsPath addedPath vault).toBe false
                             })
 
                         Vitest.expect(containsPath addedPath vault).toBe true
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                     })
             }
@@ -898,7 +880,7 @@ Vitest.describe (
                         let first =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 1
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 do! writeFileAsync addedPath "queued" TextEncoding.Utf8
                                 do! firstOperationGate
                             })
@@ -906,7 +888,7 @@ Vitest.describe (
                         let second =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 2
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 Vitest.expect(containsPath addedPath vault).toBe true
                                 do! secondOperationGate
                             })
@@ -923,7 +905,7 @@ Vitest.describe (
                         releaseSecondOperation ()
                         do! second
 
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                         Vitest.expect(containsPath addedPath vault).toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                     })
@@ -940,16 +922,18 @@ Vitest.describe (
 
                         let suspension =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 do! vault.RefreshFileTreeDirectory "dataset"
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                             })
 
                         do! suspension
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
 
                         Vitest
-                            .expect(isWatchedPath rootPath "dataset/existing.txt" (loadedDirectoryWatcher vault).Value)
+                            .expect(
+                                isWatchedPath rootPath "dataset/existing.txt" (directoryWatcher "dataset" vault).Value
+                            )
                             .toBe
                             true
                     })
@@ -990,7 +974,7 @@ Vitest.describe (
                         let second =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 secondEntered <- true
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 Vitest.expect(containsPath addedPath vault).toBe true
                                 do! secondOperationGate
                             })
@@ -1002,7 +986,7 @@ Vitest.describe (
 
                         releaseSecondOperation ()
                         do! second
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
@@ -1028,7 +1012,7 @@ Vitest.describe (
 
                         Vitest.expect(containsPath stalePath vault).toBe false
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                        Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                     })
             }
         )
@@ -1062,7 +1046,7 @@ Vitest.describe (
                         do! stopping
                         do! Promise.sleep 25
 
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                        Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
                         Vitest.expect(vault.LoadedDirectoryWatcherController.Current.PendingHandoffs.Count).toBe 0
                         Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Refreshes.IsEmpty).toBe true
@@ -1082,7 +1066,7 @@ Vitest.describe (
                         vault.StartFileWatcher()
                         do! vault.RefreshFileTreeDirectory "dataset"
 
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
 
                         let restartedPath = join [| datasetPath; "after-restart.txt" |]
                         do! writeFileAsync restartedPath "restart" TextEncoding.Utf8
@@ -1091,32 +1075,6 @@ Vitest.describe (
                             waitUntil
                                 "loaded-directory event after restart"
                                 (fun () -> containsPath restartedPath vault)
-                    })
-            }
-        )
-
-        Vitest.test (
-            "refresh invalidated by a root reset cannot repopulate loaded scopes",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-                        let stalePath = join [| datasetPath; "stale-after-reset.txt" |]
-                        do! writeFileAsync stalePath "stale" TextEncoding.Utf8
-
-                        let queueGate, releaseQueue = TestHelpers.deferred ()
-                        vault.FileTreeUpdateTail <- queueGate
-                        let refresh = vault.RefreshFileTreeDirectory "dataset"
-                        let reset = vault.ResetFileTreeToRoot()
-
-                        releaseQueue ()
-                        do! refresh
-                        do! reset
-
-                        Vitest.expect(containsPath stalePath vault).toBe false
-                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                     })
             }
         )
@@ -1136,7 +1094,7 @@ Vitest.describe (
                         do! vault.RefreshFileTreeDirectory "dataset"
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
@@ -1147,6 +1105,8 @@ Vitest.describe (
             fun () -> promise {
                 do!
                     withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                        // Cover the root first, so both controlled watchers belong to "dataset".
+                        do! vault.EnsureLoadedDirectoryWatcherCoverage()
                         let firstCreated, signalFirstCreated = TestHelpers.deferred ()
                         let firstClosed, signalFirstClosed = TestHelpers.deferred ()
                         let secondCreated, signalSecondCreated = TestHelpers.deferred ()
@@ -1182,68 +1142,59 @@ Vitest.describe (
                         Vitest.expect(firstGeneration.IsNone).toBe true
                         Vitest.expect(secondGeneration.IsSome).toBe true
                         Vitest.expect(closeCount).toBe 1
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect(isDirectoryCovered "" vault).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
 
         Vitest.test (
-            "existing scopes stay active while replacement coverage becomes ready",
+            "existing directory watchers stay active and unchanged while a new directory's watcher becomes ready",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
                     withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        let original = (loadedDirectoryWatcher vault).Value
-                        let replacementCreated, signalReplacementCreated = TestHelpers.deferred ()
-                        let mutable signalReplacementReady = ignore
+                        let original = (directoryWatcher "dataset" vault).Value
+                        let candidateCreated, signalCandidateCreated = TestHelpers.deferred ()
+                        let mutable signalCandidateReady = ignore
 
                         interceptNextControlledWatch
                             watchMock
-                            signalReplacementCreated
-                            (fun ready -> signalReplacementReady <- ready)
+                            signalCandidateCreated
+                            (fun ready -> signalCandidateReady <- ready)
                             ignore
 
-                        let replacement = vault.RefreshFileTreeDirectory "dataset/nested"
-                        do! replacementCreated
-                        Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe true
+                        let expansion = vault.RefreshFileTreeDirectory "dataset/nested"
+                        do! candidateCreated
+                        Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe true
 
-                        let changedPath = join [| datasetPath; "changed-during-replacement.txt" |]
+                        let changedPath = join [| datasetPath; "changed-during-expansion.txt" |]
                         do! writeFileAsync changedPath "changed" TextEncoding.Utf8
 
+                        // The pending watcher of the new directory does not hold up FileTree updates.
                         do!
                             waitUntil
-                                "active watcher event during replacement"
-                                (fun () ->
-                                    vault.LoadedDirectoryWatcherController.Current.Refreshes.ContainsKey "dataset"
-                                )
-
-                        signalReplacementReady ()
-                        do! replacement
-
-                        do!
-                            waitUntil
-                                "existing-scope mutation during replacement"
+                                "existing-scope mutation while the new watcher is pending"
                                 (fun () -> containsPath changedPath vault)
 
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
-                        Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe false
+                        signalCandidateReady ()
+                        do! expansion
+
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsSome).toBe true
+                        Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe true
                     })
             }
         )
 
         Vitest.test (
-            "replacement error before ready retires the candidate and preserves the active generation",
+            "a directory watcher error before ready leaves that directory uncovered and keeps the others",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
                     withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        let original = (loadedDirectoryWatcher vault).Value
-
-                        let activeGeneration =
-                            vault.LoadedDirectoryWatcherController.Current.ActiveGeneration
-
+                        let original = (directoryWatcher "dataset" vault).Value
                         let candidateCreated, signalCandidateCreated = TestHelpers.deferred ()
                         let mutable signalCandidateError: exn -> unit = ignore
                         let mutable candidateCloseCount = 0
@@ -1254,22 +1205,35 @@ Vitest.describe (
                             (fun emitError -> signalCandidateError <- emitError)
                             (fun () -> candidateCloseCount <- candidateCloseCount + 1)
 
-                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset/nested", false)
-                        let replacement = vault.RequestLoadedDirectoryWatcherCoverage true
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset/nested", true)
+                        let establishment = vault.RequestLoadedDirectoryWatcherCoverage true
                         do! candidateCreated
                         signalCandidateError (exn "candidate failed before ready")
 
-                        let! replacementGeneration = replacement
+                        let! _ = establishment
                         do! vault.LoadedDirectoryWatcherController.Current.WatcherTransitionTail
 
-                        Vitest.expect(replacementGeneration).toEqual (None)
                         Vitest.expect(candidateCloseCount).toBe (1)
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsNone).toBe (true)
+                        Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe (true)
+
+                        // The uncovered directory keeps its pending handoff, so the next coverage catches it up.
+                        Vitest
+                            .expect(
+                                vault.LoadedDirectoryWatcherController.Current.PendingHandoffs.Contains
+                                    "dataset/nested"
+                            )
+                            .toBe (true)
+
+                        do! vault.EnsureLoadedDirectoryWatcherCoverage()
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsSome).toBe (true)
 
                         Vitest
-                            .expect(vault.LoadedDirectoryWatcherController.Current.ActiveGeneration)
-                            .toEqual (activeGeneration)
-
-                        Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe (true)
+                            .expect(
+                                vault.LoadedDirectoryWatcherController.Current.PendingHandoffs.Contains
+                                    "dataset/nested"
+                            )
+                            .toBe (false)
                     })
             }
         )
@@ -1292,7 +1256,7 @@ Vitest.describe (
 
                         let suspension =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 signalOperationEntered ()
                                 do! operationGate
                             })
@@ -1300,12 +1264,12 @@ Vitest.describe (
                         do! closed
                         do! operationEntered
                         do! refresh
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                        Vitest.expect(hasNoDirectoryWatchers vault).toBe true
 
                         releaseOperation ()
                         do! suspension
 
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
@@ -1322,12 +1286,12 @@ Vitest.describe (
                         do!
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 do! vault.RefreshFileTreeDirectory "dataset"
-                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
                                 do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
                             })
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
@@ -1387,13 +1351,13 @@ Vitest.describe (
                         do! operationEntered
                         do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
                         do! refresh
-                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
+                        Vitest.expect(hasNoDirectoryWatchers vault).toBe true
 
                         releaseOperation ()
                         do! suspension
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                     })
             }
         )
@@ -1416,7 +1380,7 @@ Vitest.describe (
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                         Vitest.expect(containsPath renamedPath vault).toBe true
                     })
             }
@@ -1441,7 +1405,7 @@ Vitest.describe (
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
                         Vitest.expect(containsPath movedPath vault).toBe true
                     })
             }

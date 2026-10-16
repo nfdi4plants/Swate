@@ -77,8 +77,9 @@ let filterArcMergeRelevantEvents (events: ArcVaultFileSystemEvent[]) =
             (eventNameEquals Chokidar.Events.Add event.EventName
              || eventNameEquals Chokidar.Events.Change event.EventName
              || eventNameEquals Chokidar.Events.Unlink event.EventName)
-            && (ArcEntityPathRules.tryParseCanonicalArcFileTarget event.RelativePath
-                |> Option.isSome)
+            && ((ArcEntityPathRules.tryParseCanonicalArcFileTarget event.RelativePath
+                 |> Option.isSome)
+                || ArcEntityPathRules.isLicensePath event.RelativePath)
 
         let isEntityDirectoryUnlink =
             eventNameEquals Chokidar.Events.UnlinkDir event.EventName

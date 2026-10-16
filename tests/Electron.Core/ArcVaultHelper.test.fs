@@ -32,6 +32,9 @@ let private watchMock: obj = jsNative
 [<Import("opendir", "fs/promises")>]
 let private openDirectoryMock: obj = jsNative
 
+[<Emit("$0.mock.calls.length")>]
+let private openedDirectoryCount (_spy: obj) : int = jsNative
+
 [<Import("readdir", "fs/promises")>]
 let private directoryListingMock: obj = jsNative
 
@@ -1045,14 +1048,13 @@ Vitest.describe (
                         let! rendererSnapshot = snapshot
 
                         Vitest.expect(vault.fileTree).toBe initializedTree
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 1
                         Vitest.expect(rendererSnapshot.directoryHasMore.[""]).toBe true
 
                         do! vault.LoadNextFileTreeDirectoryPage ""
                         let! completedSnapshot = vault.GetRendererFileTreeSnapshot()
 
                         Vitest.expect(completedSnapshot.directoryHasMore.[""]).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
+                        do! vault.StopFileWatcher()
                     })
         )
 
@@ -1073,7 +1075,6 @@ Vitest.describe (
 
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
                         let! firstSnapshot = vault.GetRendererFileTreeSnapshot()
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 1
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
                         let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
@@ -1091,103 +1092,232 @@ Vitest.describe (
                         // The ARC scaffold already contains studies/.gitkeep in addition to the 250 fixtures.
                         Vitest.expect(countPublishedStudies finalSnapshot).toBe 251
                         Vitest.expect(finalSnapshot.directoryHasMore.["studies"]).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
 
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
                         let! afterCompletionSnapshot = vault.GetRendererFileTreeSnapshot()
 
                         Vitest.expect(countPublishedStudies afterCompletionSnapshot).toBe 251
                         Vitest.expect(afterCompletionSnapshot.directoryHasMore.["studies"]).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
-                    })
-        )
-
-        Vitest.test (
-            "file-tree reset closes partial directory cursors",
-            fun () ->
-                withTempArc
-                    ignore
-                    (fun arcPath -> promise {
-                        let studiesPath = join [| arcPath; "studies" |]
-                        do! mkdirWatcherDirectoryAsync studiesPath
-
-                        for index in 0..100 do
-                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
-
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 1
-
-                        do! vault.ResetFileTreeToRoot()
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
-                    })
-        )
-
-        Vitest.test (
-            "ARC closure closes partial directory cursors",
-            fun () ->
-                withTempArc
-                    ignore
-                    (fun arcPath -> promise {
-                        let studiesPath = join [| arcPath; "studies" |]
-                        do! mkdirWatcherDirectoryAsync studiesPath
-
-                        for index in 0..100 do
-                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
-
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 1
-
                         do! vault.StopFileWatcher()
-                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
                     })
         )
 
         Vitest.test (
-            "directory mutation invalidation closes affected cursors and descendants only",
+            "load more after a mutation continues with entries that were not loaded yet",
             fun () ->
                 withTempArc
                     ignore
                     (fun arcPath -> promise {
-                        let mutationPaths = [| "rename-source"; "move-source"; "delete-source" |]
+                        let studiesPath = join [| arcPath; "studies" |]
+                        do! mkdirWatcherDirectoryAsync studiesPath
 
-                        for relativePath in Array.append mutationPaths [| "unaffected" |] do
-                            do! mkdirWatcherDirectoryAsync (join [| arcPath; relativePath; "nested" |])
+                        for index in 0..249 do
+                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
 
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath
 
-                        let openCursor relativePath = promise {
-                            let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, relativePath)
-                            return ()
+                        let countPublishedStudies () = promise {
+                            let! snapshot = vault.GetRendererFileTreeSnapshot()
+
+                            return
+                                snapshot.entries.Values
+                                |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) "studies")
+                                |> Seq.length
                         }
 
-                        do! openCursor "unaffected"
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let! firstPageCount = countPublishedStudies ()
 
-                        for relativePath in mutationPaths do
-                            do! openCursor relativePath
-                            do! openCursor (join [| relativePath; "nested" |])
+                        // A mutation in the directory refreshes its loaded entries before the next page.
+                        renameSync (join [| studiesPath; "study-000" |]) (join [| studiesPath; "study-renamed" |])
+                        do! vault.ReconcileFileTreePaths [ "studies/study-000"; "studies/study-renamed" ]
+                        let! _ = vault.RefreshFileTreeDirectoryIfLoaded "studies"
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let! secondPageCount = countPublishedStudies ()
 
-                            do! vault.InvalidateFileTreeDirectoryCursors [ relativePath ]
-
-                            Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey(relativePath)).toBe false
-
-                            Vitest
-                                .expect(vault.FileTreeDirectoryCursors.ContainsKey(join [| relativePath; "nested" |]))
-                                .toBe
-                                false
-
-                            Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("unaffected")).toBe true
-
-                        do! vault.CloseFileTreeDirectoryCursors()
+                        Vitest.expect(firstPageCount).toBe 100
+                        Vitest.expect(secondPageCount).toBeGreaterThanOrEqual 200
+                        do! vault.StopFileWatcher()
                     })
         )
 
         Vitest.test (
-            "external directory removal closes watcher-owned cursors for the removed subtree",
+            "load more continues the open listing instead of reading the directory again",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let studiesPath = join [| arcPath; "studies" |]
+
+                        for index in 0..249 do
+                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let countLoadedStudies () =
+                            vault.fileTree.Values
+                            |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) studiesPath)
+                            |> Seq.length
+
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let listing = vault.FileTreeDirectoryCursors.["studies"]
+                        let openedAfterFirstPage = openedDirectoryCount openDirectoryMock
+
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        Vitest.expect(countLoadedStudies ()).toBe 200
+                        Vitest.expect(vault.FileTreeDirectoryCursors.["studies"]).toBe listing
+
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+
+                        // The ARC scaffold already contains studies/.gitkeep in addition to the 250 fixtures.
+                        Vitest.expect(countLoadedStudies ()).toBe 251
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["studies"]).toBe false
+                        Vitest.expect(openedDirectoryCount openDirectoryMock).toBe openedAfterFirstPage
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey "studies").toBe false
+                        do! vault.StopFileWatcher()
+                    })
+        )
+
+        Vitest.test (
+            "a refresh hands its listing over, so the next page continues after the refreshed entries",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let studiesPath = join [| arcPath; "studies" |]
+
+                        for index in 0..249 do
+                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let pagedListing = vault.FileTreeDirectoryCursors.["studies"]
+
+                        do! vault.RefreshFileTreeDirectory "studies"
+                        let refreshedListing = vault.FileTreeDirectoryCursors.["studies"]
+                        Vitest.expect(obj.ReferenceEquals(pagedListing, refreshedListing)).toBe false
+
+                        let openedAfterRefresh = openedDirectoryCount openDirectoryMock
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+
+                        let loadedStudies =
+                            vault.fileTree.Values
+                            |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) studiesPath)
+                            |> Seq.length
+
+                        Vitest.expect(loadedStudies).toBe 251
+                        Vitest.expect(openedDirectoryCount openDirectoryMock).toBe openedAfterRefresh
+                        do! vault.StopFileWatcher()
+                    })
+        )
+
+        Vitest.test (
+            "a suspended mutation releases every open listing and the catch-up hands over fresh ones",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let studiesPath = join [| arcPath; "studies" |]
+
+                        for index in 0..149 do
+                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey "studies").toBe true
+
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
+                            })
+
+                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey "studies").toBe true
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["studies"]).toBe false
+                        do! vault.StopFileWatcher()
+                    })
+        )
+
+        Vitest.test (
+            "stopping the watcher closes every loaded-directory watcher",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+
+                        let watchers = vault.LoadedDirectoryWatcherController.Current.Watchers
+                        Vitest.expect(watchers.ContainsKey "").toBe true
+                        Vitest.expect(watchers.ContainsKey "studies").toBe true
+
+                        do! vault.StopFileWatcher()
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty).toBe true
+                        Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe 0
+                    })
+        )
+
+        Vitest.test (
+            "reconciling mutated paths updates entries beyond the loaded page of a large directory",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let parentPath = join [| arcPath; "parent" |]
+                        do! mkdirWatcherDirectoryAsync parentPath
+
+                        for index in 0..249 do
+                            do!
+                                writeWatcherTextFileAsync
+                                    (join [| parentPath; sprintf "entry-%03d.txt" index |])
+                                    "entry"
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadNextFileTreeDirectoryPage "parent"
+
+                        let containsPath path =
+                            vault.fileTree.Values
+                            |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path path)
+
+                        let renamedSource =
+                            vault.fileTree.Values
+                            |> Seq.find (fun entry ->
+                                not entry.isDirectory && PathHelpers.pathsEqual (dirname entry.path) parentPath
+                            )
+                            |> _.path
+
+                        let renamedSourceRelativePath =
+                            tryGetRepoRelativePath arcPath renamedSource |> Option.get
+
+                        let renamedTarget = join [| parentPath; "renamed-entry.txt" |]
+                        renameSync renamedSource renamedTarget
+
+                        do! vault.ReconcileFileTreePaths [ renamedSourceRelativePath; "parent/renamed-entry.txt" ]
+                        let! _ = vault.RefreshFileTreeDirectoryIfLoaded "parent"
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["parent"]).toBe true
+                        Vitest.expect(containsPath renamedSource).toBe false
+                        Vitest.expect(containsPath renamedTarget).toBe true
+
+                        do! rmAsync renamedTarget (RmOptions())
+                        do! vault.ReconcileFileTreePaths [ "parent/renamed-entry.txt" ]
+                        let! _ = vault.RefreshFileTreeDirectoryIfLoaded "parent"
+
+                        Vitest.expect(containsPath renamedTarget).toBe false
+                        do! vault.StopFileWatcher()
+                    })
+        )
+
+        Vitest.test (
+            "external directory removal forgets the paging state of the removed subtree",
             fun () ->
                 withTempArc
                     ignore
@@ -1217,8 +1347,10 @@ Vitest.describe (
                         vault.fileTree.[removedDescendantPath] <-
                             FileEntry.create (basename removedDescendantPath, removedDescendantPath, true)
 
-                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "parent/removed")
-                        let! _ = vault.AcquireFileTreeDirectoryCursor(arcPath, "parent/removed/nested")
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("parent/removed", false)
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("parent/removed/nested", false)
+                        vault.fileTreeDirectoryHasMore.["parent/removed"] <- false
+                        vault.fileTreeDirectoryHasMore.["parent/removed/nested"] <- false
 
                         do! rmAsync removedPath (RmOptions(recursive = true, force = true))
 
@@ -1232,10 +1364,11 @@ Vitest.describe (
 
                         Vitest.expect(vault.fileTree.ContainsKey removedPath).toBe false
                         Vitest.expect(vault.fileTree.ContainsKey removedDescendantPath).toBe false
-                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("parent")).toBe true
-                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("parent/removed")).toBe false
-
-                        Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey("parent/removed/nested")).toBe false
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "parent").toBe true
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "parent/removed").toBe false
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "parent/removed/nested").toBe false
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "parent/removed").toBe false
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "parent/removed/nested").toBe false
 
                         do! vault.LoadNextFileTreeDirectoryPage "parent"
                         let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
@@ -1247,6 +1380,31 @@ Vitest.describe (
 
                         Vitest.expect(secondSnapshot.directoryHasMore.["parent"]).toBe true
                         Vitest.expect(newlyDiscoveredPaths.Length).toBe 100
+
+                        // A directory created again at the removed path is loaded from scratch.
+                        do! mkdirWatcherDirectoryAsync removedPath
+                        do! writeWatcherTextFileAsync (join [| removedPath; "recreated.txt" |]) "recreated"
+
+                        do!
+                            vault.ApplyWatcherFileTreeEvents [
+                                {
+                                    externalRemoval with
+                                        EventName = "addDir"
+                                }
+                            ]
+
+                        do! vault.LoadNextFileTreeDirectoryPage "parent/removed"
+
+                        Vitest
+                            .expect(
+                                vault.fileTree.ContainsKey(
+                                    join [| removedPath; "recreated.txt" |] |> PathHelpers.normalizePath
+                                )
+                            )
+                            .toBe
+                            true
+
+                        do! vault.StopFileWatcher()
                     })
         )
 
@@ -1277,6 +1435,7 @@ Vitest.describe (
                         Vitest.expect(vault.isInitializingArc).toBe false
                         Vitest.expect(vault.fileTree).toBe pagedTree
                         Vitest.expect(vault.fileTree.ContainsKey(childPath)).toBe true
+                        do! vault.StopFileWatcher()
                     })
         )
 
@@ -2132,7 +2291,7 @@ Vitest.describe (
                             Vitest.expect(vault.arc).toEqual (None)
                             Vitest.expect(vault.fileTree.Count).toBe (0)
                             Vitest.expect(vault.watcher).toEqual (None)
-                            Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe (0)
+                            Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty).toBe (true)
                             Vitest.expect(windowState.SentMessages |> Seq.exists isPathChangeMessage).toBe (false)
                             Vitest.expect(windowState.SentMessages |> Seq.exists isFileTreeMessage).toBe (false)
                         }
@@ -2170,7 +2329,7 @@ Vitest.describe (
                     Vitest.expect(vault.arc).toEqual (None)
                     Vitest.expect(vault.fileTree.Count).toBe (0)
                     Vitest.expect(vault.watcher).toEqual (None)
-                    Vitest.expect(vault.FileTreeDirectoryCursors.Count).toBe (0)
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty).toBe (true)
                     Vitest.expect(windowState.SentMessages |> Seq.exists isPathChangeMessage).toBe (false)
                     Vitest.expect(windowState.SentMessages |> Seq.exists isFileTreeMessage).toBe (false)
 
@@ -2510,7 +2669,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "permanent watcher error before ready fails and cleans up initialization",
+            "permanent watcher error before ready does not prevent the ARC from opening",
             TestOptions(timeout = 15000),
             fun () ->
                 withTempArc
@@ -2533,15 +2692,17 @@ Vitest.describe (
                         signalError watcherError
 
                         match! opening with
-                        | Ok() -> return failwith "Expected pre-ready watcher error to fail ARC initialization."
-                        | Error error -> Vitest.expect(error.Message).toBe (watcherError.Message)
+                        | Ok() -> ()
+                        | Error error -> return failwith $"Expected the ARC to open, received {error.Message}."
 
+                        // Chokidar keeps watching after a path-level error, so the watcher stays attached.
+                        Vitest.expect(closeCount).toBe (0)
+                        Vitest.expect(vault.watcher.IsSome).toBe (true)
+                        Vitest.expect(vault.path).toEqual (Some(PathHelpers.normalizePath arcPath))
+                        Vitest.expect(vault.arc.IsSome).toBe (true)
+
+                        do! vault.StopFileWatcher()
                         Vitest.expect(closeCount).toBe (1)
-                        Vitest.expect(vault.watcher).toEqual (None)
-                        Vitest.expect(vault.FileWatcherReady).toEqual (None)
-                        Vitest.expect(vault.path).toEqual (None)
-                        Vitest.expect(vault.arc).toEqual (None)
-                        Vitest.expect(vault.isInitializingArc).toBe (false)
                     })
         )
 

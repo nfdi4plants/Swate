@@ -319,7 +319,7 @@ type FileTree =
             | Some path when willExpand ->
                 setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
 
-                if shouldLoadNextDirectoryPage path fileStateCtx.state.FileTreeDirectoryHasMore then
+                if needsInitialDirectoryLoad path fileStateCtx.state.FileTreeDirectoryHasMore then
                     loadNextDirectoryPage path
             | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
             | None -> ()
@@ -401,10 +401,7 @@ type FileTree =
 
         let createArcEntry kind (identifier: string) =
             if not isDialogBusy then
-                let existingPaths =
-                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
-
-                match tryBuildArcCreateDraft kind identifier existingPaths with
+                match tryBuildArcCreateDraft kind identifier with
                 | Error errorMessage -> applyCreateError errorMessage
                 | Ok draft ->
                     setIsDialogBusy true

@@ -27,7 +27,9 @@ let private shouldIgnorePath (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
     || isLegacyDataMapPath normalizedPath
 
-let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> = promise {
+/// Lists repository-wide large-object state. Returns None when no listing could be produced,
+/// so callers retry instead of treating an unavailable session as "no large objects".
+let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, ObjectStateDto> option> = promise {
     try
         let context = OperationContext.detached "file-tree-objects"
         let host = WorkspaceSessionHost.get ()
@@ -41,10 +43,10 @@ let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<s
             | Failed _ -> None
 
         match hostedSession with
-        | None -> return Map.empty
+        | None -> return None
         | Some hosted ->
             match hosted.Session.ObjectMaterialization with
-            | None -> return Map.empty
+            | None -> return Some Map.empty
             | Some materialization ->
                 let! listed = materialization.ListObjects context |> Async.StartAsPromise
 
@@ -58,9 +60,10 @@ let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<s
                             dto.Path, dto
                         )
                         |> Map.ofArray
-                | Failed _ -> return Map.empty
+                        |> Some
+                | Failed _ -> return None
     with _ ->
-        return Map.empty
+        return None
 }
 
 let private withFileEntryLfsMetadata
@@ -109,16 +112,52 @@ let withFileEntriesLfsMetadata
     entries
     |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
 
-/// Enriches an already-read batch of entries from one large-object metadata snapshot.
-/// Directory-only batches avoid querying the repository entirely.
-let getFileEntriesWithLfsMetadata (repoRoot: string) (entries: FileEntry[]) = promise {
-    if entries |> Array.exists (fun entry -> not entry.isDirectory) then
-        let normalizedRepoRoot = normalizeRootPath repoRoot
-        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot
-        return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
-    else
-        return entries
-}
+/// Shares one repository-wide large-object listing across File Explorer reads.
+/// Directory pages, refreshes and watcher batches reuse the snapshot until Invalidate is called
+/// after something that can change large-object state, such as a file change or a version control operation.
+type LargeObjectMetadataCache() =
+    let mutable version = 0
+
+    let mutable snapshot: (string * Fable.Core.JS.Promise<Map<string, ObjectStateDto>>) option =
+        None
+
+    member _.Invalidate() =
+        version <- version + 1
+        snapshot <- None
+
+    /// canOpenSession prevents reopening a version control session for a vault that is closing.
+    member private _.Get(repoRoot: string, canOpenSession: unit -> bool) =
+        match snapshot with
+        | Some(cachedRoot, cached) when PathHelpers.pathsEqual cachedRoot repoRoot -> cached
+        | _ when not (canOpenSession ()) -> Fable.Core.JS.Constructors.Promise.resolve Map.empty
+        | _ ->
+            let capturedVersion = version
+
+            let listing = promise {
+                let! listed = tryListLargeObjects repoRoot
+
+                match listed with
+                | Some largeObjects -> return largeObjects
+                | None ->
+                    // An unavailable listing is not kept, so the next read tries again.
+                    if capturedVersion = version then
+                        snapshot <- None
+
+                    return Map.empty
+            }
+
+            snapshot <- Some(repoRoot, listing)
+            listing
+
+    /// Enriches an already-read batch of entries. Directory-only batches avoid the listing entirely.
+    member this.Enrich(repoRoot: string, entries: FileEntry[], canOpenSession: unit -> bool) = promise {
+        if entries |> Array.exists (fun entry -> not entry.isDirectory) then
+            let normalizedRepoRoot = normalizeRootPath repoRoot
+            let! largeObjectsByRelativePath = this.Get(normalizedRepoRoot, canOpenSession)
+            return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
+        else
+            return entries
+    }
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -168,30 +207,37 @@ let private resolveFileTreeDirectory (arcPath: string) (relativeDirectoryPath: s
 
     resolvedDirectoryPath
 
+/// Number of entries File Explorer adds to a directory per page.
+[<Literal>]
+let FileTreeDirectoryPageSize = 100
+
 type FileTreeDirectoryPage = { Entries: FileEntry[]; HasMore: bool }
 
+/// An open directory listing that continues where its previous page ended, so loading the next page
+/// never reads the loaded entries again. The accepted lookahead becomes the first entry of the next page.
 type FileTreeDirectoryCursor = {
+    DirectoryPath: string
     Directory: Directory
     mutable Lookahead: Dirent option
 }
 
 let openFileTreeDirectoryCursor (arcPath: string) (relativeDirectoryPath: string) = promise {
-    let normalizedArcPath = normalizeRootPath arcPath
-    let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
+    let directoryPath =
+        resolveFileTreeDirectory (normalizeRootPath arcPath) relativeDirectoryPath
+
     let! directory = openDirectoryAsync directoryPath
 
-    return
-        directoryPath,
-        {
-            Directory = directory
-            Lookahead = None
-        }
+    return {
+        DirectoryPath = directoryPath
+        Directory = directory
+        Lookahead = None
+    }
 }
 
-/// Advances an already-open directory cursor by one bounded batch. The accepted lookahead is
-/// retained by the cursor and becomes the first entry of the next batch.
+/// Advances an open cursor by up to pageSize accepted entries. Reading continues to the next accepted
+/// entry so ignored filesystem entries do not produce a false positive HasMore; that entry is kept as
+/// the lookahead of the next page.
 let readFileTreeDirectoryCursorPage
-    (directoryPath: string)
     (cursor: FileTreeDirectoryCursor)
     (pageSize: int)
     : Fable.Core.JS.Promise<FileTreeDirectoryPage> =
@@ -205,7 +251,9 @@ let readFileTreeDirectoryCursorPage
         let tryAccept (dirent: Dirent) =
             let name = dirent.name
             let isDirectory = dirent.isDirectory ()
-            let fullPath = join [| directoryPath; name |] |> PathHelpers.normalizeSeparators
+
+            let fullPath =
+                join [| cursor.DirectoryPath; name |] |> PathHelpers.normalizeSeparators
 
             if
                 (isDirectory && shouldIgnoreDirName name)
@@ -229,8 +277,6 @@ let readFileTreeDirectoryCursorPage
             else
                 tryAccept dirent |> Option.iter entries.Add
 
-        // Read until the next accepted entry so ignored filesystem entries do not create a false
-        // positive HasMore result. Preserve that entry for the next batch.
         while not exhausted && cursor.Lookahead.IsNone do
             let! dirent = cursor.Directory.read ()
 
@@ -245,36 +291,69 @@ let readFileTreeDirectoryCursorPage
         }
     }
 
-/// Reads a fresh bounded prefix for reconciliation. Incremental pagination uses a persistent cursor.
+/// Reads the first entryCount entries of a directory. When more entries follow, the still open cursor
+/// is returned, so the next page continues after them without reading them again. An exhausted or
+/// failed listing is closed.
+let readFileTreeDirectoryPrefixWithCursor
+    (arcPath: string)
+    (relativeDirectoryPath: string)
+    (entryCount: int)
+    : Fable.Core.JS.Promise<FileTreeDirectoryPage * FileTreeDirectoryCursor option> =
+    promise {
+        if entryCount < 1 then
+            invalidArg (nameof entryCount) "Directory entry count must be at least one."
+
+        let! cursor = openFileTreeDirectoryCursor arcPath relativeDirectoryPath
+        let! readResult = readFileTreeDirectoryCursorPage cursor entryCount |> Promise.result
+
+        match readResult with
+        | Ok page when page.HasMore -> return page, Some cursor
+        | Ok page ->
+            do! cursor.Directory.close ()
+            return page, None
+        | Error error ->
+            let! _ = cursor.Directory.close () |> Promise.result
+            return raise error
+    }
+
+/// Reads the first entryCount entries of a directory and closes the listing.
 let readFileTreeDirectoryPrefix
     (arcPath: string)
     (relativeDirectoryPath: string)
-    (pageSize: int)
+    (entryCount: int)
     : Fable.Core.JS.Promise<FileTreeDirectoryPage> =
     promise {
-        if pageSize < 1 then
-            invalidArg (nameof pageSize) "Directory page size must be at least one."
+        let! page, cursor = readFileTreeDirectoryPrefixWithCursor arcPath relativeDirectoryPath entryCount
 
-        let! directoryPath, cursor = openFileTreeDirectoryCursor arcPath relativeDirectoryPath
-        let! readResult = readFileTreeDirectoryCursorPage directoryPath cursor pageSize |> Promise.result
-        let! closeResult = cursor.Directory.close () |> Promise.result
+        match cursor with
+        | Some cursor -> do! cursor.Directory.close ()
+        | None -> ()
 
-        let page =
-            match readResult, closeResult with
-            | Error error, _
-            | _, Error error -> raise error
-            | Ok page, Ok() -> page
-
-        // The provider currently lists all objects. Share that snapshot across this prefix;
-        // a path-scoped provider API would also bound the metadata lookup to the visible entries.
-        let! entries = getFileEntriesWithLfsMetadata arcPath page.Entries
-        return { page with Entries = entries }
+        return page
     }
 
-type FileTreeRootPage = {
-    Entries: Dictionary<string, FileEntry>
-    HasMore: bool
-}
+/// Moves every entry of a file tree to a new ARC root, for example after the open ARC folder was renamed.
+let remapFileTreeRoot (sourceRoot: string) (targetRoot: string) (fileTree: Dictionary<string, FileEntry>) =
+    let normalizedSourceRoot = PathHelpers.normalizePath sourceRoot
+    let normalizedTargetRoot = PathHelpers.normalizePath targetRoot
+    let remappedTree = Dictionary<string, FileEntry>()
+
+    for entry in fileTree.Values do
+        let entryPath = PathHelpers.normalizePath entry.path
+
+        if PathHelpers.isSameOrDescendantPath entryPath normalizedSourceRoot then
+            let isRoot = entryPath.Length = normalizedSourceRoot.Length
+
+            let remappedPath =
+                normalizedTargetRoot + entryPath.Substring(normalizedSourceRoot.Length)
+
+            remappedTree.[remappedPath] <- {
+                entry with
+                    path = remappedPath
+                    name = if isRoot then basename normalizedTargetRoot else entry.name
+            }
+
+    remappedTree
 
 /// Adds or replaces a page without removing direct children that belong to pages not read by this request.
 let mergeFileTreeDirectoryPage (entries: FileEntry[]) (fileTree: Dictionary<string, FileEntry>) =

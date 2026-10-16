@@ -61,14 +61,17 @@ module ArcLoadExtensions =
             // The root snapshot is authoritative: zones absent here are optional and are never read.
             let! rootEntries = readDirectory arcPath (ReaddirOptions(withFileTypes = true))
 
-            let investigationPath =
+            let structuralRootFilePaths =
                 rootEntries
-                |> Array.tryFind (fun entry ->
-                    entry.isFile ()
-                    && PathHelpers.pathsEqual entry.name ArcPathHelper.InvestigationFileName
+                |> Array.choose (fun entry ->
+                    if
+                        entry.isFile ()
+                        && PathHelpers.pathMatchesAny ArcEntityPathRules.structuralRootFileNames entry.name
+                    then
+                        Some entry.name
+                    else
+                        None
                 )
-                |> Option.map _.name
-                |> Option.toArray
 
             let existingZones =
                 ArcEntityPathRules.allAddZones
@@ -140,7 +143,7 @@ module ArcLoadExtensions =
             // Normalize and sort after all reads so filesystem enumeration and promise completion order
             // cannot affect the paths passed to ARC.fromFilePaths.
             return
-                Array.append investigationPath (Array.concat entityMetadataPaths)
+                Array.append structuralRootFilePaths (Array.concat entityMetadataPaths)
                 |> Array.map PathHelpers.normalizePath
                 |> Array.sort
         }
