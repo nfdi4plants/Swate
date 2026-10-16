@@ -235,11 +235,11 @@ module MessageInteropHelper =
                     else
                         match PendingRequests.TryGetValue(content.requestId) with
                         | true, (resolve, _) ->
-                            log $"[Swate] Response from ARCitect"
+                            log $"[ARCitISA] Response from ARCitect"
                             PendingRequests.Remove(content.requestId) |> ignore
                             resolve content.data
                         | _ ->
-                            log $"[Swate] Request from ARCitect: {content.api}"
+                            log $"[ARCitISA] Request from ARCitect: {content.api}"
                             resolveIncMessage recordType content
                 | None -> ()
 
