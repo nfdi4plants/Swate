@@ -4791,22 +4791,24 @@ let private updateCore
                 ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
         },
         Cmd.none
-    | SidebarVisibilityChanged true when model.ExternalChangesSeen ->
-        {
+    | SidebarVisibilityChanged true ->
+        let nextModel = {
             model with
                 SidebarVisible = true
                 ExternalChangesSeen = false
-        },
-        Cmd.ofMsg RefreshRequested
-    // Without an ARC the silent refresh would reset the model, including a clone that runs
-    // from the DataHub browser. A running refresh would be replaced, and its errors would
-    // no longer reach the user.
-    | SidebarVisibilityChanged true when
-        model.CurrentArcPath.IsNone
-        || model.BusyOperation = Some GitBusyOperation.Refreshing
-        ->
-        { model with SidebarVisible = true }, Cmd.none
-    | SidebarVisibilityChanged true -> { model with SidebarVisible = true }, Cmd.ofMsg RefreshRequestedSilently
+        }
+
+        // Without an ARC the silent refresh would reset the model, including a clone that runs
+        // from the DataHub browser. A running refresh would be replaced, and its errors would
+        // no longer reach the user. The running refresh also picks up the external changes, and
+        // an ARC change starts its own refresh, so the flag is cleared in both cases.
+        if
+            model.CurrentArcPath.IsNone
+            || model.BusyOperation = Some GitBusyOperation.Refreshing
+        then
+            nextModel, Cmd.none
+        else
+            nextModel, Cmd.ofMsg RefreshRequestedSilently
     | ExternalChangesDetected when not model.SidebarVisible ->
         {
             model with

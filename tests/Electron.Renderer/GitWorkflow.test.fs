@@ -1766,8 +1766,7 @@ Vitest.describe (
                 Vitest.expect(oldTimerMessages).toEqual ([||])
                 Vitest.expect(latestTimerMessages).toEqual ([| RefreshRequestedSilently |])
 
-                let hiddenState, hiddenCmd =
-                    update deps ignore ExternalChangesDetected GitState.Empty
+                let hiddenState, hiddenCmd = update deps ignore ExternalChangesDetected runningState
 
                 let! hiddenMessages = collectMessages hiddenCmd
 
@@ -1779,7 +1778,7 @@ Vitest.describe (
                 Vitest.expect(hiddenMessages).toEqual ([||])
                 Vitest.expect(hiddenState.ExternalChangesSeen).toBe (true)
                 Vitest.expect(revealedState.ExternalChangesSeen).toBe (false)
-                Vitest.expect(revealMessages).toEqual ([| RefreshRequested |])
+                Vitest.expect(revealMessages).toEqual ([| RefreshRequestedSilently |])
             }
         )
 
@@ -10976,6 +10975,10 @@ Vitest.describe (
                 Vitest.expect(primaryAllMessage).toEqual (Some "save all while marked")
                 Vitest.expect(primarySelectionCalls).toBe (0)
 
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
+
                 cleanup ()
             }
         )
@@ -11027,6 +11030,8 @@ Vitest.describe (
 
                 Vitest.expect(messageInput.value).toBe ("")
 
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']")).toBeNull ()
+
                 setTextAreaValue messageInput "local all"
                 do! Promise.sleep 0
 
@@ -11039,6 +11044,48 @@ Vitest.describe (
                 Vitest.expect(commitAllMessage).toEqual (Some "local all")
                 Vitest.expect(messageInput.value).toBe ("")
                 Vitest.expect(primaryCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar keeps the message and upload checkbox editable during a silent refresh but disables saving",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = noopCallbacks,
+                            runStatus = GitSidebarRunStatus.BusyWithoutNotice,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
+                        )
+                    )
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarProgressNotice']")).toBeNull ()
+                Vitest.expect(saveAllButton.disabled).toBe (true)
+                Vitest.expect(messageInput.disabled).toBe (false)
+                Vitest.expect(uploadCheckbox.disabled).toBe (false)
 
                 cleanup ()
             }

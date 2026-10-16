@@ -1952,6 +1952,15 @@ type GitSidebar =
             | GitSidebarRunStatus.BusyWithoutNotice
             | GitSidebarRunStatus.Progress _ -> true
 
+        // A silent refresh disables the actions but leaves the commit message and the upload
+        // checkbox editable, so typing is not interrupted when the sidebar opens.
+        let isBusyWithVisibleOperation =
+            match runStatus with
+            | GitSidebarRunStatus.Busy _
+            | GitSidebarRunStatus.Progress _ -> true
+            | GitSidebarRunStatus.Idle
+            | GitSidebarRunStatus.BusyWithoutNotice -> false
+
         let visibleError = errorNotice |> Option.orElse localError
 
         // Sync marked paths with changedFiles: remove paths that are no longer in the changed
@@ -2214,10 +2223,13 @@ type GitSidebar =
             callbacks.OnDedupLfsStorage()
 
         let hasConflicts = GitSidebarInternal.hasConflicts status changedFiles
-        let canEditCommit = not status.IsClean && not hasConflicts && not isBusy
+
+        let canEditCommit =
+            not status.IsClean && not hasConflicts && not isBusyWithVisibleOperation
+
         let markedCount = Set.count markedPaths
         let hasMarkedFiles = markedCount > 0
-        let canRunPrimarySave = canEditCommit
+        let canRunPrimarySave = canEditCommit && not isBusy
 
         let normalizedLfsThresholdInput = lfsThresholdInput.Trim()
 
