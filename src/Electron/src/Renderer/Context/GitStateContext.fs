@@ -10,6 +10,7 @@ open Swate.Components.Page.GitSidebarTypes
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.VersionControlTypes
 
 open Renderer.Context.GitWorkflow
@@ -194,6 +195,34 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let gitState, dispatch =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
+
+    // The workflow seeds the git values of a state without a session from the user defaults.
+    let userDefaults =
+        Renderer.MainSyncedState.useMainSyncedState {
+            initial = None
+            load =
+                fun () -> promise {
+                    let! defaults = Api.ipcUserDefaultsApi.getUserDefaults ()
+                    return Some defaults
+                }
+            subscribe =
+                fun update ->
+                    Renderer.IpcReceiver.subscribeProxyReceiver<IUserDefaultsRendererApi> {
+                        userDefaultsChanged = Some >> update
+                    }
+            // The built-in values stay in place. Only the settings page reports the failed load, and only
+            // once the user opens it.
+            onError = fun error -> console.warn ("Could not load the user defaults: " + error.Message)
+            dependencies = [||]
+        }
+
+    React.useEffect (
+        (fun () ->
+            userDefaults.state
+            |> Option.iter (fun defaults -> dispatch (UserDefaultsLoaded defaults.Effective))
+        ),
+        [| box userDefaults.state |]
+    )
 
     let refresh () = dispatch RefreshRequested
 

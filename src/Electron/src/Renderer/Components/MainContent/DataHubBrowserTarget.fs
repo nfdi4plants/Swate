@@ -21,6 +21,23 @@ module DataHubBrowserHelper =
         |> Option.filter (fun segment -> not (String.IsNullOrWhiteSpace segment))
         |> Option.defaultValue projectInfo.name
 
+    /// A clone follows the saved "Download large files" default. The session value belongs to the
+    /// ARC that is open in this window.
+    let toCloneRequest
+        (gitState: Renderer.Context.GitWorkflow.GitState)
+        (operationId: string)
+        (projectInfo: ExploreProjectDto)
+        (targetPath: string)
+        : CloneWorkspaceRequestDto =
+        {
+            OperationId = operationId
+            ProviderLocation = projectInfo.http_url_to_repo
+            DisplayName = Some projectInfo.name
+            TargetPath = targetPath
+            TargetRef = None
+            MaterializeAllObjects = gitState.UserDefaults.DownloadLargeFiles
+        }
+
     let createActionBtns (onClone: ExploreProjectDto -> unit) (projectInfo: ExploreProjectDto) : ButtonInfo[] = [|
         ButtonInfo.create (
             "swt:fluent--arrow-download-24-regular swt:size-5",
@@ -65,14 +82,12 @@ let DataHubBrowserTarget () =
                         destinationFolder
                         (DataHubBrowserHelper.toRepositoryFolderName projectInfo)
 
-                let cloneRequest: CloneWorkspaceRequestDto = {
-                    OperationId = Renderer.VersionControlApiClient.newOperationId ()
-                    ProviderLocation = projectInfo.http_url_to_repo
-                    DisplayName = Some projectInfo.name
-                    TargetPath = targetPath
-                    TargetRef = None
-                    MaterializeAllObjects = gitStateCtx.state.DownloadLargeFiles
-                }
+                let cloneRequest =
+                    DataHubBrowserHelper.toCloneRequest
+                        gitStateCtx.state
+                        (Renderer.VersionControlApiClient.newOperationId ())
+                        projectInfo
+                        targetPath
 
                 match! gitStateCtx.cloneRepository cloneRequest with
                 | Error _ -> ()

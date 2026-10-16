@@ -19,6 +19,16 @@ let private externalChangesRefreshDelayMs = 1500
 [<Literal>]
 let DefaultDiffIndexingLimitMb = 1024
 
+/// The defaults Swate ships with. The renderer starts from these values until the main process
+/// reports the effective ones, and keeps them when that call fails.
+let builtInUserDefaults: UserDefaultValuesDto = {
+    LfsAutoTrackThresholdMb = 1
+    DownloadLargeFiles = false
+    DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
+    UploadRightAway = true
+    AutoCreateNotesFolder = true
+}
+
 [<RequireQualifiedAccess>]
 type GitRefreshState =
     | Idle
@@ -180,6 +190,9 @@ type GitState = {
     /// workspace token.
     PendingPublishAfterRefresh: bool
     PendingPublishForPath: string option
+    /// The effective user defaults of the main process. A state without a session starts from them,
+    /// and a reset for another ARC keeps them.
+    UserDefaults: UserDefaultValuesDto
     LfsAutoTrackThresholdMb: int
     /// Whole MiB. A value from 1 to 63 keeps a new diff in memory with that budget. A larger value
     /// lets the diff use temp files, and the background indexing of an open diff stops once the
@@ -252,10 +265,11 @@ type GitState = {
         ProvisionedRemote = None
         PendingPublishAfterRefresh = false
         PendingPublishForPath = None
-        LfsAutoTrackThresholdMb = 1
-        DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
-        DownloadLargeFiles = false
-        UploadRightAway = true
+        UserDefaults = builtInUserDefaults
+        LfsAutoTrackThresholdMb = builtInUserDefaults.LfsAutoTrackThresholdMb
+        DiffIndexingLimitMb = builtInUserDefaults.DiffIndexingLimitMb
+        DownloadLargeFiles = builtInUserDefaults.DownloadLargeFiles
+        UploadRightAway = builtInUserDefaults.UploadRightAway
         UploadRightAwayLoad = UploadRightAwayLoad.NotStarted
         RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
@@ -617,6 +631,7 @@ type Msg =
     | SidebarVisibilityChanged of bool
     | UploadRightAwayChanged of bool
     | UploadRightAwayLoaded of arcSessionId: int * value: bool
+    | UserDefaultsLoaded of UserDefaultValuesDto
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | SilentRefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested
@@ -1183,10 +1198,10 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
             modelWithBranches with
                 LfsAutoTrackThresholdMb =
                     settings.AutoPolicyThresholdMb
-                    |> Option.defaultValue GitState.Empty.LfsAutoTrackThresholdMb
+                    |> Option.defaultValue model.UserDefaults.LfsAutoTrackThresholdMb
                 DiffIndexingLimitMb =
                     settings.DiffIndexingLimitMb
-                    |> Option.defaultValue GitState.Empty.DiffIndexingLimitMb
+                    |> Option.defaultValue model.UserDefaults.DiffIndexingLimitMb
                 DownloadLargeFiles = settings.MaterializeLargeObjects
           }
         | Error _ -> modelWithBranches
@@ -4647,14 +4662,26 @@ let private confirmMergeResolutionAsync
 
 let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 
-let private resetFor (model: GitState) = {
-    GitState.Empty with
-        SidebarVisible = model.SidebarVisible
-        ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
-        // The page load counter keeps counting. A page load of an ARC that closed could finish after
-        // a counter that started again at 0 has reached its id in a later ARC.
-        PageLoadRequestId = model.PageLoadRequestId
+/// The four git values a state shows before the main process reports the ones of a session.
+let private withSeededGitValues (defaults: UserDefaultValuesDto) (model: GitState) = {
+    model with
+        UserDefaults = defaults
+        LfsAutoTrackThresholdMb = defaults.LfsAutoTrackThresholdMb
+        DiffIndexingLimitMb = defaults.DiffIndexingLimitMb
+        DownloadLargeFiles = defaults.DownloadLargeFiles
+        UploadRightAway = defaults.UploadRightAway
 }
+
+let private resetFor (model: GitState) =
+    {
+        GitState.Empty with
+            SidebarVisible = model.SidebarVisible
+            ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
+            // The page load counter keeps counting. A page load of an ARC that closed could finish after
+            // a counter that started again at 0 has reached its id in a later ARC.
+            PageLoadRequestId = model.PageLoadRequestId
+    }
+    |> withSeededGitValues model.UserDefaults
 
 let private missingRepositoryModel (model: GitState) = {
     resetFor model with
@@ -4926,6 +4953,9 @@ let private updateCore
         },
         Cmd.none
     | UploadRightAwayLoaded _ -> model, Cmd.none
+    | UserDefaultsLoaded defaults when model.CurrentArcPath.IsNone -> withSeededGitValues defaults model, Cmd.none
+    // The values of an open ARC come from its session. Only the seed for the next reset changes.
+    | UserDefaultsLoaded defaults -> { model with UserDefaults = defaults }, Cmd.none
     | ExternalChangesDetected when not model.SidebarVisible ->
         {
             model with

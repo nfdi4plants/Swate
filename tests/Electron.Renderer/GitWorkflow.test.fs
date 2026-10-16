@@ -440,6 +440,16 @@ let private runningState = {
         WorkspaceVersion = Some "v1"
 }
 
+/// Every value differs from the built-in one.
+let private changedUserDefaults = {
+    builtInUserDefaults with
+        LfsAutoTrackThresholdMb = 7
+        DownloadLargeFiles = true
+        DiffIndexingLimitMb = 2048
+        UploadRightAway = false
+        AutoCreateNotesFolder = false
+}
+
 let private noOwnerSelection: GitPublishOwnerSelection = { Owners = None; Choice = None }
 
 let private publishGroup groupId path canCreate level : PublishGroupDto = {
@@ -3358,6 +3368,90 @@ Vitest.describe (
 
                 Vitest.expect(nextState.DownloadLargeFiles).toBe (true)
                 Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "UserDefaultsLoaded seeds the git values of a state without an ARC and a reset keeps the seed",
+            fun () -> promise {
+                let seeded, cmd =
+                    update defaultDependencies ignore (UserDefaultsLoaded changedUserDefaults) GitState.Empty
+
+                let! messages = collectMessages cmd
+                let reset, _ = update defaultDependencies ignore RefreshRequested seeded
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(seeded.UserDefaults).toEqual (changedUserDefaults)
+                Vitest.expect(seeded.LfsAutoTrackThresholdMb).toBe (7)
+                Vitest.expect(seeded.DiffIndexingLimitMb).toBe (2048)
+                Vitest.expect(seeded.UploadRightAway).toBe (false)
+                // A clone without an ARC takes this value.
+                Vitest.expect(seeded.DownloadLargeFiles).toBe (true)
+                Vitest.expect(reset.UserDefaults).toEqual (changedUserDefaults)
+                Vitest.expect(reset.DownloadLargeFiles).toBe (true)
+                Vitest.expect(reset.LfsAutoTrackThresholdMb).toBe (7)
+            }
+        )
+
+        Vitest.test (
+            "UserDefaultsLoaded leaves the values of an open ARC alone and changes the seed",
+            fun () -> promise {
+                let nextState, cmd =
+                    update defaultDependencies ignore (UserDefaultsLoaded changedUserDefaults) runningState
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.UserDefaults).toEqual (changedUserDefaults)
+                Vitest.expect(nextState.LfsAutoTrackThresholdMb).toBe (runningState.LfsAutoTrackThresholdMb)
+                Vitest.expect(nextState.DownloadLargeFiles).toBe (runningState.DownloadLargeFiles)
+                Vitest.expect(nextState.DiffIndexingLimitMb).toBe (runningState.DiffIndexingLimitMb)
+                Vitest.expect(nextState.UploadRightAway).toBe (runningState.UploadRightAway)
+            }
+        )
+
+        Vitest.test (
+            "The seed of UserDefaultsLoaded survives a change of the ARC and starts the new session",
+            fun () -> promise {
+                let seeded, _ =
+                    update defaultDependencies ignore (UserDefaultsLoaded changedUserDefaults) runningState
+
+                let opened, _ =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) seeded
+
+                let closed, _ = update defaultDependencies ignore (ArcPathChanged None) opened
+                let reset, _ = update defaultDependencies ignore ResetWorkflow opened
+
+                for state in [| opened; closed; reset |] do
+                    Vitest.expect(state.UserDefaults).toEqual (changedUserDefaults)
+                    Vitest.expect(state.LfsAutoTrackThresholdMb).toBe (7)
+                    Vitest.expect(state.DownloadLargeFiles).toBe (true)
+                    Vitest.expect(state.DiffIndexingLimitMb).toBe (2048)
+                    Vitest.expect(state.UploadRightAway).toBe (false)
+                    Vitest.expect(state.UploadRightAwayLoad).toEqual (UploadRightAwayLoad.NotStarted)
+            }
+        )
+
+        Vitest.test (
+            "A refresh result overrides the values seeded from the user defaults",
+            fun () -> promise {
+                let deps = {
+                    withRefresh cleanStatus defaultDependencies with
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 3 false)) }
+                }
+
+                let seeded, _ =
+                    update deps ignore (UserDefaultsLoaded changedUserDefaults) GitState.Empty
+
+                let! bound, bindMessages = step deps seeded (ArcPathChanged(Some "C:/arc"))
+                let! refreshing, refreshMessages = step deps bound bindMessages[0]
+                let! refreshed, _ = step deps refreshing refreshMessages[0]
+
+                Vitest.expect(bound.LfsAutoTrackThresholdMb).toBe (7)
+                Vitest.expect(bound.DownloadLargeFiles).toBe (true)
+                Vitest.expect(refreshed.LfsAutoTrackThresholdMb).toBe (3)
+                Vitest.expect(refreshed.DownloadLargeFiles).toBe (false)
+                Vitest.expect(refreshed.UserDefaults).toEqual (changedUserDefaults)
             }
         )
 

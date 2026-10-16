@@ -14,6 +14,7 @@ Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAppVersionApi>
 Remoting.createIpc () |> Remoting.buildBridge<IAppVersionRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IReleaseNotesRendererApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IUiSettingsApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IUserDefaultsApi>
 
 Remoting.createIpc () |> Remoting.buildBridge<IPathChangeRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IRecentArcsRendererApi>
@@ -24,6 +25,7 @@ Remoting.createIpc () |> Remoting.buildBridge<IGitRepositoryRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IVersionControlRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IHasUnsavedArcChangesRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IUiSettingsRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IUserDefaultsRendererApi>
 
 Remoting.createIpc () |> Remoting.buildBridge<IArcFileWatcherApi>
 Remoting.createIpc () |> Remoting.buildBridge<IMainSaveBeforeQuitApi>

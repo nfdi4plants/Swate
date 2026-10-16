@@ -115,16 +115,18 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         let! opened = factory.Open binding context
 
         let initializeSettings (outcome: OperationOutcome<WorkspaceSession>) = async {
+            let sessionDefaults = runtime.SessionDefaults()
+
             let hosted = {
                 SessionId = Guid.NewGuid().ToString()
                 Binding = binding
                 Session = outcome.Value
-                Settings = VersionControlSettings.defaults
-                UploadRightAway = true
+                Settings = sessionDefaults.InitialSettings
+                UploadRightAway = sessionDefaults.InitialUploadRightAway
             }
 
-            // The app owns these values. Every session starts from the defaults.
-            // Provider repository keys only mirror them.
+            // The app owns these values. Every session starts from the user defaults, or from the
+            // built-in ones when the user has none. Provider repository keys only mirror them.
             match hosted.Session.StoragePolicy with
             | Some policy ->
                 // A provider that throws here must not lose the session it just opened,
@@ -219,7 +221,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     member _.GetSettings(workspaceRoot: string) : VersionControlSettings =
         tryFindSession workspaceRoot
         |> Option.map (fun hosted -> hosted.Settings)
-        |> Option.defaultValue VersionControlSettings.defaults
+        |> Option.defaultWith (fun () -> runtime.SessionDefaults().InitialSettings)
 
     member _.SetSettings
         (workspaceRoot: string, settings: VersionControlSettings, context: OperationContext)

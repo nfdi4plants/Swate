@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+- The settings page has a "Git defaults" section where you choose the git sidebar settings that every ARC opened afterwards starts with, and Swate keeps them across restarts and updates. #1424 (by @caroott)
+
 ## 2.6.1 - 2026-10-16
 
 ### 🔄 Changed

@@ -60,6 +60,7 @@ else
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.TemplateApi.api
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.ValidationPackageApi.api
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.UiSettingsApi.api
+            Remoting.createIpc () |> Remoting.fromValue Main.IPC.UserDefaultsApi.api
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.IAppVersionApi.api
 
             app.onActivate (fun _ ->
