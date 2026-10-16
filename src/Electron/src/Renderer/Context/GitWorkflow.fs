@@ -4583,6 +4583,14 @@ let private missingRepositoryModel (model: GitState) = {
         RepositoryAvailability = GitRepositoryAvailability.MissingRepository
 }
 
+/// Opening the Git tab refreshes silently. For an ARC without a repository that refresh fails
+/// every time, and clearing the page then would close whatever page the main area shows. The
+/// page is cleared only when the model learns about the missing repository.
+let private clearPageOnFirstMissingCmd (setPageState: PageState option -> unit) (model: GitState) =
+    match model.RepositoryAvailability with
+    | GitRepositoryAvailability.MissingRepository -> Cmd.none
+    | GitRepositoryAvailability.Ready -> applyPageChangeCmd setPageState GitPageChange.Clear
+
 let private clearBusy (model: GitState) = {
     model with
         BusyOperation = None
@@ -4711,6 +4719,13 @@ let private updateCore
     match msg with
     | ResetWorkflow -> resetFor model, Cmd.none
     | DiffPageMsg diffMsg -> GitDiffPageLoader.update deps diffMsg model
+    // A silent refresh has no notice text. Progress from another source, such as the text diff
+    // scan, would otherwise show the progress banner that the silent refresh avoids.
+    | SetCurrentProgress(Some _) when
+        model.BusyOperation = Some GitBusyOperation.Refreshing
+        && model.BusyNotice.IsNone
+        ->
+        model, Cmd.none
     | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
@@ -4936,7 +4951,7 @@ let private updateCore
             reportErrorCmd deps "Could not refresh Git state" message
         ]
     | RefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.exists isMissingRepository ->
-        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
+        missingRepositoryModel model, clearPageOnFirstMissingCmd setPageState model
     | RefreshCompleted(_, Ok refreshResult) ->
         let nextModel = model |> applyRefreshResult refreshResult |> clearBusy
 
@@ -4964,7 +4979,7 @@ let private updateCore
         },
         Cmd.none
     | SilentRefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.exists isMissingRepository ->
-        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
+        missingRepositoryModel model, clearPageOnFirstMissingCmd setPageState model
     | SilentRefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.isSome ->
         {
             clearBusy model with

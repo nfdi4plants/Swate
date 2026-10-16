@@ -1562,6 +1562,56 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Opening the sidebar of an ARC already known to have no repository leaves the page alone",
+            fun () -> promise {
+                let setPages = ResizeArray<PageState option>()
+
+                let missing =
+                    makeFailure
+                        NotFound
+                        VersionControlCodes.WorkspaceUnmanaged
+                        "The selected ARC path is not a git repository."
+                        None
+                        [||]
+
+                let refreshResult = {
+                    Session = Ok sessionInfo
+                    Status = Error missing
+                    Refs = Error missing
+                    LfsSettings = Error missing
+                    OriginRemoteRepositoryWebUrl = None
+                }
+
+                let state = {
+                    runningState with
+                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
+                }
+
+                let openedState, openCmd =
+                    update defaultDependencies setPages.Add (SidebarVisibilityChanged true) state
+
+                let! openMessages = collectMessages openCmd
+
+                let requestingState, _ =
+                    update defaultDependencies setPages.Add RefreshRequestedSilently openedState
+
+                let nextState, nextCmd =
+                    update
+                        defaultDependencies
+                        setPages.Add
+                        (SilentRefreshCompleted(requestingState.RefreshRequestId, Ok refreshResult))
+                        requestingState
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(openMessages).toEqual ([| RefreshRequestedSilently |])
+                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.MissingRepository)
+                Vitest.expect(setPages |> Seq.toArray).toEqual ([||])
+                Vitest.expect(nextMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "SelectChangeCompleted leaves the current selection untouched when an older request finishes late",
             fun () -> promise {
                 let mutable replyResult = None
@@ -3069,6 +3119,27 @@ Vitest.describe (
 
                 Vitest.expect(nextState.CurrentProgress).toEqual (None)
                 Vitest.expect(currentRunStatus nextState).toEqual (None)
+                Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "SetCurrentProgress shows no progress during a silent refresh",
+            fun () -> promise {
+                let silentState, _ =
+                    update defaultDependencies ignore RefreshRequestedSilently runningState
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(sidebarProgress "Receiving objects" 72.)))
+                        silentState
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.CurrentProgress).toEqual (None)
+                Vitest.expect(currentRunStatus nextState).toEqual (Some GitSidebarRunStatus.BusyWithoutNotice)
                 Vitest.expect(messages).toEqual ([||])
             }
         )
