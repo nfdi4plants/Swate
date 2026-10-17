@@ -1,4 +1,4 @@
-module Swate.Components.Primitive.Select.Context
+module ARCitISA.Components.Primitive.Select.Context
 
 open Feliz
 

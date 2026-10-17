@@ -3,8 +3,8 @@ module Renderer.Components.MainContent.PDFViewer
 open Feliz
 open Fable.Core.JsInterop
 open Fable.Core
-open Swate.Components.Primitive
-open Swate.Components.Primitive.LoadingSpinner
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.LoadingSpinner
 
 module private PDFData =
 

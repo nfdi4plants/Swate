@@ -3,8 +3,8 @@ module ElectronRenderer.NoteSearchInteropTests
 open System
 open ARCtrl
 open ARCtrl.Json
-open Swate.Components.Composite.Notes.Types
-open Swate.Electron.Shared.DTOs.NoteSearchDto
+open ARCitISA.Components.Composite.Notes.Types
+open ARCitISA.Electron.Shared.DTOs.NoteSearchDto
 open Vitest
 
 let private buildNoteDto (tags: string[] option) : NoteSearchDto = {
@@ -41,7 +41,7 @@ Vitest.describe (
                 let dto =
                     buildNoteDto (
                         Some [|
-                            OntologyAnnotation.create (name = "Planning", tsr = "SWATE", tan = "SWATE:0001")
+                            OntologyAnnotation.create (name = "Planning", tsr = "ARCITISA", tan = "ARCITISA:0001")
                             |> serializeTag
                             OntologyAnnotation.create (name = "Execution", tsr = "MS", tan = "MS:1000121")
                             |> serializeTag
@@ -53,7 +53,7 @@ Vitest.describe (
                 match note.Tags with
                 | Some tags ->
                     Vitest.expect(tags.Count).toBe (2)
-                    expectTag tags.[0] "Planning" (Some "SWATE") (Some "SWATE:0001")
+                    expectTag tags.[0] "Planning" (Some "ARCITISA") (Some "ARCITISA:0001")
                     expectTag tags.[1] "Execution" (Some "MS") (Some "MS:1000121")
                 | None -> failwith "Expected note tags to be present."
         )
@@ -123,8 +123,8 @@ Vitest.describe (
                     Tags =
                         Some(
                             ResizeArray [
-                                OntologyAnnotation.create (name = "Planning", tsr = "SWATE", tan = "SWATE:0001")
-                                OntologyAnnotation.create (name = "Review", tsr = "SWATE", tan = "SWATE:0002")
+                                OntologyAnnotation.create (name = "Planning", tsr = "ARCITISA", tan = "ARCITISA:0001")
+                                OntologyAnnotation.create (name = "Review", tsr = "ARCITISA", tan = "ARCITISA:0002")
                             ]
                         )
                     Content = "Body"
@@ -155,8 +155,8 @@ Vitest.describe (
                 match roundTripped.Tags with
                 | Some tags ->
                     Vitest.expect(tags.Count).toBe (2)
-                    expectTag tags.[0] "Planning" (Some "SWATE") (Some "SWATE:0001")
-                    expectTag tags.[1] "Review" (Some "SWATE") (Some "SWATE:0002")
+                    expectTag tags.[0] "Planning" (Some "ARCITISA") (Some "ARCITISA:0001")
+                    expectTag tags.[1] "Review" (Some "ARCITISA") (Some "ARCITISA:0002")
                 | None -> failwith "Expected note tags to be present."
         )
 )

@@ -1,6 +1,6 @@
-module Swate.Components.Shared.ProvenanceGrouping.Edit
+module ARCitISA.Components.Shared.ProvenanceGrouping.Edit
 
-open Swate.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
 
 [<RequireQualifiedAccess>]
 type EditError =

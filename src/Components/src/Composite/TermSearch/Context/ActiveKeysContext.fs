@@ -1,9 +1,9 @@
 [<AutoOpenAttribute>]
-module Swate.Components.Composite.TermSearch.Context.ActiveKeysContext
+module ARCitISA.Components.Composite.TermSearch.Context.ActiveKeysContext
 
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.TermSearch
+open ARCitISA.Components
+open ARCitISA.Components.Composite.TermSearch
 
 type TermSearchActiveKeysContext = {|
     disableDefault: bool

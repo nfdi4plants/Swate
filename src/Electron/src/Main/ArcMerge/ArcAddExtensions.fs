@@ -4,7 +4,7 @@ open ARCtrl
 open ARCtrl.Contract
 open CrossAsync
 open Main.ARCtrlExtensions
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 [<AutoOpen>]
 module ArcAddExtensions =

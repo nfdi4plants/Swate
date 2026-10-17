@@ -1,4 +1,4 @@
-namespace Swate.Components.Page.Landing
+namespace ARCitISA.Components.Page.Landing
 
 open System
 open System.Text.RegularExpressions

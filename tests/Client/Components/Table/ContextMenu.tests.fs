@@ -3,21 +3,21 @@ module Components.Tests.Table.ContextMenu
 open Fable.Mocha
 open Fable.Core
 open ARCtrl
-open Swate.Components
-open Swate.Components.Composite.AnnotationTable.Types
-open global.Swate.Components.Composite.AnnotationTable
-open global.Swate.Components.Composite.AnnotationTable.Types.AnnotationTableContextMenu
-open global.Swate.Components.Composite.DataMapTable.Types
-open global.Swate.Components.Composite.DataMapTable.ClipboardTarget
-open global.Swate.Components.Composite.Table
-open global.Swate.Components.Composite.Table.Types
-open global.Swate.Components.Primitive.ContextMenu.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.AnnotationTable.Types
+open global.ARCitISA.Components.Composite.AnnotationTable
+open global.ARCitISA.Components.Composite.AnnotationTable.Types.AnnotationTableContextMenu
+open global.ARCitISA.Components.Composite.DataMapTable.Types
+open global.ARCitISA.Components.Composite.DataMapTable.ClipboardTarget
+open global.ARCitISA.Components.Composite.Table
+open global.ARCitISA.Components.Composite.Table.Types
+open global.ARCitISA.Components.Primitive.ContextMenu.Types
 open Browser.Types
 
 [<Emit("Object.defineProperty($0, 'clipboard', { configurable: true, value: $1 })")>]
 let private setNavigatorClipboard
-    (navigator: Swate.Components.Navigator)
-    (clipboard: Swate.Components.Clipboard)
+    (navigator: ARCitISA.Components.Navigator)
+    (clipboard: ARCitISA.Components.Clipboard)
     : unit =
     jsNative
 
@@ -268,10 +268,10 @@ type TestCases =
             DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt#row=2") ])
 
         let copiedText =
-            Swate.Components.ClipboardContract.Contract.Capture.matrix
+            ARCitISA.Components.ClipboardContract.Contract.Capture.matrix
                 (fun coordinate -> dataMap.GetCell(coordinate.x - 1, coordinate.y - 1))
                 [ {| x = 1; y = 1 |} ]
-            |> Swate.Components.ClipboardContract.Contract.Capture.toPlainText
+            |> ARCitISA.Components.ClipboardContract.Contract.Capture.toPlainText
 
         Expect.equal copiedText "DatamapTesting.txt#row=2" "Copied DataMap data should include its selector."
 
@@ -279,10 +279,10 @@ type TestCases =
             DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt") ])
 
         let copiedTextWithoutSelector =
-            Swate.Components.ClipboardContract.Contract.Capture.matrix
+            ARCitISA.Components.ClipboardContract.Contract.Capture.matrix
                 (fun coordinate -> dataMapWithoutSelector.GetCell(coordinate.x - 1, coordinate.y - 1))
                 [ {| x = 1; y = 1 |} ]
-            |> Swate.Components.ClipboardContract.Contract.Capture.toPlainText
+            |> ARCitISA.Components.ClipboardContract.Contract.Capture.toPlainText
 
         Expect.equal
             copiedTextWithoutSelector
@@ -301,10 +301,10 @@ type TestCases =
             )
 
         let copiedText =
-            Swate.Components.ClipboardContract.Contract.Capture.matrix
+            ARCitISA.Components.ClipboardContract.Contract.Capture.matrix
                 (fun coordinate -> source.GetCell(coordinate.x - 1, coordinate.y - 1))
                 [ {| x = 5; y = 1 |}; {| x = 6; y = 1 |} ]
-            |> Swate.Components.ClipboardContract.Contract.Capture.toPlainText
+            |> ARCitISA.Components.ClipboardContract.Contract.Capture.toPlainText
 
         Expect.equal copiedText "explicit\tmetre" "Each selected DataMap cell should occupy one clipboard column."
 
@@ -480,7 +480,7 @@ type TestCases =
         Expect.equal tableValues dataMapValues "AnnotationTable should preserve the same empty-row geometry."
 
     static member PlainTextParserIgnoresTerminalSeparators() =
-        let parse = Swate.Components.ClipboardContract.Contract.PlainText.parseRows
+        let parse = ARCitISA.Components.ClipboardContract.Contract.PlainText.parseRows
         Expect.equal (parse "A\n") [| [| "A" |] |] "A terminal newline should terminate, not add, a row."
         Expect.equal (parse "A\n\nB") [| [| "A" |]; [| "" |]; [| "B" |] |] "An internal empty row should be retained."
 
@@ -607,8 +607,8 @@ type TestCases =
     static member private ClipboardItem(plainText: string, cells: CompositeCell[][]) =
         let payload =
             cells
-            |> Swate.Components.ClipboardCodec.createPayload
-            |> Swate.Components.ClipboardCodec.encode
+            |> ARCitISA.Components.ClipboardCodec.createPayload
+            |> ARCitISA.Components.ClipboardCodec.encode
 
         let blob text =
             { new ClipboardBlob with
@@ -616,11 +616,14 @@ type TestCases =
             }
 
         { new ClipboardItem with
-            member _.types = [| Swate.Components.ClipboardCodec.MimeType; "text/plain" |]
+            member _.types = [|
+                ARCitISA.Components.ClipboardCodec.MimeType
+                "text/plain"
+            |]
 
             member _.getType mimeType = promise {
                 return
-                    if mimeType = Swate.Components.ClipboardCodec.MimeType then
+                    if mimeType = ARCitISA.Components.ClipboardCodec.MimeType then
                         blob payload
                     else
                         blob plainText
@@ -708,17 +711,17 @@ type TestCases =
             setNavigatorClipboard GlobalBindings.navigator clipboardMock
 
             do!
-                Swate.Components.ClipboardCodec.write "plain" (Some [| [| CompositeCell.FreeText "plain" |] |])
+                ARCitISA.Components.ClipboardCodec.write "plain" (Some [| [| CompositeCell.FreeText "plain" |] |])
                 |> Async.AwaitPromise
 
             Expect.equal attempts.Count 2 "Writing should retry after custom MIME writing fails."
 
             Expect.isTrue
-                (attempts.[0] |> Array.contains Swate.Components.ClipboardCodec.MimeType)
+                (attempts.[0] |> Array.contains ARCitISA.Components.ClipboardCodec.MimeType)
                 "The first write should contain the typed payload."
 
             Expect.isFalse
-                (attempts.[1] |> Array.contains Swate.Components.ClipboardCodec.MimeType)
+                (attempts.[1] |> Array.contains ARCitISA.Components.ClipboardCodec.MimeType)
                 "The HTML fallback should omit the unsupported custom MIME type."
 
             Expect.isTrue (attempts.[1] |> Array.contains "text/html") "The second write should retain HTML content."
@@ -737,7 +740,7 @@ type TestCases =
             setNavigatorClipboard GlobalBindings.navigator plainTextClipboardMock
 
             do!
-                Swate.Components.ClipboardCodec.write "plain" (Some [| [| CompositeCell.FreeText "plain" |] |])
+                ARCitISA.Components.ClipboardCodec.write "plain" (Some [| [| CompositeCell.FreeText "plain" |] |])
                 |> Async.AwaitPromise
 
             Expect.equal finalPlainText (Some "plain") "Failed typed and HTML writes should fall back to plain text."
@@ -758,34 +761,34 @@ type TestCases =
 
         let decoded =
             cells
-            |> Swate.Components.ClipboardCodec.createPayload
-            |> Swate.Components.ClipboardCodec.encode
-            |> Swate.Components.ClipboardCodec.tryDecode
+            |> ARCitISA.Components.ClipboardCodec.createPayload
+            |> ARCitISA.Components.ClipboardCodec.encode
+            |> ARCitISA.Components.ClipboardCodec.tryDecode
             |> Option.get
 
         let actual =
             decoded.Rows
-            |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
+            |> Array.map (Array.map (ARCitISA.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
 
         let expected = cells |> Array.map (Array.map _.ToTabStr())
         Expect.equal actual expected "The typed clipboard codec should round-trip every composite cell kind."
 
         Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecode """{"Version":1,"Rows":[[null]]}""")
+            (ARCitISA.Components.ClipboardCodec.tryDecode """{"Version":1,"Rows":[[null]]}""")
             "A payload containing a null cell should be rejected."
 
         Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecode
+            (ARCitISA.Components.ClipboardCodec.tryDecode
                 """{"Version":1,"Rows":[[{"Kind":"term","Name":"incomplete"}]]}""")
             "A payload with missing cell fields should be rejected."
 
         Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecode
+            (ARCitISA.Components.ClipboardCodec.tryDecode
                 """{"Version":1,"Rows":[[{"Kind":"unknown","Value":"","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
             "A payload with an unknown cell kind should be rejected."
 
         Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecode
+            (ARCitISA.Components.ClipboardCodec.tryDecode
                 """{"Version":1,"Rows":[[{"Kind":"freetext","Value":"A","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}],[],[{"Kind":"freetext","Value":"B","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
             "A payload containing an empty row should be rejected."
 
@@ -816,8 +819,8 @@ type TestCases =
         assay.DataMap <- Some(DataMap(ResizeArray [ DataContext(label = "asdhjasklhd") ]))
 
         let refreshed =
-            Swate.Components.Shared.ARCtrlHelper.ArcFiles.refreshRef (
-                Swate.Components.Shared.ARCtrlHelper.ArcFiles.Assay assay
+            ARCitISA.Components.Shared.ARCtrlHelper.ArcFiles.refreshRef (
+                ARCitISA.Components.Shared.ARCtrlHelper.ArcFiles.Assay assay
             )
 
         let label = refreshed.TryGetDataMap().Value.DataContexts.[0].Label
@@ -845,7 +848,7 @@ type TestCases =
                 ]
             )
 
-        Swate.Components.Composite.Table.Helper.fillColumn
+        ARCitISA.Components.Composite.Table.Helper.fillColumn
             dataMap.RowCount
             {| x = 1; y = 1 |}
             (fun coordinate -> dataMap.GetCell(coordinate.x - 1, coordinate.y - 1))
@@ -875,7 +878,7 @@ type TestCases =
         Expect.equal dataMap.DataContexts.[1].FilePath None "Clear Column should clear the second row."
 
         ([ {| x = 1; y = 1 |} ]: CellCoordinate list)
-        |> Swate.Components.Composite.Table.Helper.selectedRowIndices dataMap.RowCount
+        |> ARCitISA.Components.Composite.Table.Helper.selectedRowIndices dataMap.RowCount
         |> Array.iter dataMap.DataContexts.RemoveAt
 
         Expect.equal dataMap.DataContexts.Count 1 "Only the unselected row should remain."
@@ -911,7 +914,7 @@ type TestCases =
 
     static member ClipboardCaptureAndMappingPreserveGeometry() =
         let source =
-            Swate.Components.ClipboardContract.Contract.Capture.matrix
+            ARCitISA.Components.ClipboardContract.Contract.Capture.matrix
                 (fun coordinate -> CompositeCell.FreeText $"{coordinate.x},{coordinate.y}")
                 [
                     {| x = 2; y = 2 |}
@@ -937,7 +940,7 @@ type TestCases =
         |]
 
         let mapped =
-            Swate.Components.ClipboardContract.Contract.Mapping.map source anchor selection
+            ARCitISA.Components.ClipboardContract.Contract.Mapping.map source anchor selection
 
         Expect.equal
             (mapped |> Array.map (fun item -> item.Target, item.Source.ToString()))
@@ -961,7 +964,7 @@ type TestCases =
         let bottomRightAnchor: CellCoordinate = {| x = 4; y = 5 |}
 
         let mappedFromBottomRight =
-            Swate.Components.ClipboardContract.Contract.Mapping.map source bottomRightAnchor twoByTwoSelection
+            ARCitISA.Components.ClipboardContract.Contract.Mapping.map source bottomRightAnchor twoByTwoSelection
 
         Expect.equal
             (mappedFromBottomRight |> Array.map (fun item -> item.Source.ToString()))
@@ -1024,7 +1027,7 @@ type TestCases =
 
     static member ClipboardRejectsMalformedFieldTypes() =
         Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecode
+            (ARCitISA.Components.ClipboardCodec.tryDecode
                 """{"Version":1,"Rows":[[{"Kind":"freetext","Value":42,"Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
             "Structured DTO fields with non-string runtime values must be rejected."
 

@@ -4,8 +4,8 @@ open Browser.Dom
 open Fable.Core
 open Feliz
 open Renderer.Context.LfsActivityContext
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 open Vitest
 
 let rec private waitUntil (predicate: unit -> bool, attempts: int) = promise {

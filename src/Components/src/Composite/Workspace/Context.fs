@@ -1,9 +1,9 @@
-module Swate.Components.Composite.Workspace.Context
+module ARCitISA.Components.Composite.Workspace.Context
 
 open Fable.Core
 open Feliz
-open Swate.Components.Composite.Workspace.Types
-open Swate.Components.JsBindings
+open ARCitISA.Components.Composite.Workspace.Types
+open ARCitISA.Components.JsBindings
 
 // -- DnD context --
 

@@ -1,7 +1,7 @@
 namespace Components
 
 open Feliz
-open Swate.Components
+open ARCitISA.Components
 
 type BaseDropdown =
     [<ReactComponent>]

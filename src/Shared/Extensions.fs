@@ -1,4 +1,4 @@
-namespace Swate.Components.Shared
+namespace ARCitISA.Components.Shared
 
 [<AutoOpen>]
 module Extensions =

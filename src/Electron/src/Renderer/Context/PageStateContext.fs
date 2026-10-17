@@ -2,7 +2,7 @@ module Renderer.Context.PageStateContext
 
 open Feliz
 open Renderer.Types
-open Swate.Components
+open ARCitISA.Components
 
 let PageStateCtx =
     React.createContext<StateContext<PageState option>> ({ state = None; setState = ignore })

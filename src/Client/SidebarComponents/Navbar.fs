@@ -7,12 +7,12 @@ open Feliz
 
 open Components
 open ARCtrl
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open Components.Metadata
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Primitive.LoadingSpinner
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Primitive.LoadingSpinner
 
 type public NavbarState = {
     BurgerActive: bool
@@ -266,7 +266,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             )
         )
         match model.PersistentStorageState.Host with
-        | Some Swatehost.Excel ->
+        | Some ARCitISAhost.Excel ->
             Buttons.QuickAccessButton(
                 Icons.AutoformatTable(),
                 "Autoformat Table",
@@ -322,7 +322,7 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
             SelectModalDialog toggleMetdadataModal model dispatch
         Components.Logo.Main()
         match model.PersistentStorageState.Host with
-        | Some Swatehost.Excel ->
+        | Some ARCitISAhost.Excel ->
             Html.div [
                 prop.className "swt:navbar swt:flex swt:gap-4"
                 prop.children [ QuickAccessList toggleMetdadataModal model dispatch ]

@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Electron.Main
 open Main
 open Main.Bindings.Abort
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
 
 type ActiveFileImport = {
     State: ActiveFileImportState

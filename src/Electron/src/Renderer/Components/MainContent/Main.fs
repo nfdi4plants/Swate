@@ -2,7 +2,7 @@ module Renderer.Components.MainContent.Main
 
 open Feliz
 open Renderer.Types
-open Swate.Electron.Shared
+open ARCitISA.Electron.Shared
 open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
@@ -27,7 +27,7 @@ module private MainHelper =
     let loadTemplates () =
         promise {
             // let! json =
-            //     Swate.Components.Api.SwateApi.SwateTemplateApi.getTemplates ()
+            //     ARCitISA.Components.Api.ARCitISAApi.ARCitISATemplateApi.getTemplates ()
             //     |> Async.StartAsPromise
             // return Ok(ARCtrl.Json.Templates.fromJsonString json)
 
@@ -46,14 +46,14 @@ module private MainHelper =
 
 module private LazyComponents =
 
-    open Swate.Components.Primitive
+    open ARCitISA.Components.Primitive
 
     [<ReactComponent>]
     let FullPageLoadingSpinner (text: string) =
         Html.div [
             prop.className "swt:flex-1 swt:flex swt:min-w-0 swt:min-h-0 swt:grow swt:justify-center swt:items-center"
             prop.children [
-                Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
+                ARCitISA.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
                     size = DaisyuiSize.XL,
                     color = DaisyuiColors.Primary,
                     text = text
@@ -85,7 +85,7 @@ module private LazyComponents =
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
 
-    Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
+    ARCitISA.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
         loadTemplates = MainHelper.loadTemplates,
         children =
             Html.div [

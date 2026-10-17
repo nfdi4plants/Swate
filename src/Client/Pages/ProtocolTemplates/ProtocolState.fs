@@ -7,7 +7,7 @@ open Messages.Protocol
 
 module ProtocolState =
 
-    open Swate.Components.Shared
+    open ARCitISA.Components.Shared
     open Fable.Core
 
     let update

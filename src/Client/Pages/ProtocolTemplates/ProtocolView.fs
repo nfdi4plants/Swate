@@ -4,10 +4,10 @@ open Model
 
 open Feliz
 open ARCtrl
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Primitive.LoadingSpinner
-open Swate.Components.Composite.Template
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Primitive.LoadingSpinner
+open ARCitISA.Components.Composite.Template
 
 module private TemplatesAux =
 

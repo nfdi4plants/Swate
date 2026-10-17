@@ -1,6 +1,6 @@
-module Swate.Components.Shared.ProvenanceGrouping.Grouping
+module ARCitISA.Components.Shared.ProvenanceGrouping.Grouping
 
-open Swate.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
 
 type GroupingKey = ProvenancePropertyKey
 

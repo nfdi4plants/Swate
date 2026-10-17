@@ -8,8 +8,8 @@ open Main.FileImportAuthorization
 open Main.IPC.FileSystemIO
 open Main.IPC.Rename
 open Main.ARCtrlExtensions
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 open ARCtrl
 open Vitest
 
@@ -18,7 +18,7 @@ let private pathExistsAsync = TestHelpers.pathExistsAsync
 let private testWindow = TestHelpers.testWindow
 
 let private withTempArc =
-    TestHelpers.withTempArcWith "swate-ipc-rename-sync-" "RenameSyncArc"
+    TestHelpers.withTempArcWith "arcitisa-ipc-rename-sync-" "RenameSyncArc"
 
 let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEvent = {
     EventName = eventName

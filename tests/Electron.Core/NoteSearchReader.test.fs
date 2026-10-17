@@ -3,7 +3,7 @@ module ElectronCore.NoteSearchReaderTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.NoteSearchReader
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.FileIOTypes
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -17,12 +17,12 @@ date: 2026-04-27T00:00:00.0000000
 tags:
   -
     annotationValue: Planning
-    termSource: SWATE
-    termAccession: SWATE:0001
+    termSource: arcitisa
+    termAccession: arcitisa:0001
   -
     annotationValue: Review
-    termSource: SWATE
-    termAccession: SWATE:0002
+    termSource: arcitisa
+    termAccession: arcitisa:0002
 ---
 
 Body line 1
@@ -59,7 +59,7 @@ Vitest.describe (
                 let tmpDir = osDynamic?tmpdir () |> unbox<string>
 
                 let! repoRoot =
-                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-"))
+                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "arcitisa-notes-"))
                     |> unbox<JS.Promise<string>>
 
                 let notesDir =
@@ -90,8 +90,8 @@ Vitest.describe (
                 | Some tags ->
                     Vitest.expect(tags.Count).toBe (2)
                     Vitest.expect(tags.[0].Name).toEqual (Some "Planning")
-                    Vitest.expect(tags.[0].TermSourceREF).toEqual (Some "SWATE")
-                    Vitest.expect(tags.[0].TermAccessionNumber).toEqual (Some "SWATE:0001")
+                    Vitest.expect(tags.[0].TermSourceREF).toEqual (Some "arcitisa")
+                    Vitest.expect(tags.[0].TermAccessionNumber).toEqual (Some "arcitisa:0001")
                 | None -> failwith "Expected tags from YAML frontmatter."
             }
         )
@@ -102,7 +102,7 @@ Vitest.describe (
                 let tmpDir = osDynamic?tmpdir () |> unbox<string>
 
                 let! repoRoot =
-                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-"))
+                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "arcitisa-notes-"))
                     |> unbox<JS.Promise<string>>
 
                 let notesDir =
@@ -131,7 +131,7 @@ Vitest.describe (
                 let tmpDir = osDynamic?tmpdir () |> unbox<string>
 
                 let! repoRoot =
-                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-"))
+                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "arcitisa-notes-"))
                     |> unbox<JS.Promise<string>>
 
                 let notesDir =

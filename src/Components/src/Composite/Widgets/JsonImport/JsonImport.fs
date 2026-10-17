@@ -1,12 +1,12 @@
-namespace Swate.Components.Composite.Widgets.JsonImport
+namespace ARCitISA.Components.Composite.Widgets.JsonImport
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Browser.Types
-open Swate.Components.Composite.Widgets
-open Swate.Components.Composite.Widgets.JsonImport.Types
-open Swate.Components.Shared
+open ARCitISA.Components.Composite.Widgets
+open ARCitISA.Components.Composite.Widgets.JsonImport.Types
+open ARCitISA.Components.Shared
 open ARCtrl
 
 module private JsonImportWidgetHelper =

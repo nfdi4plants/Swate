@@ -1,4 +1,4 @@
-module Swate.Components.Page.Metadata.FormComponents.PersonsInput.Types
+module ARCitISA.Components.Page.Metadata.FormComponents.PersonsInput.Types
 
 open Fable.Core
 

@@ -12,11 +12,11 @@ open Main.ArcVaultTypes
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.Notes.NoteConstants
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.IPCTypesHelper
 open Vitest
 
 module FileImportCoordinator = Main.FileImportCoordinator
@@ -44,7 +44,7 @@ let private ipcEventWithSenderId senderId : IpcMainInvokeEvent =
     |> unbox<IpcMainInvokeEvent>
 
 let private withTempArc =
-    TestHelpers.withTempArcWith "swate-watcher-merge-validation-" "WatcherMergeValidationArc"
+    TestHelpers.withTempArcWith "arcitisa-watcher-merge-validation-" "WatcherMergeValidationArc"
 
 let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEvent = {
     EventName = eventName
@@ -774,7 +774,7 @@ Vitest.describe (
                         let persistedArc = ARC("WatcherMergeValidationArc")
                         persistedArc.AddAssay(ArcAssay("A1"))
 
-                        match! persistedArc.TryWriteAsyncSwate arcPath with
+                        match! persistedArc.TryWriteAsyncARCitISA arcPath with
                         | Error _ -> return failwith "Could not recreate the canonical A1 file."
                         | Ok _ -> ()
 
@@ -826,7 +826,7 @@ Vitest.describe (
         Vitest.test (
             "normalizeAgainstDisk keeps directory deletes and drops missing-file changes",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-watcher-normalize-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-watcher-normalize-"
 
                 try
                     let existingDirectory = join [| rootPath; "existing-directory" |]
@@ -873,7 +873,7 @@ Vitest.describe (
         Vitest.test (
             "normalizeAgainstDisk keeps case-only rename unlinks",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-watcher-case-rename-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-watcher-case-rename-"
 
                 try
                     let oldFilePath = join [| rootPath; "sample_metadata_neg.csv" |]
@@ -1599,7 +1599,7 @@ Vitest.describe (
         Vitest.test (
             "OpenOrFocusArc rejects an invalid target before creating a window for an occupied caller",
             fun () -> promise {
-                let! invalidTargetPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-occupied-"
+                let! invalidTargetPath = TestHelpers.createTempDirectoryAsync "arcitisa-open-invalid-occupied-"
                 let callingWindowId = 42
                 let targetWindowId = 43
                 let existingArcPath = "C:/already-open-validation-guard"
@@ -1656,7 +1656,7 @@ Vitest.describe (
             "concurrent OpenOrFocusArc requests create exactly one owner for the same ARC",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-concurrent-"
+                    "arcitisa-open-concurrent-"
                     "Concurrent Open ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -1730,7 +1730,7 @@ Vitest.describe (
             "concurrent OpenOrFocusArc requests use one new-window owner for an occupied caller",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-concurrent-window-"
+                    "arcitisa-open-concurrent-window-"
                     "Concurrent Window ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -1809,7 +1809,7 @@ Vitest.describe (
         Vitest.test (
             "concurrent CreateOrFocusArc requests write once and use one new-window owner",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-concurrent-window-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-concurrent-window-"
                 let callingWindowId = 52
                 let targetWindowId = 53
                 let identifier = "Concurrent Created ARC"
@@ -1888,7 +1888,7 @@ Vitest.describe (
             "OpenOrFocusArc does not publish renderer state when the initial file-tree scan fails",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-tree-transaction-current-"
+                    "arcitisa-open-tree-transaction-current-"
                     "Open Tree Transaction"
                     ignore
                     (fun arcPath -> promise {
@@ -1939,7 +1939,7 @@ Vitest.describe (
         Vitest.test (
             "CreateOrFocusArc keeps the written ARC but does not publish renderer state when the initial tree fails",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-tree-transaction-current-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-tree-transaction-current-"
                 let arcPath = join [| rootPath; "created-arc" |] |> PathHelpers.normalizePath
                 let movedPath = arcPath + "-during-tree-scan"
                 let mutable movedForTreeFailure = false
@@ -1995,7 +1995,7 @@ Vitest.describe (
             "new-window open preserves the initial file-tree error and cleans up without late IPC",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-tree-transaction-window-"
+                    "arcitisa-open-tree-transaction-window-"
                     "Open Tree Window Transaction"
                     ignore
                     (fun arcPath -> promise {
@@ -2046,7 +2046,7 @@ Vitest.describe (
         Vitest.test (
             "new-window create keeps the written ARC and cleans up without late IPC when the initial tree fails",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-tree-transaction-window-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-tree-transaction-window-"
                 let arcPath = join [| rootPath; "created-window-arc" |] |> PathHelpers.normalizePath
                 let movedPath = arcPath + "-during-tree-scan"
                 let mutable movedForTreeFailure = false
@@ -2102,7 +2102,7 @@ Vitest.describe (
             "successful initialization publishes the path once after ARC and initial tree readiness",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-transaction-commit-"
+                    "arcitisa-open-transaction-commit-"
                     "Finalized Initialization ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2163,7 +2163,7 @@ Vitest.describe (
             "OpenOrFocusArc shows the new renderer before loading an existing ARC",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-or-focus-order-"
+                    "arcitisa-open-or-focus-order-"
                     "Renderer First ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2232,7 +2232,7 @@ Vitest.describe (
             "OpenOrFocusArc cleans up when the target window closes during ARC loading",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-or-focus-close-during-load-"
+                    "arcitisa-open-or-focus-close-during-load-"
                     "Closing ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2303,7 +2303,7 @@ Vitest.describe (
             "OpenOrFocusArc cleans up when renderer loading fails",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-or-focus-renderer-failure-"
+                    "arcitisa-open-or-focus-renderer-failure-"
                     "Renderer Failure ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2359,7 +2359,7 @@ Vitest.describe (
             "openARCByPath treats a destroyed target during pending renderer load as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-open-destroyed-renderer-load-"
+                    "arcitisa-open-destroyed-renderer-load-"
                     "Destroyed During Renderer Load"
                     ignore
                     (fun arcPath -> promise {
@@ -2422,7 +2422,7 @@ Vitest.describe (
             "openARCByPath preserves the open error when the native error dialog throws",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-ipc-dialog-failure-"
+                    "arcitisa-ipc-dialog-failure-"
                     "Dialog Failure ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2479,7 +2479,7 @@ Vitest.describe (
             "openARCByPath treats closing a newly opened window during ARC loading as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-ipc-close-during-load-"
+                    "arcitisa-ipc-close-during-load-"
                     "Closing ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2559,7 +2559,7 @@ Vitest.describe (
             "openARCByPath treats closing a new window after startup but before file-tree publication as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-ipc-close-during-open-tree-"
+                    "arcitisa-ipc-close-during-open-tree-"
                     "Closing During Open Tree Scan"
                     ignore
                     (fun arcPath -> promise {
@@ -2679,7 +2679,7 @@ Vitest.describe (
             "openARCByPath treats closing the current window during ARC loading as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-ipc-current-close-during-load-"
+                    "arcitisa-ipc-current-close-during-load-"
                     "Closing Current ARC"
                     ignore
                     (fun arcPath -> promise {
@@ -2766,7 +2766,7 @@ Vitest.describe (
             "openARCByPath treats closing the current window after startup but before file-tree publication as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-ipc-current-close-during-tree-"
+                    "arcitisa-ipc-current-close-during-tree-"
                     "Closing Current ARC During Tree Scan"
                     ignore
                     (fun arcPath -> promise {
@@ -2859,7 +2859,7 @@ Vitest.describe (
         Vitest.test (
             "openARCByPath rejects an invalid ARC and shows one native error with folder context",
             fun () -> promise {
-                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-ipc-invalid-arc-"
+                let! folderPath = TestHelpers.createTempDirectoryAsync "arcitisa-ipc-invalid-arc-"
                 let windowId = 16
                 let window = (createTestWindow (testWindowOptions windowId)).Window
                 let vault = ArcVault(window)
@@ -3034,7 +3034,7 @@ Vitest.describe (
         Vitest.test (
             "createARC resolves FocusedExisting without creating or writing another ARC",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-focus-existing-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-ipc-create-focus-existing-"
                 let originatingWindowId = 40
                 let existingWindowId = 41
                 let identifier = "Already Open ARC"
@@ -3106,7 +3106,7 @@ Vitest.describe (
         Vitest.test (
             "createARC resolves Created with the normalized path after successful creation",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-success-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-ipc-create-success-"
                 let originatingWindowId = 36
                 let targetWindowId = 37
                 let identifier = "Successful ARC"
@@ -3232,7 +3232,7 @@ Vitest.describe (
         Vitest.test (
             "createARC treats a destroyed target during pending renderer load as pre-write cancellation",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-destroyed-renderer-load-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-destroyed-renderer-load-"
                 let originatingWindowId = 54
                 let targetWindowId = 55
                 let identifier = "Never Written ARC"
@@ -3300,7 +3300,7 @@ Vitest.describe (
         Vitest.test (
             "createARC does not infer creation when a pre-existing ARC remains after renderer-load cancellation",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-existing-load-cancellation-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-existing-load-cancellation-"
                 let originatingWindowId = 56
                 let targetWindowId = 57
                 let identifier = "Existing ARC"
@@ -3374,7 +3374,7 @@ Vitest.describe (
         Vitest.test (
             "createARC resolves CreatedButClosed when the new window closes during post-write loading",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-close-during-load-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-ipc-create-close-during-load-"
                 let originatingWindowId = 38
                 let targetWindowId = 39
                 let identifier = "Created Then Closed ARC"
@@ -3438,7 +3438,7 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                Vitest.vi.stubEnv ("SWATE_TEST_USER_DATA", Some rootPath)
+                Vitest.vi.stubEnv ("arcitisa_TEST_USER_DATA", Some rootPath)
 
                 let versionControlHost =
                     Main.VersionControl.VersionControlRuntime.createProduction
@@ -3514,7 +3514,7 @@ Vitest.describe (
         Vitest.test (
             "createARC resolves CreatedButClosed when the new window closes after startup but before file-tree publication",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-close-during-tree-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-ipc-create-close-during-tree-"
                 let originatingWindowId = 46
                 let targetWindowId = 47
                 let identifier = "Created During Tree Scan ARC"
@@ -3649,7 +3649,7 @@ Vitest.describe (
         Vitest.test (
             "createARC resolves Error when new-window creation fails",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-failure-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-ipc-create-failure-"
                 let originatingWindowId = 23
                 let targetWindowId = 24
                 let identifier = "Creation Failure ARC"
@@ -3677,7 +3677,7 @@ Vitest.describe (
                 let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
-                    let request: Swate.Electron.Shared.IPCTypes.CreateArcRequest = {
+                    let request: ARCitISA.Electron.Shared.IPCTypes.CreateArcRequest = {
                         identifier = identifier
                         initGit = false
                     }
@@ -3714,7 +3714,7 @@ Vitest.describe (
 
                 let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
-                let request: Swate.Electron.Shared.IPCTypes.CreateArcRequest = {
+                let request: ARCitISA.Electron.Shared.IPCTypes.CreateArcRequest = {
                     identifier = "Dialog Failure ARC"
                     initGit = false
                 }
@@ -3728,7 +3728,7 @@ Vitest.describe (
         Vitest.test (
             "RegisterVaultWithNewArc loads and shows the renderer before creating the ARC",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-order-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-registration-create-order-"
                 let arcPath = join [| rootPath; "new-arc" |]
                 let mutable vaultsRef: ArcVaults option = None
                 let mutable vaultWasEmptyWhenShown = false
@@ -3786,7 +3786,7 @@ Vitest.describe (
         Vitest.test (
             "RegisterVaultWithNewArc renderer-load failure does not create an ARC",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-registration-create-"
                 let arcPath = join [| rootPath; "new-arc" |]
                 let mutable initializedVault: ArcVault option = None
                 let mutable vaultsRef: ArcVaults option = None
@@ -3917,7 +3917,7 @@ Vitest.describe (
         Vitest.test (
             "legacy isa_datamap file is migrated to the canonical workbook path",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-legacy-datamap-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-legacy-datamap-"
 
                 try
                     let assayFolder = join [| rootPath; "assays"; "assay_1" |]
@@ -3944,7 +3944,7 @@ Vitest.describe (
         Vitest.test (
             "canonical DataMap workbook wins over a legacy isa_datamap file",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-canonical-datamap-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-canonical-datamap-"
 
                 try
                     let assayFolder = join [| rootPath; "assays"; "assay_1" |]
@@ -3973,7 +3973,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Swate write contracts contain only targeted scaffold and ARC files",
+            "ARCitISA write contracts contain only targeted scaffold and ARC files",
             fun () ->
                 let arc = ARC("TargetedWriteArc")
                 addDataMapToAllEntityTypes arc
@@ -3988,7 +3988,7 @@ Vitest.describe (
                     |]
                 )
 
-                let actualPaths = arc.GetWriteContractsSwate() |> Array.map _.Path |> Array.sort
+                let actualPaths = arc.GetWriteContractsARCitISA() |> Array.map _.Path |> Array.sort
 
                 let expectedPaths =
                     [|
@@ -4015,9 +4015,9 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "TryWriteAsyncSwate writes the default gitignore and notes README into an ARC root",
+            "TryWriteAsyncARCitISA writes the default gitignore and notes README into an ARC root",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-default-gitignore-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-default-gitignore-"
                 let arcPath = join [| rootPath; "arc" |]
                 let gitignorePath = join [| arcPath; ".gitignore" |]
                 let notesReadmePath = join [| arcPath; NotesRootFolderName; NotesReadmeFileName |]
@@ -4027,7 +4027,7 @@ Vitest.describe (
 
                     let arc = ARC("ScaffoldArc")
 
-                    match! arc.TryWriteAsyncSwate(arcPath) with
+                    match! arc.TryWriteAsyncARCitISA(arcPath) with
                     | Error errors -> failwith (String.concat "\n" errors)
                     | Ok _ -> ()
 
@@ -4043,9 +4043,9 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "TryWriteAsyncSwate preserves payload and does not create unmanaged file-tree entries",
+            "TryWriteAsyncARCitISA preserves payload and does not create unmanaged file-tree entries",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-targeted-write-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-targeted-write-"
                 let arcPath = join [| rootPath; "arc" |]
                 let gitFolder = join [| arcPath; ".git" |]
                 let assayFolder = join [| arcPath; "assays"; "Assay 1" |]
@@ -4073,7 +4073,7 @@ Vitest.describe (
                         |]
                     )
 
-                    match! arc.TryWriteAsyncSwate(arcPath) with
+                    match! arc.TryWriteAsyncARCitISA(arcPath) with
                     | Error errors -> failwith (String.concat "\n" errors)
                     | Ok _ -> ()
 
@@ -4104,7 +4104,7 @@ Vitest.describe (
             "ARC vault save preserves note markdown files",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-save-notes-"
+                    "arcitisa-save-notes-"
                     "NotesPreservingArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4146,7 +4146,7 @@ Vitest.describe (
             "ARC loading and writing ignore Git metadata and preserve payload",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-load-arc-ignore-git-"
+                    "arcitisa-load-arc-ignore-git-"
                     "IgnoreGitArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4160,7 +4160,7 @@ Vitest.describe (
                         do! writeTextFileAsync (join [| nestedGitFolder; "config" |]) "nested-git-config"
                         do! writeTextFileAsync payloadPath "payload"
 
-                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let! loadResult = ARC.LoadAsyncARCitISA arcPath
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
                         let paths = loadedArc.FileSystem.Tree.ToFilePaths()
 
@@ -4181,7 +4181,7 @@ Vitest.describe (
             "normal ARC save does not restore deleted DTO-less files from a stale file tree",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-save-deleted-file-"
+                    "arcitisa-save-deleted-file-"
                     "DeletedFileArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4189,7 +4189,7 @@ Vitest.describe (
                         let collectionGitKeepPath = join [| arcPath; "assays"; ".gitkeep" |]
                         do! writeTextFileAsync payloadPath "payload"
 
-                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let! loadResult = ARC.LoadAsyncARCitISA arcPath
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
                         let stalePaths = loadedArc.FileSystem.Tree.ToFilePaths()
 
@@ -4215,7 +4215,7 @@ Vitest.describe (
         Vitest.test (
             "LoadArc reports load errors without crashing the printf formatter",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-load-arc-error-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-load-arc-error-"
 
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
@@ -4246,7 +4246,7 @@ Vitest.describe (
             "RenameOpenArcRoot moves the active ARC folder and updates the vault path",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-rename-arc-root-"
+                    "arcitisa-rename-arc-root-"
                     "RenameRootArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4278,7 +4278,7 @@ Vitest.describe (
             "RenameOpenArcRoot clears pending watcher state before moving the active ARC",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-rename-arc-root-watcher-"
+                    "arcitisa-rename-arc-root-watcher-"
                     "RenameRootWatcherArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4318,7 +4318,7 @@ Vitest.describe (
             "RenameOpenArcRoot rejects destination conflicts without moving the active ARC",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-rename-arc-root-conflict-"
+                    "arcitisa-rename-arc-root-conflict-"
                     "RenameRootConflictArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4348,7 +4348,7 @@ Vitest.describe (
             "RenameOpenArcRoot refuses while a write runs and renames after it ends",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-rename-arc-root-busy-"
+                    "arcitisa-rename-arc-root-busy-"
                     "RenameRootBusyArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4396,7 +4396,7 @@ Vitest.describe (
             "LoadArc repairs zero-byte canonical ARC workbooks before retrying",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-load-arc-repair-"
+                    "arcitisa-load-arc-repair-"
                     "RepairArc"
                     ignore
                     (fun arcPath -> promise {
@@ -4425,7 +4425,7 @@ Vitest.describe (
             "LoadArc baselines loaded datamap hashes without marking the ARC dirty",
             fun () ->
                 TestHelpers.withTempArcWith
-                    "swate-load-arc-datamap-baseline-"
+                    "arcitisa-load-arc-datamap-baseline-"
                     "DatamapBaselineArc"
                     addDataMapToAllEntityTypes
                     (fun arcPath -> promise {
@@ -4453,7 +4453,7 @@ Vitest.describe (
         Vitest.test (
             "CreateARC write failure restores the current empty vault and leaves it reusable",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-write-rollback-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-write-rollback-"
                 let blockedParent = join [| rootPath; "not-a-directory" |]
                 let failedArcPath = join [| blockedParent; "failed-arc" |]
                 let reusableArcPath = join [| rootPath; "reusable-arc" |]
@@ -4489,7 +4489,10 @@ Vitest.describe (
                     Vitest.expect(vault.watcher).toEqual (None)
                     Vitest.expect(vault.fileTree.Count).toBe (0)
                     Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
-                    Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+
+                    Vitest
+                        .expect(vault.window.title)
+                        .toBe (ARCitISA.Electron.Shared.ApplicationVersion.windowTitle None)
 
                     Vitest
                         .expect(
@@ -4527,7 +4530,7 @@ Vitest.describe (
         Vitest.test (
             "CreateARC preserves the write failure when rollback dirty-state notification throws",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-notification-rollback-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-notification-rollback-"
                 let blockedParent = join [| rootPath; "not-a-directory" |]
                 let failedArcPath = join [| blockedParent; "failed-arc" |]
                 let rollbackError = exn "Expected rollback renderer notification failure."
@@ -4582,7 +4585,7 @@ Vitest.describe (
         Vitest.test (
             "CreateARC Startup failure preserves the written ARC while restoring the empty vault",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-startup-rollback-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "arcitisa-create-startup-rollback-"
                 let arcPath = join [| rootPath; "written-arc" |]
                 let startupError = exn "Expected ARC reload title failure."
 
@@ -4614,7 +4617,10 @@ Vitest.describe (
                     Vitest.expect(vault.watcher).toEqual (None)
                     Vitest.expect(vault.fileTree.Count).toBe (0)
                     Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
-                    Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+
+                    Vitest
+                        .expect(vault.window.title)
+                        .toBe (ARCitISA.Electron.Shared.ApplicationVersion.windowTitle None)
 
                     Vitest
                         .expect(
@@ -4644,7 +4650,7 @@ Vitest.describe (
         Vitest.test (
             "OpenARC clears pre-existing vault state after opening a non-ARC folder fails",
             fun () -> promise {
-                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
+                let! folderPath = TestHelpers.createTempDirectoryAsync "arcitisa-open-invalid-arc-"
 
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
@@ -4674,7 +4680,7 @@ Vitest.describe (
         Vitest.test (
             "Startup does not start a watcher when ARC loading fails",
             fun () -> promise {
-                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-invalid-arc-startup-"
+                let! folderPath = TestHelpers.createTempDirectoryAsync "arcitisa-invalid-arc-startup-"
 
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
@@ -4708,7 +4714,7 @@ Vitest.describe (
 
                 Vitest.expect(vault.arc).toEqual (None)
                 Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
-                Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+                Vitest.expect(vault.window.title).toBe (ARCitISA.Electron.Shared.ApplicationVersion.windowTitle None)
         )
 
         Vitest.test (

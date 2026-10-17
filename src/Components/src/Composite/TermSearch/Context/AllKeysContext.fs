@@ -1,5 +1,5 @@
 [<AutoOpenAttribute>]
-module Swate.Components.Composite.TermSearch.Context.AllKeysContext
+module ARCitISA.Components.Composite.TermSearch.Context.AllKeysContext
 
 open Feliz
 

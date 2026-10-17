@@ -1,4 +1,4 @@
-module internal Swate.Components.Page.Metadata.FormComponents.PublicationsInput.RtlTests
+module internal ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput.RtlTests
 
 open ARCtrl
 open Browser.Types

@@ -1,10 +1,10 @@
-module Swate.Components.Api.GitLabApi
+module ARCitISA.Components.Api.GitLabApi
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Fetch
-open Swate.Components.Api.Helper
+open ARCitISA.Components.Api.Helper
 
 // Maintainer notes:
 // - This module intentionally uses the same Fable.Fetch request style as Authentication.getUserAPIRequest.

@@ -1,9 +1,9 @@
-namespace Swate.Components.Composite.ArcVaultActions
+namespace ARCitISA.Components.Composite.ArcVaultActions
 
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive.Popover
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Popover
 open ARCtrl
 
 [<Erase; Mangle(false)>]

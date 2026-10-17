@@ -5,11 +5,11 @@ open Feliz
 open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
-open Swate.Components
-open Swate.Components.Composite.Layout
-open Swate.Components.Primitive.ErrorModal
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Layout
+open ARCitISA.Components.Primitive.ErrorModal
+open ARCitISA.Electron.Shared
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
 
 type private Model = {
     // Current ARC root shared with renderer contexts.
@@ -137,7 +137,7 @@ let private subscribe (_model: Model) : Sub<Msg> = [
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSidebarTarget =
     let leftSidebarCtx =
-        Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
+        ARCitISA.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
@@ -238,7 +238,7 @@ let Main () =
 
     let currentArcScopeId =
         model.ArcRootPath
-        |> Option.map Swate.Components.Shared.PathHelpers.normalizePath
+        |> Option.map ARCitISA.Components.Shared.PathHelpers.normalizePath
         |> Option.bind (fun path ->
             if System.String.IsNullOrWhiteSpace path then
                 None
@@ -258,8 +258,8 @@ let Main () =
         else
             None
 
-    Swate.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
-        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+    ARCitISA.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
+        ARCitISA.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
             Context.AppStateContext.AppStateCtx.Provider(
                 model.ArcRootPath,
                 Renderer.Context.FileStateContext.FileStateCtxProviderWithSnapshots(
@@ -278,7 +278,7 @@ let Main () =
                                 Renderer.Context.AuthStateContext.Provider(
                                     Renderer.Context.LfsActivityContext.LfsActivityCtxProvider(
                                         Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                            Swate
+                                            ARCitISA
                                                 .Components
                                                 .Composite
                                                 .AnnotationTable

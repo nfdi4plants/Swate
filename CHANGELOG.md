@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 3.0.1 - 2026-10-17
+
+### 🔄 Changed
+
+- Move remaining references from "Swate" to "ARCitISA" in the documentation and code comments.
+
 ## 3.0.0 - 2026-10-16
 
 ### ✨ Added

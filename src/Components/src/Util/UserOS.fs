@@ -1,6 +1,6 @@
-module Swate.Components.Util.UserOS
+module ARCitISA.Components.Util.UserOS
 
-open Swate.Components
+open ARCitISA.Components
 
 type UserOS =
     | Windows

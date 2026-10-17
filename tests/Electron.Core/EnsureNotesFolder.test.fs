@@ -11,7 +11,7 @@ let private pathDynamic: obj = importAll "path"
 
 let private createTempArcPathAsync () : JS.Promise<string * string> = promise {
     let tmpDir = osDynamic?tmpdir () |> unbox<string>
-    let prefix = pathDynamic?join (tmpDir, "swate-notes-folder-") |> unbox<string>
+    let prefix = pathDynamic?join (tmpDir, "arcitisa-notes-folder-") |> unbox<string>
     let! rootPath = fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
     let arcPath = pathDynamic?join (rootPath, "arc") |> unbox<string>
 

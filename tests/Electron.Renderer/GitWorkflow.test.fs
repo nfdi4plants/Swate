@@ -9,9 +9,9 @@ open Fable.Core.JsInterop
 open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Page.GitSidebarTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Page.GitSidebarTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open Vitest
 
 [<Import("renderToStaticMarkup", "react-dom/server")>]
@@ -244,17 +244,17 @@ $0.dispatchEvent(new Event("input", { bubbles: true }));
 let private setInputValue (element: HTMLInputElement) (value: string) : unit = jsNative
 
 [<Emit("""
-globalThis.__swateOriginalFetch = globalThis.fetch;
-globalThis.__swateGitLabCreateProjectFetches = [];
+globalThis.__arcitisaOriginalFetch = globalThis.fetch;
+globalThis.__arcitisaGitLabCreateProjectFetches = [];
 globalThis.fetch = async (url, options) => {
   const body = options && options.body ? JSON.parse(options.body) : null;
-  globalThis.__swateGitLabCreateProjectFetches.push({ url, options, body });
+  globalThis.__arcitisaGitLabCreateProjectFetches.push({ url, options, body });
   return $0(body);
 };
 """)>]
 let private installGitLabCreateProjectFetchSpy (response: obj -> obj) : unit = jsNative
 
-[<Emit("globalThis.__swateGitLabCreateProjectFetches[globalThis.__swateGitLabCreateProjectFetches.length - 1].body")>]
+[<Emit("globalThis.__arcitisaGitLabCreateProjectFetches[globalThis.__arcitisaGitLabCreateProjectFetches.length - 1].body")>]
 let private lastGitLabCreateProjectBody () : obj = jsNative
 
 [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
@@ -270,13 +270,13 @@ let private findBodyButtonContaining (text: string) : HTMLButtonElement option =
 let private getProperty<'T> (target: obj) (propertyName: string) : 'T = jsNative
 
 [<Emit("""
-if (globalThis.__swateOriginalFetch === undefined) {
+if (globalThis.__arcitisaOriginalFetch === undefined) {
   delete globalThis.fetch;
 } else {
-  globalThis.fetch = globalThis.__swateOriginalFetch;
+  globalThis.fetch = globalThis.__arcitisaOriginalFetch;
 }
-delete globalThis.__swateOriginalFetch;
-delete globalThis.__swateGitLabCreateProjectFetches;
+delete globalThis.__arcitisaOriginalFetch;
+delete globalThis.__arcitisaGitLabCreateProjectFetches;
 """)>]
 let private cleanupGitLabCreateProjectFetchSpy () : unit = jsNative
 
@@ -688,7 +688,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "index_reconciliation_failed uses Swate's recovery instructions",
+            "index_reconciliation_failed uses ARCitISA's recovery instructions",
             fun () ->
                 let failure =
                     makeFailure
@@ -1435,7 +1435,7 @@ Vitest.describe (
                         listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 3 true)) }
                         getRepositoryWebUrl =
-                            fun _ -> promise { return Ok(succeeded (Some "https://github.com/nfdi4plants/Swate")) }
+                            fun _ -> promise { return Ok(succeeded (Some "https://github.com/nfdi4plants/ARCitISA")) }
                 }
 
                 let state = {
@@ -1455,7 +1455,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(nextState.OriginRemoteRepositoryWebUrl)
-                    .toEqual (Some "https://github.com/nfdi4plants/Swate")
+                    .toEqual (Some "https://github.com/nfdi4plants/ARCitISA")
 
                 Vitest.expect(nextMessages).toEqual ([||])
             }
@@ -9906,7 +9906,7 @@ Vitest.describe (
 
 let private renderSaveSidebar (callbacks: GitSidebarCallbacks) =
     renderToBody (
-        Swate.Components.Page.GitSidebar.Main(
+        ARCitISA.Components.Page.GitSidebar.Main(
             status = {
                 CurrentBranch = Some "main"
                 TrackingBranch = Some "origin/main"
@@ -9934,7 +9934,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitMergeConflictViewer.Viewer(
+                        ARCitISA.Components.Page.GitMergeConflictViewer.Viewer(
                             mergeConflictContent = "<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> branch\n",
                             defaultResolvedContent = "resolved",
                             onConfirmMerge = (fun _ -> confirmCalls <- confirmCalls + 1),
@@ -9971,7 +9971,7 @@ Vitest.describe (
                         Html.div [
                             prop.style [ style.width 960; style.height 520 ]
                             prop.children [
-                                Swate.Components.Page.GitMergeConflictViewer.Viewer(
+                                ARCitISA.Components.Page.GitMergeConflictViewer.Viewer(
                                     mergeConflictContent = buildSingleConflictDocument currentLines incomingLines,
                                     testIdPrefix = "renderer-large-merge"
                                 )
@@ -10006,7 +10006,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = status,
                             changedFiles = [||],
                             branchOptions = [| sidebarLocalBranch "feature/local-only" true false |],
@@ -10081,7 +10081,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10137,7 +10137,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10186,7 +10186,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10248,7 +10248,7 @@ Vitest.describe (
                         Html.div [
                             prop.style [ style.width 340; style.height 760 ]
                             prop.children [
-                                Swate.Components.Page.GitSidebar.Main(
+                                ARCitISA.Components.Page.GitSidebar.Main(
                                     status = {
                                         CurrentBranch = Some "main"
                                         TrackingBranch = Some "origin/main"
@@ -10341,7 +10341,7 @@ Vitest.describe (
                         Html.div [
                             prop.style [ style.width 340; style.height 760 ]
                             prop.children [
-                                Swate.Components.Page.GitSidebar.Main(
+                                ARCitISA.Components.Page.GitSidebar.Main(
                                     status = {
                                         CurrentBranch = Some "main"
                                         TrackingBranch = Some "origin/main"
@@ -10430,7 +10430,7 @@ Vitest.describe (
                                             prop.className boundedWrapperClasses
                                             prop.style [ style.height (length.percent 100) ]
                                             prop.children [
-                                                Swate.Components.Page.GitSidebar.Main(
+                                                ARCitISA.Components.Page.GitSidebar.Main(
                                                     status = {
                                                         CurrentBranch = Some "main"
                                                         TrackingBranch = Some "origin/main"
@@ -10501,7 +10501,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10556,7 +10556,7 @@ Vitest.describe (
                         Html.div [
                             prop.style [ style.width 340; style.height 760 ]
                             prop.children [
-                                Swate.Components.Page.GitSidebar.Main(
+                                ARCitISA.Components.Page.GitSidebar.Main(
                                     status = {
                                         CurrentBranch = Some "main"
                                         TrackingBranch = Some "origin/main"
@@ -10618,7 +10618,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10699,7 +10699,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10759,7 +10759,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10846,7 +10846,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -10938,7 +10938,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -11001,7 +11001,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = None
@@ -11057,7 +11057,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -11135,7 +11135,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -11178,7 +11178,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -11251,7 +11251,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -11412,7 +11412,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.Page.GitSidebar.Main(
+                        ARCitISA.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"

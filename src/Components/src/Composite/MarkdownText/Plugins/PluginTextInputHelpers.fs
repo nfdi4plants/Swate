@@ -1,11 +1,11 @@
-namespace Swate.Components.Composite.MarkdownText.Plugins
+namespace ARCitISA.Components.Composite.MarkdownText.Plugins
 
 open System
 open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
 
-open Swate.Components.Composite.MarkdownText.JsBindings
+open ARCitISA.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module PluginTextInputHelpers =

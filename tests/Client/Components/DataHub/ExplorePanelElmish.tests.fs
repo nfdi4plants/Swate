@@ -2,13 +2,13 @@ module ExplorePanelElmish
 
 open Fable.Core
 open Fable.Mocha
-open Swate.Components
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Page.DataHub
-open Swate.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Page.DataHub
+open ARCitISA.Components.Page.DataHub.DataHubTypes
 
-module DataHubBrowserModel = Swate.Components.Page.DataHub.DataHubBrowserModel
-module MockData = Swate.Components.Page.MockData.DataHub
+module DataHubBrowserModel = ARCitISA.Components.Page.DataHub.DataHubBrowserModel
+module MockData = ARCitISA.Components.Page.MockData.DataHub
 
 let private noopLoadRepos (_: ExploreLoadRequest) = promise { return Ok ExploreLoadResult.empty }
 

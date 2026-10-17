@@ -1,12 +1,12 @@
-namespace Swate.Components.Composite.TermSearch
+namespace ARCitISA.Components.Composite.TermSearch
 
-open Swate.Components
+open ARCitISA.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Primitive
-open Swate.Components.Composite.TermSearch.Context
-open Swate.Components.Composite.TermSearch.Types
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Composite.TermSearch.Context
+open ARCitISA.Components.Composite.TermSearch.Types
 
 module private TermSearchConfigProviderHelper =
 
@@ -24,7 +24,7 @@ module private TermSearchConfigProviderHelper =
 
                     let query: SearchCall =
                         fun (q: string) ->
-                            Swate.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
+                            ARCitISA.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
                             |> Promise.map (fun searchApi ->
                                 match searchApi with
                                 | Some api -> api.ToMyTerm() |> ResizeArray
@@ -40,7 +40,7 @@ module private TermSearchConfigProviderHelper =
 
                     let query: ParentSearchCall =
                         fun (parent: string, query: string) ->
-                            Swate.Components.Api.TIBApi.TIBApi.searchChildrenOf (query, parent, 10, c)
+                            ARCitISA.Components.Api.TIBApi.TIBApi.searchChildrenOf (query, parent, 10, c)
                             |> Promise.map (fun searchApi ->
                                 match searchApi with
                                 | Some api -> api.ToMyTerm() |> ResizeArray
@@ -56,7 +56,7 @@ module private TermSearchConfigProviderHelper =
 
                     let query: AllChildrenSearchCall =
                         fun (p: string) ->
-                            Swate.Components.Api.TIBApi.TIBApi.searchAllChildrenOf (p, 300, collection = c)
+                            ARCitISA.Components.Api.TIBApi.TIBApi.searchAllChildrenOf (p, 300, collection = c)
                             |> Promise.map (fun searchApi ->
                                 match searchApi with
                                 | Some api -> api.ToMyTerm() |> ResizeArray
@@ -125,7 +125,7 @@ type TermSearchConfigProvider =
             ?defaultActive: Set<string>,
             ?localStorageKey: string
         ) =
-        let localStorageKey = defaultArg localStorageKey "swate-termsearchconfig-ctx"
+        let localStorageKey = defaultArg localStorageKey "arcitisa-termsearchconfig-ctx"
         let defaultActive = defaultArg defaultActive Set.empty
 
         let (activeKeys: TermSearchActiveKeysContext), setActiveKeys =

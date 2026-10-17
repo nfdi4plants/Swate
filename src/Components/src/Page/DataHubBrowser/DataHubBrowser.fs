@@ -1,19 +1,19 @@
-namespace Swate.Components.Page.DataHub
+namespace ARCitISA.Components.Page.DataHub
 
 open Fable.Core
 open Elmish
 open Feliz
 open Feliz.UseElmish
-open Swate.Components
-open Swate.Components.Composite.Authentication
-open Swate.Components.Composite.Authentication.Types
-open Swate.Components.Composite.Actionbar.Types
-open Swate.Components.Page.DataHub.DataHubTypes
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Page.MockData.DataHub
-open Swate.Components.Page.DataHubBrowser.sub
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Authentication
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Components.Composite.Actionbar.Types
+open ARCitISA.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Page.MockData.DataHub
+open ARCitISA.Components.Page.DataHubBrowser.sub
 
 [<Erase; Mangle(false)>]
 type DataHubBrowser =
@@ -266,7 +266,7 @@ type DataHubBrowser =
     [<ReactComponent>]
     static member ExplorePanel
         (
-            accounts: Swate.Components.Composite.Authentication.Types.AuthStateDto,
+            accounts: ARCitISA.Components.Composite.Authentication.Types.AuthStateDto,
             loaders: ExploreLoaders,
             ?reloadTrigger: int,
             ?onRender: (ExploreProjectDto -> unit),
@@ -513,7 +513,7 @@ type DataHubBrowser =
         let mockUser: AccountSummary = {
             User = {
                 Id = 1
-                LocalSwateAccountId = "1"
+                LocalARCitISAAccountId = "1"
                 Username = "storybook-user"
                 Name = "storybook-user"
                 Email = "Storybook User"
@@ -882,7 +882,7 @@ type DataHubBrowser =
                     let userDTO: AccountSummary = {
                         User = {
                             Id = user.id
-                            LocalSwateAccountId = string user.id
+                            LocalARCitISAAccountId = string user.id
                             Username = user.username
                             Name = user.name
                             AvatarUrl = user.avatar_url |> Option.defaultValue ""

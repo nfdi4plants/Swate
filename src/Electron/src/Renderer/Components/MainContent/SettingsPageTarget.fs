@@ -3,10 +3,10 @@ module Renderer.Components.MainContent.SettingsPageTarget
 open System
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
-open Swate.Components.Page.GitSidebarTypes
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Components.Page.GitSidebarTypes
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
 
 let private toGitDefaults (values: UserDefaultValuesDto) : SettingsGitDefaults = {
     LfsAutoTrackThresholdMb = values.LfsAutoTrackThresholdMb
@@ -106,7 +106,7 @@ let SettingsPage () =
         prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:overflow-y-auto"
         prop.testId "main-content-settings-page"
         prop.children [
-            Swate.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage(
+            ARCitISA.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage(
                 onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled,
                 uiScaling = uiScaling.state,
                 onUIScaling = submitUIScaling,

@@ -1,13 +1,13 @@
-namespace Swate.Components.Composite.Actionbar
+namespace ARCitISA.Components.Composite.Actionbar
 
 open Feliz
 open Fable.Core
 
-open Swate.Components
-open Swate.Components.Composite.Actionbar.Types
-open Swate.Components.Primitive
-open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Primitive.ContextMenu.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Actionbar.Types
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.ContextMenu
+open ARCitISA.Components.Primitive.ContextMenu.Types
 
 [<Erase; Mangle(false)>]
 type Actionbar =

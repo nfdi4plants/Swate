@@ -1,7 +1,7 @@
 module Renderer.Components.MainElement
 
 open Feliz
-open Swate.Components
+open ARCitISA.Components
 open Browser.Dom
 open ARCtrl
 open Renderer.MetadataForms

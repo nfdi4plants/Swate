@@ -1,4 +1,4 @@
-module Swate.Components.Shared.Tests
+module ARCitISA.Components.Shared.Tests
 
 #if FABLE_COMPILER
 open Fable.Mocha

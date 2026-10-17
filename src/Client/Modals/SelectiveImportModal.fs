@@ -3,15 +3,15 @@ namespace Modals
 open Feliz
 open Model
 open Messages
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 open Fable.Core.JsInterop
 open ARCtrl
 open FileImport
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Shared
 
 
 type SelectiveImportModal =

@@ -1,10 +1,10 @@
-module internal Swate.Components.Primitive.Select.MultiSelectSample
+module internal ARCitISA.Components.Primitive.Select.MultiSelectSample
 
 open Fable.Core
 open Feliz
 open Types
-open Swate.Components
-open Swate.Components.Primitive.Select.Context
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Select.Context
 
 [<ReactComponent(true)>]
 let Sample () =

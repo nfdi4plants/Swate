@@ -1,7 +1,7 @@
 namespace BuildingBlock
 
 open Feliz
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 open OfficeInterop.Core
 open ARCtrl

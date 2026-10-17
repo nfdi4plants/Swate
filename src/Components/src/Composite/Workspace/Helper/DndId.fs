@@ -1,7 +1,7 @@
-module Swate.Components.Composite.Workspace.Helper.DndId
+module ARCitISA.Components.Composite.Workspace.Helper.DndId
 
 open Fable.Core
-open Swate.Components.Composite.Workspace.Types
+open ARCitISA.Components.Composite.Workspace.Types
 
 type DndId =
     | Tab of paneId: string * tabId: string

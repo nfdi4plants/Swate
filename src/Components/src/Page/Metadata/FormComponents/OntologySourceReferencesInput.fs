@@ -1,4 +1,4 @@
-namespace Swate.Components.Page.Metadata.FormComponents
+namespace ARCitISA.Components.Page.Metadata.FormComponents
 
 open Fable.Core
 open System
@@ -6,8 +6,8 @@ open Browser.Types
 open Feliz
 open ARCtrl
 
-open Swate.Components
-open Swate.Components.Primitive.LayoutComponents
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.LayoutComponents
 
 module private OntologySourceReferencesInputHelper =
 

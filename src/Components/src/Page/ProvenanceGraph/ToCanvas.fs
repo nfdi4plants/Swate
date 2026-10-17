@@ -1,12 +1,12 @@
 /// One pure mapping per view, from the result of a provenance query to the generic canvas input.
-module Swate.Components.Page.ProvenanceGraph.ToCanvas
+module ARCitISA.Components.Page.ProvenanceGraph.ToCanvas
 
 open System
 open System.Collections.Generic
-open Swate.Components.Shared.ProvenanceGraph.Types
-open Swate.Components.Shared.ProvenanceGraph.Queries
-open Swate.Components.Composite.GraphCanvas.Types
-open Swate.Components.Page.ProvenanceGraph.Types
+open ARCitISA.Components.Shared.ProvenanceGraph.Types
+open ARCitISA.Components.Shared.ProvenanceGraph.Queries
+open ARCitISA.Components.Composite.GraphCanvas.Types
+open ARCitISA.Components.Page.ProvenanceGraph.Types
 
 [<Literal>]
 let LineageNodeLimit = 80

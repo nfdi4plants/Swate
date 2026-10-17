@@ -1,10 +1,10 @@
-module internal Swate.Components.Composite.Widgets.FilePickerWidgetTests
+module internal ARCitISA.Components.Composite.Widgets.FilePickerWidgetTests
 
 open ARCtrl
 open Feliz
 open Fable.Core
 open Vitest
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 Vitest.afterEach (fun () -> RTL.cleanup ())
 

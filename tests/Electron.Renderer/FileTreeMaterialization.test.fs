@@ -3,8 +3,8 @@ module ElectronRenderer.FileTreeMaterializationTests
 open System.Collections.Generic
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Electron.Shared.FileIOTypes
 open Vitest
 
 let private fileNode (name: string) (path: string) =

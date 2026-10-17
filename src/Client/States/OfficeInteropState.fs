@@ -1,6 +1,6 @@
 namespace OfficeInterop
 
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open ARCtrl
 open FileImport
 

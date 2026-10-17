@@ -1,4 +1,4 @@
-module Swate.Components.Composite.TutorialOverlay.Types
+module ARCitISA.Components.Composite.TutorialOverlay.Types
 
 open Fable.Core
 open Browser.Types

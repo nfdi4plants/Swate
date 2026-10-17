@@ -1,10 +1,10 @@
 module Renderer.Components.FileExplorerLfs
 
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Electron.Shared.FileIOTypes
 
-module FileExplorerGitLfsHelper = Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
+module FileExplorerGitLfsHelper = ARCitISA.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 
 type FileTreeNodeLfsState = {
     IsLFS: bool option

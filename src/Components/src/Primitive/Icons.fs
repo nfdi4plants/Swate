@@ -1,4 +1,4 @@
-namespace Swate.Components.Primitive
+namespace ARCitISA.Components.Primitive
 
 open Fable.Core
 open Feliz

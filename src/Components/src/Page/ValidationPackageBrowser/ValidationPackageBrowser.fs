@@ -1,13 +1,13 @@
-namespace Swate.Components.Page.ValidationPackageBrowser
+namespace ARCitISA.Components.Page.ValidationPackageBrowser
 
 open Fable.Core
 open Feliz
 open ARCtrl.ValidationPackages
-open Swate.Components
-open Swate.Components.Page.ValidationPackageBrowser.Context
+open ARCitISA.Components
+open ARCitISA.Components.Page.ValidationPackageBrowser.Context
 open Types
-open Swate.Components.Primitive.Types
-open Swate.Components.Primitive.LoadingSpinner
+open ARCitISA.Components.Primitive.Types
+open ARCitISA.Components.Primitive.LoadingSpinner
 
 module private ValidationPackageBrowserModel =
 

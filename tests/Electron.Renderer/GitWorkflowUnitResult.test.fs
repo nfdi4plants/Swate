@@ -1,7 +1,7 @@
 module ElectronRenderer.ToUnitResultTests
 
 open Renderer.Context.GitWorkflow
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open Vitest
 
 let private outcome: OperationOutcomeDto<unit> = {

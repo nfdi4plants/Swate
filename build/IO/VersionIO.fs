@@ -72,10 +72,10 @@ let updateFSharpProjectVersions (version: Changelog.Version) =
     printGreenfn "Updating .fsproj files to version %O" version.Version
 
     let componentsProjectPath =
-        Path.Combine(ProjectInfo.ProjectPaths.componentsPath, "src/Swate.Components.fsproj")
+        Path.Combine(ProjectInfo.ProjectPaths.componentsPath, "src/ARCitISA.Components.fsproj")
 
     let sharedProjectPath =
-        Path.Combine(ProjectInfo.ProjectPaths.sharedPath, "Swate.Components.Core.fsproj")
+        Path.Combine(ProjectInfo.ProjectPaths.sharedPath, "ARCitISA.Components.Core.fsproj")
 
 
     let nextVersion = version.Version.ToString()

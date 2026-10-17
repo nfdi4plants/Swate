@@ -1,4 +1,4 @@
-module Swate.Components.Page.Metadata.FormComponents.PublicationsInput.Types
+module ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput.Types
 
 type SearchResult = {
     key: string

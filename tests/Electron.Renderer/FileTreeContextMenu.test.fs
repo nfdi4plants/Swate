@@ -2,9 +2,9 @@ module ElectronRenderer.FileTreeContextMenuTests
 
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 open Vitest
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 

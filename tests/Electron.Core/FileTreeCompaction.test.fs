@@ -3,10 +3,10 @@ module ElectronCore.FileTreeCompactionTests
 open System.Collections.Generic
 module FileTreeCreator = Main.FileTreeCreator
 
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.VersionControlTypes
-open Swate.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Shared
 open Vitest
 
 let private fileNode (name: string) (path: string) =
@@ -229,8 +229,8 @@ Vitest.describe (
         let createFileEntry path isDirectory = {
             name =
                 path
-                |> Swate.Components.Shared.PathHelpers.normalizePath
-                |> Swate.Components.Shared.PathHelpers.getFileName
+                |> ARCitISA.Components.Shared.PathHelpers.normalizePath
+                |> ARCitISA.Components.Shared.PathHelpers.getFileName
             isDirectory = isDirectory
             path = path
             largeObject = None
@@ -262,8 +262,8 @@ Vitest.describe (
         let createFileEntry path isDirectory largeObject = {
             name =
                 path
-                |> Swate.Components.Shared.PathHelpers.normalizePath
-                |> Swate.Components.Shared.PathHelpers.getFileName
+                |> ARCitISA.Components.Shared.PathHelpers.normalizePath
+                |> ARCitISA.Components.Shared.PathHelpers.getFileName
             isDirectory = isDirectory
             path = path
             largeObject = largeObject

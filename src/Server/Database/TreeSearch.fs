@@ -3,9 +3,9 @@ module Database.TreeSearch
 open System
 open Neo4j.Driver
 
-open Swate.Components.Shared.DTOs
-open Swate.Components.Shared.Database
-open Swate.Components.Shared.Database.TreeTypes
+open ARCitISA.Components.Shared.DTOs
+open ARCitISA.Components.Shared.Database
+open ARCitISA.Components.Shared.Database.TreeTypes
 
 open Helper
 

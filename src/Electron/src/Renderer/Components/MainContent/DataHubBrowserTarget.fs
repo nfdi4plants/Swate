@@ -3,13 +3,13 @@ module Renderer.Components.MainContent.DataHubBrowserTarget
 open System
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
-open Swate.Components
-open Swate.Components.Page.DataHub
-open Swate.Components.Page.DataHub.DataHubTypes
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Composite.Actionbar.Types
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components
+open ARCitISA.Components.Page.DataHub
+open ARCitISA.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Composite.Actionbar.Types
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 module DataHubBrowserHelper =
     let isCancelError (error: exn) =
@@ -102,7 +102,7 @@ let DataHubBrowserTarget () =
     Html.div [
         prop.className "swt:size-full swt:flex swt:flex-col swt:overflow-hidden"
         prop.children [
-            Swate.Components.Page.GitSidebar.OperationStatusNotice(
+            ARCitISA.Components.Page.GitSidebar.OperationStatusNotice(
                 ?runStatus = runStatus,
                 ?errorNotice = gitStateCtx.state.ErrorNotice,
                 ?warningNotice = gitStateCtx.state.WarningNotice,

@@ -5,8 +5,8 @@ open ARCtrl
 open ARCtrl.Contract
 open Main.Bindings.Path
 open Main.Bindings.Filesystem
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
 
 [<AutoOpen>]
 module ArcLoadExtensions =
@@ -177,7 +177,7 @@ module ArcLoadExtensions =
 
         /// Hotfix for #619, not fixed in the consumed ARCtrl 3.0.0-beta.12.
         /// Mirrors ARC.tryLoadAsync, changing only filesystem traversal so `.git` directories are never enumerated.
-        static member LoadAsyncSwate(arcPath: string) = promise {
+        static member LoadAsyncARCitISA(arcPath: string) = promise {
             let! discoveredPaths = getAllArcFilePathsAsync arcPath
             let! paths = migrateLegacyDataMapPathsAsync arcPath discoveredPaths
             let arc = ARC.fromFilePaths paths
@@ -191,9 +191,9 @@ module ArcLoadExtensions =
         }
 
         /// Hotfix for #620, not fixed in the consumed ARCtrl 3.0.0-beta.12.
-        /// Repairs only zero-byte canonical workbooks left by interrupted creates, then retries LoadAsyncSwate.
-        static member LoadAsyncSwateZeroByteRepair(arcPath: string) = promise {
-            match! ARC.LoadAsyncSwate arcPath with
+        /// Repairs only zero-byte canonical workbooks left by interrupted creates, then retries LoadAsyncARCitISA.
+        static member LoadAsyncARCitISAZeroByteRepair(arcPath: string) = promise {
+            match! ARC.LoadAsyncARCitISA arcPath with
             | Ok arc ->
                 baselineArcStaticHashes arc
                 return Ok arc
@@ -201,7 +201,7 @@ module ArcLoadExtensions =
                 let! repairedAny = repairZeroByteCanonicalArcFiles arcPath
 
                 if repairedAny then
-                    match! ARC.LoadAsyncSwate arcPath with
+                    match! ARC.LoadAsyncARCitISA arcPath with
                     | Ok arc ->
                         baselineArcStaticHashes arc
                         return Ok arc

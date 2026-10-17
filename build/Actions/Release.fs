@@ -34,7 +34,7 @@ let npm (version: Changelog.Version) (isDryRun: bool) =
         printGreenfn "Start updating .css file to use @layer swt-base instead of @layer base"
 
         let cssFilePath =
-            Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
+            Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "arcitisa-components.css")
 
         if not (System.IO.File.Exists(cssFilePath)) then
             failwithf "CSS file not found at %s" cssFilePath
@@ -106,7 +106,7 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     VersionIO.updateFSharpProjectVersions version
 
     let dockerRegistryTarget = "ghcr.io"
-    let imageName = "ghcr.io/nfdi4plants/swate"
+    let imageName = "ghcr.io/nfdi4plants/arcitisa"
 
     let login =
         run
@@ -129,7 +129,7 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageLatest = $"{imageName}:latest"
     let imageNext = $"{imageName}:next"
 
-    // docker build -t ghcr.io/nfdi4plants/swate:next -t ghcr.io/nfdi4plants/swate:2.0.0 -t ghcr.io/nfdi4plants/swate:latest -f ./build/Dockerfile.publish .
+    // docker build -t ghcr.io/nfdi4plants/arcitisa:next -t ghcr.io/nfdi4plants/arcitisa:2.0.0 -t ghcr.io/nfdi4plants/arcitisa:latest -f ./build/Dockerfile.publish .
 
     let build =
         run
@@ -161,21 +161,6 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
 
 open System.IO
 open System.IO.Compression
-
-/// Builds the frontend and zips it for the GitHub release
-let electron () =
-
-    let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
-    let targetZip = "./SwateClient.zip"
-
-    Bundle.Client(false)
-
-    if File.Exists(targetZip) then
-        File.Delete(targetZip)
-
-    ZipFile.CreateFromDirectory(sourceDir, targetZip, CompressionLevel.Optimal, includeBaseDirectory = false)
-
-    ()
 
 /// File extensions electron-forge make produces per GitHub runner.os name.
 let private electronMakeExtensions (os: string) : string list =

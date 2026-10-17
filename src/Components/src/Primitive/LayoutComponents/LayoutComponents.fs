@@ -1,8 +1,8 @@
-namespace Swate.Components.Primitive.LayoutComponents
+namespace ARCitISA.Components.Primitive.LayoutComponents
 
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
 
 [<RequireQualifiedAccess>]
 type LayoutComponents =

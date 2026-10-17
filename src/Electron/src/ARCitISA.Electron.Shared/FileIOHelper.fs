@@ -1,10 +1,10 @@
-module Swate.Electron.Shared.FileIOHelper
+module ARCitISA.Electron.Shared.FileIOHelper
 
 open System
 open System.Collections.Generic
 open ARCtrl
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 
 let getNonEmptyPathParts (path: string) =
     PathHelpers.normalizePath path
@@ -91,7 +91,7 @@ let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
     | _ -> None
 
 let resolveArcPreviewPath (path: string) =
-    Swate.Components.Shared.PathHelpers.resolveArcViewPath path
+    ARCitISA.Components.Shared.PathHelpers.resolveArcViewPath path
 
 let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
     let parts = getNonEmptyPathParts entry.path

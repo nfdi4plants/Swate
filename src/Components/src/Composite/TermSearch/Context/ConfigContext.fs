@@ -1,9 +1,9 @@
 [<AutoOpenAttribute>]
-module Swate.Components.Composite.TermSearch.Context.ConfigContext
+module ARCitISA.Components.Composite.TermSearch.Context.ConfigContext
 
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.TermSearch.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.TermSearch.Types
 
 type TermSearchConfigContext = {
     hasProvider: bool

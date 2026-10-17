@@ -1,8 +1,8 @@
 ﻿module Preload
 
 open Fable.Electron.Remoting.Preload
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
 
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IArcVaultsApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IVersionControlApi>

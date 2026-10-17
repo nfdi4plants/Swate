@@ -4,8 +4,8 @@ module Main.RecentArcStore
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
 
 [<Literal>]
 let private recentArcsSettingsFileName = "recent-arcs.json"

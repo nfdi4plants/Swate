@@ -1,11 +1,11 @@
-module Swate.Components.Page.ProvenanceGrouping.Types
+module ARCitISA.Components.Page.ProvenanceGrouping.Types
 
 open Fable.Core
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Grouping
-open Swate.Components.Shared.ProvenanceGrouping.Edit
-open Swate.Components.Shared.ProvenanceGrouping.Session
-open Swate.Components.Shared.ProvenanceGrouping.Fixtures
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Grouping
+open ARCitISA.Components.Shared.ProvenanceGrouping.Edit
+open ARCitISA.Components.Shared.ProvenanceGrouping.Session
+open ARCitISA.Components.Shared.ProvenanceGrouping.Fixtures
 
 type ProvenanceEditorChange = {
     Session: ProvenanceSession

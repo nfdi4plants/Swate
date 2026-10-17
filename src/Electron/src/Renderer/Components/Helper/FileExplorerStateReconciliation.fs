@@ -1,9 +1,9 @@
 module Renderer.Components.Helper.FileExplorerStateReconciliation
 
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 open Renderer.Types
-open Swate.Components.Page.ArcFileEditor.Types
+open ARCitISA.Components.Page.ArcFileEditor.Types
 
 let containsPath (paths: string seq) (relativePath: string) =
     let normalizedTargetPath = PathHelpers.normalizePath relativePath

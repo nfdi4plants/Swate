@@ -7,8 +7,8 @@ open Expecto
 #endif
 
 open ARCtrl
-open Swate.Components.Page.Landing
-open Swate.Components.Shared
+open ARCitISA.Components.Page.Landing
+open ARCitISA.Components.Shared
 
 let private mkPerson (firstName: string) (lastName: string) =
     Person.create (firstName = firstName, lastName = lastName)

@@ -1,11 +1,11 @@
-namespace Swate.Components.Page.Metadata.FormComponents.PublicationsInput
+namespace ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput
 
 open System
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive.Dialog
-open Swate.Components.Page.Metadata.FormComponents.PublicationsInput.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.Dialog
+open ARCitISA.Components.Page.Metadata.FormComponents.PublicationsInput.Types
 
 [<Erase; Mangle(false)>]
 type PublicationSearchDialog =

@@ -1,13 +1,13 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 
 open System
-open Swate.Components
+open ARCitISA.Components
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
@@ -268,7 +268,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
             copyPathContextMenuItems config.arcRootPath item
             fileSystemCreateContextMenuItems config.openFileSystemCreateModal item
             dataMapContextMenuItems config.createDataMap config.requestDeleteItem config.tryFindDataMapItemByPath item
-            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
+            ARCitISA.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item
                 toggleLfsMark
                 (Some downloadLfsFile)

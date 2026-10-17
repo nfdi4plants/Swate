@@ -1,19 +1,19 @@
-namespace Swate.Components.Composite.DataMapTable
+namespace ARCitISA.Components.Composite.DataMapTable
 
 open ARCtrl
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Primitive.ContextMenu.Types
-open Swate.Components.Composite.DataMapTable.Types
-open Swate.Components.Composite.Table.Helper
-open Swate.Components.Composite.Table.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.ContextMenu
+open ARCitISA.Components.Primitive.ContextMenu.Types
+open ARCitISA.Components.Composite.DataMapTable.Types
+open ARCitISA.Components.Composite.Table.Helper
+open ARCitISA.Components.Composite.Table.Types
 
-module DataMapTableHelper = Swate.Components.Composite.DataMapTable.Helper
-module TableHelper = Swate.Components.Composite.Table.Helper
+module DataMapTableHelper = ARCitISA.Components.Composite.DataMapTable.Helper
+module TableHelper = ARCitISA.Components.Composite.Table.Helper
 
 [<Erase; Mangle(false)>]
 type DataMapContextMenu =

@@ -3,7 +3,7 @@ module Renderer.Components.MainContent.GitMergeConflictTarget
 open Fable.Core
 open Feliz
 open Renderer.Types
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 [<ReactComponent>]
 let Main (mergeData: VersionControlConflictPage) =
@@ -38,7 +38,7 @@ let Main (mergeData: VersionControlConflictPage) =
                     prop.text "Applying merge resolution..."
                 ]
 
-            Swate.Components.Page.GitMergeConflictViewer.Viewer(
+            ARCitISA.Components.Page.GitMergeConflictViewer.Viewer(
                 mergeConflictContent = mergeData.ConflictContent,
                 currentTitle = mergeData.Path,
                 resolvedTitle = mergeData.Path,

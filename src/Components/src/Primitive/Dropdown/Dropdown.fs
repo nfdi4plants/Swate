@@ -1,8 +1,8 @@
-namespace Swate.Components.Primitive.Dropdown
+namespace ARCitISA.Components.Primitive.Dropdown
 
 open Fable.Core
 open Feliz
-open Swate.Components
+open ARCitISA.Components
 
 [<Erase; Mangle(false)>]
 type Dropdown =

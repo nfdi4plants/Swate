@@ -1,9 +1,9 @@
-module Swate.Components.Composite.AnnotationTable.Context
+module ARCitISA.Components.Composite.AnnotationTable.Context
 
 open Feliz
-open Swate.Components
-open Swate.Components
-open Swate.Components.Primitive
+open ARCitISA.Components
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
 
 
 type AnnotationTableContext = {

@@ -1,4 +1,4 @@
-module Swate.Components.Shared.DataMapCopyWorkaround
+module ARCitISA.Components.Shared.DataMapCopyWorkaround
 
 open ARCtrl
 

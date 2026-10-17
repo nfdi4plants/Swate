@@ -1,7 +1,7 @@
 namespace Main.ArcMerge
 
 open ARCtrl
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 [<AutoOpen>]
 module ArcEntityRefExtensions =

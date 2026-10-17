@@ -1,11 +1,11 @@
-namespace Swate.Components.Composite.Template
+namespace ARCitISA.Components.Composite.Template
 
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Composite.Template.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Composite.Template.Types
 
 [<Erase; Mangle(false)>]
 type TemplateImportModal =

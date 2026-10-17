@@ -3,13 +3,13 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Renderer.Components.Helper
 open Renderer.Components.Helper.ArcViewHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Modals
-open Swate.Components
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
+open ARCitISA.Components
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.FileIOHelper
 open Feliz
 open Fable.Core
 open ARCtrl
@@ -220,7 +220,7 @@ type FileTree =
 
                             result
                             |> Result.map (
-                                withStartingView Swate.Components.Page.ArcFileEditor.Types.ActiveView.Metadata
+                                withStartingView ARCitISA.Components.Page.ArcFileEditor.Types.ActiveView.Metadata
                             )
                             |> applyPreviewResult item.Name
                         | None -> pageStateCtx.setState None
@@ -230,7 +230,7 @@ type FileTree =
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
+                    if ARCitISA.Components.Page.FileExplorer.Helper.needsLfsDownload item then
                         pageStateCtx.setState None
                     else
                         let! result = openView selectedPath
@@ -461,7 +461,7 @@ type FileTree =
             |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
             |> Option.map (fun entry ->
                 let item =
-                    Swate.Components.Page.FileExplorer.Types.FileTree.createFile
+                    ARCitISA.Components.Page.FileExplorer.Types.FileTree.createFile
                         entry.name
                         (Some entry.path)
                         FileItemIcon.Document
@@ -522,7 +522,7 @@ type FileTree =
                     IsDirectory = true
             }
 
-            Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
+            ARCitISA.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
                 (fun _ ->
                     FileTreeContextMenu.rootContextMenuItems contextMenuConfig rootMenuItem
                     |> List.map (fun item -> item.ToPrimitiveContextMenuItem())
@@ -606,7 +606,7 @@ type FileTree =
                 Html.div [
                     prop.className "swt:w-full"
                     prop.children [
-                        Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
+                        ARCitISA.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
                             directoryChevronToggleOnlyForItem = isArcEntityDirectory,

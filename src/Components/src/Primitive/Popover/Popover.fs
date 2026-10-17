@@ -1,11 +1,11 @@
-namespace Swate.Components.Primitive.Popover
+namespace ARCitISA.Components.Primitive.Popover
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Popover.Context
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Popover.Context
 
 module private PopoverHelper =
 

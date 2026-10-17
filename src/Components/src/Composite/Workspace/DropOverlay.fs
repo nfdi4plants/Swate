@@ -1,15 +1,15 @@
-namespace Swate.Components.Composite.Workspace
+namespace ARCitISA.Components.Composite.Workspace
 
 open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components
-open Swate.Components.JsBindings
-open Swate.Components.Composite.Workspace.Types
-open Swate.Components.Composite.Workspace.Context
-open Swate.Components.Composite.Workspace.Helper.DndId
-open Swate.Components.Composite.Workspace.Helper.DropTarget
+open ARCitISA.Components
+open ARCitISA.Components.JsBindings
+open ARCitISA.Components.Composite.Workspace.Types
+open ARCitISA.Components.Composite.Workspace.Context
+open ARCitISA.Components.Composite.Workspace.Helper.DndId
+open ARCitISA.Components.Composite.Workspace.Helper.DropTarget
 
 [<Erase; Mangle(false)>]
 type DropOverlay =

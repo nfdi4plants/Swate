@@ -15,6 +15,7 @@ node_modules/
 *.orig
 *.DotSettings.user
 .assets/swate.zip
+.assets/arcitisa.zip
 .db/
 .git
 **/dev.json

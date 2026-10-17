@@ -1,10 +1,10 @@
-namespace Swate.Components.Composite.Widgets.JsonExport
+namespace ARCitISA.Components.Composite.Widgets.JsonExport
 
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.Widgets
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Widgets
+open ARCitISA.Components.Shared
 open ARCtrl
 
 
@@ -26,7 +26,7 @@ module private JsonExportHelper =
 
     let downloadJson (arcfile: ArcFiles, jef: JsonExportFormat) =
         let jsonExport = Json.Export.parseToJsonString (arcfile, jef)
-        Swate.Components.Util.Download.downloadFromString (jsonExport)
+        ARCitISA.Components.Util.Download.downloadFromString (jsonExport)
 
     let defaultExportJson (arcfile: ArcFiles, jef: JsonExportFormat) = promise {
         try

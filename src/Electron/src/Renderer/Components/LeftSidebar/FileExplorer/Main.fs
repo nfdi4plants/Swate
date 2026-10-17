@@ -2,10 +2,10 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.Actionbar.Types
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Actionbar.Types
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Primitive.ErrorModal.Types
 
 [<Erase; Mangle(false)>]
 type Main =
@@ -113,7 +113,7 @@ type Main =
                         prop.testId "left-sidebar-file-explorer-toolbar"
                         prop.className "swt:flex swt:shrink-0 swt:justify-center swt:bg-base-100"
                         prop.children [
-                            Swate.Components.Composite.Actionbar.Actionbar.Main(
+                            ARCitISA.Components.Composite.Actionbar.Actionbar.Main(
                                 [|
                                     //ButtonInfo.create (
                                     //    "swt:fluent--book-open-24-regular swt:size-5",
@@ -145,7 +145,7 @@ type Main =
                     Html.div [
                         prop.ref arcNameContextMenuRef
                         prop.children [
-                            Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
+                            ARCitISA.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
                                 path,
                                 copyArcPathToClipboard,
                                 fun () ->

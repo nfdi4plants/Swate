@@ -2,9 +2,9 @@ module Main.ArcVaultHelper
 
 
 open System
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.FileIOTypes
 open ARCtrl
 open Fable.Electron
 open Fable.Core
@@ -13,7 +13,7 @@ open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
 open Node.Api
-open Swate.Electron.Shared.RenamePathRules
+open ARCitISA.Electron.Shared.RenamePathRules
 
 let arcNotOpenError () =
     exn "No ARC is open. Open an ARC and try again."
@@ -135,10 +135,10 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
                 Ok oldArc
         | ArcFiles.Template _ -> Error(exn "Saving of template files is not supported.")
 
-let swatelogfn id fmt =
+let mainlogfn id fmt =
     Printf.kprintf (fun s -> Browser.Dom.console.log ("[ARCitISA-" + string id + "] " + s)) fmt
 
-let swatefailfn id fmt =
+let mainfailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[ARCitISA-" + string id + "] " + s)) fmt
 
 /// Serializes ARC merge operations through a single FIFO owner. Individual operation failures
@@ -163,7 +163,7 @@ type internal ArcMergeQueue(windowId: int) =
                     let! result = operation ()
                     resolve result
                 with error ->
-                    swatelogfn windowId "Queued ARC merge failed: %s" error.Message
+                    mainlogfn windowId "Queued ARC merge failed: %s" error.Message
                     reject error
             })
         )
@@ -306,7 +306,7 @@ let createWindow () =
 
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
-            title = Swate.Electron.Shared.ApplicationVersion.windowTitle None,
+            title = ARCitISA.Electron.Shared.ApplicationVersion.windowTitle None,
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
@@ -360,7 +360,7 @@ let private currentNodePlatform () : string =
 let isFileWatcherPathIgnored (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
+    let temporaryImportPattern = """(^|/)\.arcitisa-import-[0-9a-fA-F]{32}(/|$)"""
     let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
@@ -399,6 +399,6 @@ let createFileWatcher (path: string) (usePolling: bool option) =
     watcher
 
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
-    WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
+    WindowSend.send<ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
         window
         (fun api -> api.arcUnsavedChangesUpdate hasUnsavedChanges)

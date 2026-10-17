@@ -1,7 +1,7 @@
-module Swate.Components.Composite.Template.TemplateActions
+module ARCitISA.Components.Composite.Template.TemplateActions
 
 open ARCtrl
-open Swate.Components.Composite.Template.Types
+open ARCitISA.Components.Composite.Template.Types
 
 /// Syncs the selected template IDs with the currently loaded templates, removing any IDs that no longer exist in the loaded templates.
 let syncSelectedTemplateIds

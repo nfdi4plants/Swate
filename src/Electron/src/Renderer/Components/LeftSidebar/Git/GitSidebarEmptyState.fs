@@ -2,8 +2,8 @@ namespace Renderer.Components.LeftSidebar.Git
 
 open Fable.Core
 open Feliz
-open Swate.Components.Primitive.Blankslate
-open Swate.Components.Primitive.Blankslate.Types
+open ARCitISA.Components.Primitive.Blankslate
+open ARCitISA.Components.Primitive.Blankslate.Types
 open Renderer.Components.LeftSidebar.Git.Types
 
 [<Erase; Mangle(false)>]

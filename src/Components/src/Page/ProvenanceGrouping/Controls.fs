@@ -1,21 +1,21 @@
-namespace Swate.Components.Page.ProvenanceGrouping
+namespace ARCitISA.Components.Page.ProvenanceGrouping
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components
-open Swate.Components.JsBindings
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Primitive.Dropdown
-open Swate.Components.Primitive.Popover
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Grouping
-open Swate.Components.Shared.ProvenanceGrouping.Edit
-open Swate.Components.Shared.ProvenanceGrouping.Session
-open Swate.Components.Page.ProvenanceGrouping.Types
-open Swate.Components.Composite.TermSearch
-open Swate.Components.Composite.TermSearch.Types
+open ARCitISA.Components
+open ARCitISA.Components.JsBindings
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Primitive.Dropdown
+open ARCitISA.Components.Primitive.Popover
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Grouping
+open ARCitISA.Components.Shared.ProvenanceGrouping.Edit
+open ARCitISA.Components.Shared.ProvenanceGrouping.Session
+open ARCitISA.Components.Page.ProvenanceGrouping.Types
+open ARCitISA.Components.Composite.TermSearch
+open ARCitISA.Components.Composite.TermSearch.Types
 
 [<Erase; Mangle(false)>]
 type Controls =

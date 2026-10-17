@@ -5,9 +5,9 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Shared
 
 
 [<ReactComponent>]
@@ -36,7 +36,7 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                     e.stopPropagation ()
                     onSubmit inputS
                 )
-                prop.children [ Swate.Components.Primitive.Icons.Check() ]
+                prop.children [ ARCitISA.Components.Primitive.Icons.Check() ]
             ]
         ]
     ]
@@ -49,7 +49,7 @@ module private DropdownElements =
         Html.a [
             prop.href "#"
             prop.onClick (fun _ ->
-                Browser.Dom.window.``open`` (Swate.Components.Shared.URLs.AnnotationPrinciplesUrl, "_blank")
+                Browser.Dom.window.``open`` (ARCitISA.Components.Shared.URLs.AnnotationPrinciplesUrl, "_blank")
                 |> ignore
             )
             prop.className "swt:ml-auto swt:link-info"
@@ -72,7 +72,7 @@ module private DropdownElements =
                     prop.className "swt:flex swt:flex-row swt:justify-between"
                     prop.children [
                         Html.span subpage.toString
-                        Swate.Components.Primitive.Icons.ArrowRight()
+                        ARCitISA.Components.Primitive.Icons.ArrowRight()
                     ]
                 ]
             ]
@@ -95,7 +95,7 @@ module private DropdownElements =
                 if hasBack then
                     Html.a [
                         prop.className "swt:content-center"
-                        prop.children [ Swate.Components.Primitive.Icons.ArrowLeft() ]
+                        prop.children [ ARCitISA.Components.Primitive.Icons.ArrowLeft() ]
                     ]
                 annotationsPrinciplesLink
             ]
@@ -115,7 +115,7 @@ module private DropdownElements =
                     Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
                 )
                 prop.onKeyDown (fun k ->
-                    if k.code = Swate.Components.kbdEventCode.enter then
+                    if k.code = ARCitISA.Components.kbdEventCode.enter then
                         Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
                 )
                 prop.text (headerType.ToString())
@@ -160,7 +160,7 @@ module private DropdownElements =
                 )
 
                 prop.onKeyDown (fun k ->
-                    if k.code = Swate.Components.kbdEventCode.enter then
+                    if k.code = ARCitISA.Components.kbdEventCode.enter then
                         setIO iotype
                 )
 
@@ -239,7 +239,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
             prop.className "swt:btn swt:btn-primary swt:border swt:border-base-content! swt:join-item swt:flex-nowrap"
             prop.children [
                 Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
-                Swate.Components.Primitive.Icons.AngleDown()
+                ARCitISA.Components.Primitive.Icons.AngleDown()
             ]
         ],
         [

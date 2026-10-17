@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace ARCitISA.Components
 
 type StateContext<'T> = { state: 'T; setState: 'T -> unit }
 

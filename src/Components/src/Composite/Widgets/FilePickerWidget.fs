@@ -1,20 +1,20 @@
-namespace Swate.Components.Composite.Widgets
+namespace ARCitISA.Components.Composite.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.DataMapTable.ClipboardTarget
-open Swate.Components.Composite.SortableList
-open Swate.Components.Composite.SortableList.Types
-open Swate.Components.Shared
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Primitive.LoadingSpinner
-open Swate.Components.Composite.AnnotationTable.Context
-open Swate.Components.Composite.DataMapTable
-open Swate.Components.Composite.DataMapTable.Types
-open Swate.Components.Composite.Widgets.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.DataMapTable.ClipboardTarget
+open ARCitISA.Components.Composite.SortableList
+open ARCitISA.Components.Composite.SortableList.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Primitive.LoadingSpinner
+open ARCitISA.Components.Composite.AnnotationTable.Context
+open ARCitISA.Components.Composite.DataMapTable
+open ARCitISA.Components.Composite.DataMapTable.Types
+open ARCitISA.Components.Composite.Widgets.Types
 
 /// This context is designed to be used only internally in this file.
 module private FilePickerWidgetContext =

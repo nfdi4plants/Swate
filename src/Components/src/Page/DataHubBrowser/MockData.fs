@@ -1,7 +1,7 @@
-module Swate.Components.Page.MockData.DataHub
+module ARCitISA.Components.Page.MockData.DataHub
 
-open Swate.Components.Page.DataHub.DataHubTypes
-open Swate.Components.Api.GitLabApi
+open ARCitISA.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components.Api.GitLabApi
 
 
 let private ns id name path = {

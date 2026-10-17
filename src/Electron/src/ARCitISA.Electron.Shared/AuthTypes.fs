@@ -1,6 +1,6 @@
-module Swate.Electron.Shared.AuthTypes
+module ARCitISA.Electron.Shared.AuthTypes
 
-open Swate.Components.Composite.Authentication.Types
+open ARCitISA.Components.Composite.Authentication.Types
 
 /// Request sent from Renderer to Main to sign in.
 type AuthSignInRequest = {

@@ -1,9 +1,9 @@
-module internal Swate.Components.Composite.SortableListSample
+module internal ARCitISA.Components.Composite.SortableListSample
 
 open Fable.Core
 open Feliz
-open Swate.Components.Composite.SortableList
-open Swate.Components.Composite.SortableList.Types
+open ARCitISA.Components.Composite.SortableList
+open ARCitISA.Components.Composite.SortableList.Types
 
 let sampleItems: SortableListItem<{| description: string |}>[] = [|
     {|

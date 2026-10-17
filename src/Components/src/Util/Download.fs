@@ -1,6 +1,6 @@
-module Swate.Components.Util.Download
+module ARCitISA.Components.Util.Download
 
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open Fable.Remoting.Client
 
 let download (filename, bytes: byte[]) = bytes.SaveFileAs(filename)

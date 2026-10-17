@@ -1,7 +1,7 @@
 namespace Cytoscape
 
-open Swate.Components.Shared
-open Swate.Components.Shared.Database
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Shared.Database
 open JS
 
 type Model = {

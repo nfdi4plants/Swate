@@ -1,11 +1,11 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Fable.Core
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.RenamePathRules
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeDialogWorkflow

@@ -84,7 +84,7 @@ type PrivacyPolicy =
                 <p>Germany</p>
                 <p>Phone: 49 631 205 4657</p>
                 <p>Email: timo.muehlhaus@rptu.de</p>
-                <p>Website: https://swate-alpha.nfdi4plants.org</p>
+                <p>Website: https://swate.nfdi4plants.org</p>
 
                 <h4>3. Collection of general data and information</h4>
                 <p>The website of the Computational Systems Biology collects a series of general data and information when a data subject or automated system calls up the website. This general data and information are stored in the server log files. Collected may be (1) the browser types and versions used, (2) the operating system used by the accessing system, (3) the website from which an accessing system reaches our website (so-called referrers), (4) the sub-websites, (5) the date and time of access to the Internet site, (6) an Internet protocol address (IP address), (7) the Internet service provider of the accessing system, and (8) any other similar data and information that may be used in the event of attacks on our information technology systems.</p>

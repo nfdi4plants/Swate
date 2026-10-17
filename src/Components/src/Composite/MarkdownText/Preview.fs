@@ -1,11 +1,11 @@
-namespace Swate.Components.Composite.MarkdownText
+namespace ARCitISA.Components.Composite.MarkdownText
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 
-open Swate.Components.Composite.MarkdownText.JsBindings
+open ARCitISA.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module Preview =

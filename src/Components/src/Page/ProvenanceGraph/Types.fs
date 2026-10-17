@@ -1,7 +1,7 @@
-module Swate.Components.Page.ProvenanceGraph.Types
+module ARCitISA.Components.Page.ProvenanceGraph.Types
 
-open Swate.Components.Shared.ProvenanceGraph.Types
-open Swate.Components.Composite.GraphCanvas.Types
+open ARCitISA.Components.Shared.ProvenanceGraph.Types
+open ARCitISA.Components.Composite.GraphCanvas.Types
 
 /// The level of the explorer together with the selections that lead to it.
 /// Each deeper level keeps the ids of the shallower ones, so a view alone says where the user is.

@@ -1,14 +1,14 @@
-module internal Swate.Components.Composite.Widgets.DataAnnotator.HelperTests
+module internal ARCitISA.Components.Composite.Widgets.DataAnnotator.HelperTests
 
 open ARCtrl
 open Vitest
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.AnnotationTable.Context
-open Swate.Components.Composite.DataMapTable
-open Swate.Components.Composite.Widgets
-open Swate.Components.Composite.Widgets.DataAnnotator.Types
-open Swate.Components.Composite.Widgets.DataAnnotator.Helper
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.AnnotationTable.Context
+open ARCitISA.Components.Composite.DataMapTable
+open ARCitISA.Components.Composite.Widgets
+open ARCitISA.Components.Composite.Widgets.DataAnnotator.Types
+open ARCitISA.Components.Composite.Widgets.DataAnnotator.Helper
 
 let private input selectors = {
     Selectors = selectors

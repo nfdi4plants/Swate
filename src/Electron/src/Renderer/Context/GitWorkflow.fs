@@ -5,12 +5,12 @@ open Elmish
 open Fable.Core
 
 open Renderer.Types
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Page.GitSidebarTypes
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Page.GitSidebarTypes
+open ARCitISA.Electron.Shared
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.VersionControlTypes
 
 /// Large copies need time to settle before Git hashes their contents again.
 let private externalChangesRefreshDelayMs = 1500
@@ -19,7 +19,7 @@ let private externalChangesRefreshDelayMs = 1500
 [<Literal>]
 let DefaultDiffIndexingLimitMb = 1024
 
-/// The defaults Swate ships with. The renderer starts from these values until the main process
+/// The defaults ARCitISA ships with. The renderer starts from these values until the main process
 /// reports the effective ones, and keeps them when that call fails.
 let builtInUserDefaults: UserDefaultValuesDto = {
     LfsAutoTrackThresholdMb = 1
@@ -899,7 +899,7 @@ let private mergeProgressUpdate (model: GitState) (progress: VersionControlProgr
 /// The message shown for a structured failure: the library message plus its
 /// recovery instructions when it has any.
 let failureMessage (failure: OperationFailureDto) =
-    // Only a commit that exists while the index lags behind gets Swate's text. A held
+    // Only a commit that exists while the index lags behind gets ARCitISA's text. A held
     // lock without a commit keeps the library's instructions for the lock dialog.
     let usesIndexRecoveryText =
         failure.Code = "index_reconciliation_failed"
@@ -1075,10 +1075,10 @@ let private personalPublishOwner: GitPublishOwner = {
 /// process refuses such a rename, so the check joins the parent of the current path with the
 /// name and compares both with PathHelpers.normalizePathForFsComparison, as ArcVaultHelper does.
 let private keepsArcFolderName (currentArcPath: string) (name: string) =
-    let comparable = Swate.Components.Shared.PathHelpers.normalizePathForFsComparison
+    let comparable = ARCitISA.Components.Shared.PathHelpers.normalizePathForFsComparison
 
     let target =
-        match Swate.Components.Shared.PathHelpers.tryGetParentPath currentArcPath with
+        match ARCitISA.Components.Shared.PathHelpers.tryGetParentPath currentArcPath with
         | Some parent -> $"{parent}/{name}"
         | None -> name
 
@@ -1531,7 +1531,7 @@ let private loadPageAsync
 /// replaced is dropped, and a handle that arrives for such a page is closed at once.
 module GitDiffPageLoader =
 
-    module Paged = Swate.Components.Page.GitComparison.GitPagedDiffTypes
+    module Paged = ARCitISA.Components.Page.GitComparison.GitPagedDiffTypes
     module Presentation = Renderer.GitDiffPresentation
 
     [<Literal>]
@@ -4873,7 +4873,7 @@ let private updateCore
     | ArcPathChanged arcPath ->
         let pendingPublishAfterRefresh =
             match model.PendingPublishForPath, arcPath with
-            | Some pendingPath, Some nextPath -> Swate.Components.Shared.PathHelpers.pathsEqual pendingPath nextPath
+            | Some pendingPath, Some nextPath -> ARCitISA.Components.Shared.PathHelpers.pathsEqual pendingPath nextPath
             | _ -> false
 
         let nextModel = {
@@ -4977,7 +4977,7 @@ let private updateCore
     | ExternalRefreshDue _ -> model, Cmd.ofMsg RefreshRequestedSilently
     | GitRepositoryInitialized arcPath ->
         match model.CurrentArcPath with
-        | Some currentArcPath when Swate.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
+        | Some currentArcPath when ARCitISA.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
             model, Cmd.ofMsg RefreshRequested
         | _ -> model, Cmd.none
     | RefreshRequested when model.CurrentArcPath.IsNone ->
@@ -5674,7 +5674,9 @@ let private updateCore
         sessionId = model.ArcSessionId
         && not (
             model.CurrentArcPath
-            |> Option.exists (fun currentPath -> Swate.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath)
+            |> Option.exists (fun currentPath ->
+                ARCitISA.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath
+            )
         )
         ->
         {
@@ -5689,7 +5691,9 @@ let private updateCore
     | PublishRenameCompleted(sessionId, Ok renamedPath, selection) when
         sessionId <> model.ArcSessionId
         && (model.CurrentArcPath
-            |> Option.exists (fun currentPath -> Swate.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath))
+            |> Option.exists (fun currentPath ->
+                ARCitISA.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath
+            ))
         ->
         // The path change already reset the model. Its refresh may still be running or
         // may have finished before this reply, so a refresh is asked for either way and

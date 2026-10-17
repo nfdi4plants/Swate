@@ -3,9 +3,9 @@ module Renderer.Components.LeftSidebar.Main
 open Fable.Core
 open Feliz
 open Renderer.Types
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Primitive.ErrorModal.Context
+open ARCitISA.Components.Primitive.ErrorModal.Types
+open ARCitISA.Electron.Shared.FileIOTypes
 
 [<ReactComponent>]
 let private FileImportStatusNotice () =
@@ -38,7 +38,7 @@ let private FileImportStatusNotice () =
                     prop.className
                         "swt:alert swt:alert-info swt:w-fit swt:max-w-md swt:shadow-lg swt:pointer-events-auto"
                     prop.children [
-                        Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
+                        ARCitISA.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
                             text =
                                 if fileStateCtx.isCancellingFileImport then
                                     "Cancelling import..."

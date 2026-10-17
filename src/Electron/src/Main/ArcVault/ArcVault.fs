@@ -15,11 +15,11 @@ open Main.Bindings.Path
 open Main.ArcMerge
 open Main.ArcVaultHelper
 open Main.FileImportCoordinator
-open Swate.Components.Shared
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.IPCTypesHelper
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.FileIOTypes
 open ARCtrl
 
 type ArcLoadCancelledException(targetWindowId: int) =
@@ -173,14 +173,14 @@ type ArcVault(window: BrowserWindow) =
         this.arc <- Some arc
 
         if not (this.window.isDestroyed ()) then
-            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
+            this.window.title <- ARCitISA.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
         this.arc <- None
         this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
-            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+            this.window.title <- ARCitISA.Electron.Shared.ApplicationVersion.windowTitle None
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -202,11 +202,11 @@ module ArcVaultExtensions =
             try
                 match this.path, this.arc with
                 | Some arcPath, None ->
-                    match! ARC.LoadAsyncSwateZeroByteRepair arcPath with
+                    match! ARC.LoadAsyncARCitISAZeroByteRepair arcPath with
                     | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
                     | Ok snapshot -> return Ok snapshot
                 | Some arcPath, Some _ ->
-                    match! ARC.LoadAsyncSwate arcPath with
+                    match! ARC.LoadAsyncARCitISA arcPath with
                     | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
                     | Ok snapshot -> return Ok snapshot
                 | _ -> return Error(arcNotOpenError ())
@@ -282,7 +282,7 @@ module ArcVaultExtensions =
                                     nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
                                     hasFileTreeChanges <- true
                             with fileTreeError ->
-                                swatelogfn
+                                mainlogfn
                                     this.window.id
                                     "Unable to update file tree for watcher event '%s' on '%s': %s"
                                     event.EventName
@@ -377,7 +377,7 @@ module ArcVaultExtensions =
             match! this.TryTriggerArcInMemoryMergeOnFileWatcherEvents events with
             | Ok() -> ()
             | Error mergeError ->
-                swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
+                mainlogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
         }
 
         member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
@@ -385,11 +385,11 @@ module ArcVaultExtensions =
             let logWatcherDeferral deferralCount =
                 match deferralCount with
                 | 1 ->
-                    swatelogfn
+                    mainlogfn
                         this.window.id
                         "Watcher merge deferred because a write is running or ran during the snapshot load."
                 | 3 ->
-                    swatelogfn
+                    mainlogfn
                         this.window.id
                         "Watcher merge deferred three times in a row. The tree batch is published on this and every further deferral until a merge applies."
                 | _ -> ()
@@ -423,7 +423,7 @@ module ArcVaultExtensions =
                     Fable.Core.JS.setTimeout
                         (fun () ->
                             promise {
-                                swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
+                                mainlogfn this.window.id "Scheduled ARC reload triggered by file watcher."
                                 let callbackEpoch = this.WatcherEpoch
 
                                 if this.isBusyWriting then
@@ -472,7 +472,7 @@ module ArcVaultExtensions =
                                         | (WatcherMergeOutcome.Applied | WatcherMergeOutcome.Failed _) as outcome ->
                                             match outcome with
                                             | WatcherMergeOutcome.Failed mergeError ->
-                                                swatelogfn
+                                                mainlogfn
                                                     this.window.id
                                                     "Unable to merge ARC after file watcher event: %s"
                                                     mergeError.Message
@@ -489,7 +489,7 @@ module ArcVaultExtensions =
                                             finishReload ()
                                         | WatcherMergeOutcome.Deferred ->
                                             if callbackEpoch <> this.WatcherEpoch then
-                                                swatelogfn
+                                                mainlogfn
                                                     this.window.id
                                                     "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
 
@@ -538,7 +538,7 @@ module ArcVaultExtensions =
                                                     ()
                             }
                             |> Promise.catch (fun ex ->
-                                swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
+                                mainlogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
                                 finishReload ()
                             )
                             |> Promise.start
@@ -550,7 +550,7 @@ module ArcVaultExtensions =
 
             fun (eventName: string) (path: string) ->
 
-                swatelogfn this.window.id "File change detected: %s on %s" eventName path
+                mainlogfn this.window.id "File change detected: %s on %s" eventName path
 
                 WatcherHelpers.queueFileWatcherEvent
                     (fun event ->
@@ -582,7 +582,7 @@ module ArcVaultExtensions =
             | None -> Error(arcNotOpenError ())
             | Some arc ->
                 let normalizedRequest =
-                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
+                    ARCitISA.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
                 match updateARCByFileContentDTO arc normalizedRequest with
                 | Error saveError -> Error saveError
@@ -600,7 +600,7 @@ module ArcVaultExtensions =
                 return!
                     this.WithBusyWritingScope(fun () -> promise {
                         try
-                            match! arc.TryUpdateAsyncSwate(arcPath) with
+                            match! arc.TryUpdateAsyncARCitISA(arcPath) with
                             | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                             | Ok _ ->
                                 this.RefreshHasUnsavedArcChangesFlag()
@@ -619,9 +619,9 @@ module ArcVaultExtensions =
                 return Error(exn "ARCitISA is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arcLocal ->
                 let normalizedRequest =
-                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
+                    ARCitISA.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
-                match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
+                match ARCitISA.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
                 | Some arcFile ->
                     return!
@@ -629,7 +629,7 @@ module ArcVaultExtensions =
                             match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
                             | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                             | Ok _ ->
-                                match! ARC.LoadAsyncSwate arcPath with
+                                match! ARC.LoadAsyncARCitISA arcPath with
                                 | Ok persistedArc ->
                                     baselineArcStaticHashes persistedArc
                                     syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
@@ -685,14 +685,14 @@ module ArcVaultExtensions =
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
-                match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
-                | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
+                match! ARC.LoadAsyncARCitISAZeroByteRepair this.path.Value with
+                | Error e -> mainfailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
                 | Ok _ when this.window.isDestroyed () -> return raise (ArcLoadCancelledException this.window.id)
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()
             else
-                swatefailfn this.window.id "No path set for StartFileWatcher."
+                mainfailfn this.window.id "No path set for StartFileWatcher."
         }
 
         member this.StartFileWatcher(?usePolling: bool) =
@@ -712,7 +712,7 @@ module ArcVaultExtensions =
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
             else
-                swatefailfn this.window.id "No path set for StartFileWatcher."
+                mainfailfn this.window.id "No path set for StartFileWatcher."
 
         member this.ClearPendingFileWatcherState() =
             this.IncrementWatcherEpoch()
@@ -748,14 +748,14 @@ module ArcVaultExtensions =
             try
                 this.ClearArc()
             with error ->
-                swatelogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
+                mainlogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
 
             if not (this.window.isDestroyed ()) then
                 if hadUnsavedArcChanges then
                     try
                         sendArcHasUnsavedChangesUpdate false this.window
                     with error ->
-                        swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
+                        mainlogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
         }
 
         /// Loads the ARC during initialization. The watcher is activated only after the initial
@@ -766,7 +766,7 @@ module ArcVaultExtensions =
         member internal this.FinalizeArcInitialization(fileTree: Dictionary<string, FileEntry>) =
             match this.window.isDestroyed (), this.path with
             | true, _ -> raise (ArcLoadCancelledException this.window.id)
-            | false, None -> swatefailfn this.window.id "Unable to commit ARC initialization without a path."
+            | false, None -> mainfailfn this.window.id "Unable to commit ARC initialization without a path."
             | false, Some normalizedPath ->
                 this.fileTree <- fileTree
                 this.StartFileWatcher()
@@ -783,11 +783,11 @@ module ArcVaultExtensions =
 
         member this.OpenARC(path: string) = promise {
             match this.path with
-            | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."
+            | Some _ -> mainfailfn this.window.id "Unable to open ARC in vault bound to ARC."
             | None ->
                 let normalizedPath = PathHelpers.normalizePath path
 
-                swatelogfn this.window.id "path: %s" normalizedPath
+                mainlogfn this.window.id "path: %s" normalizedPath
                 this.isInitializingArc <- true
                 this.path <- Some normalizedPath
 
@@ -800,8 +800,8 @@ module ArcVaultExtensions =
 
         member this.CreateARC(path: string, identifier: string) = promise {
             match this.path, this.arc with
-            | Some _, _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to path."
-            | _, Some _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to ARC."
+            | Some _, _ -> mainfailfn this.window.id "Unable to create ARC in vault bound to path."
+            | _, Some _ -> mainfailfn this.window.id "Unable to create ARC in vault bound to ARC."
             | None, None ->
                 let normalizedPath = PathHelpers.normalizePath path
 
@@ -814,7 +814,7 @@ module ArcVaultExtensions =
 
                     do!
                         this.WithBusyWritingScope(fun () -> promise {
-                            match! arc.TryWriteAsyncSwate(normalizedPath) with
+                            match! arc.TryWriteAsyncARCitISA(normalizedPath) with
                             | Ok _ -> ()
                             | Error errors ->
                                 failwithf
@@ -873,7 +873,7 @@ module ArcVaultExtensions =
                         match moved with
                         | Ok() -> ()
                         | Error message ->
-                            swatelogfn
+                            mainlogfn
                                 this.window.id
                                 "ARC folder was renamed to '%s', but its version control binding could not follow: %s"
                                 renamedPath
@@ -884,7 +884,7 @@ module ArcVaultExtensions =
                         try
                             do! this.LoadArc()
                         with loadError ->
-                            swatelogfn
+                            mainlogfn
                                 this.window.id
                                 "ARC folder was renamed to '%s', but reload failed: %s"
                                 renamedPath
@@ -894,7 +894,7 @@ module ArcVaultExtensions =
                         try
                             this.StartFileWatcher()
                         with watcherError ->
-                            swatelogfn
+                            mainlogfn
                                 this.window.id
                                 "ARC folder was renamed to '%s', but file watcher restart failed: %s"
                                 renamedPath
@@ -904,7 +904,7 @@ module ArcVaultExtensions =
                         let! fileTree = getFileTree renamedPath
                         this.SetFileTree fileTree
                     with refreshError ->
-                        swatelogfn
+                        mainlogfn
                             this.window.id
                             "ARC folder was renamed to '%s', but file tree refresh failed: %s"
                             renamedPath
@@ -915,7 +915,7 @@ module ArcVaultExtensions =
                             this.window
                             (fun api -> api.pathChange (Some renamedPath))
                     with notifyError ->
-                        swatelogfn
+                        mainlogfn
                             this.window.id
                             "ARC folder was renamed to '%s', but renderer path notification failed: %s"
                             renamedPath
@@ -981,7 +981,7 @@ type ArcVaults() =
 
     member this.DisposeVault(id: int) =
         match this.Vaults.TryGetValue(id) with
-        | false, _ -> swatefailfn id "Failed to remove vault."
+        | false, _ -> mainfailfn id "Failed to remove vault."
         | true, vault ->
             vault.StopFileWatcher() |> Promise.start
             this.Vaults.Remove(id) |> ignore
@@ -1011,23 +1011,23 @@ type ArcVaults() =
         match this.TryGetVault(windowId) with
         | None ->
             let message = "Close request ignored. No vault found."
-            swatelogfn windowId "%s" message
+            mainlogfn windowId "%s" message
             return Error(exn message)
         | Some(vault: ArcVault) ->
             vault.isCloseRequestPending <- false
 
             match decision with
             | SaveBeforeQuitDecision.CancelClose ->
-                swatelogfn windowId "Close request cancelled by user."
+                mainlogfn windowId "Close request cancelled by user."
                 return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                swatelogfn windowId "Close request approved by user. Closing without saving."
+                mainlogfn windowId "Close request approved by user. Closing without saving."
                 vault.RefreshHasUnsavedArcChangesFlag()
                 vault.isCloseApproved <- true
                 vault.window.close ()
                 return Ok()
             | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Closing after main save."
+                mainlogfn windowId "Close request approved by user. Closing after main save."
 
                 if vault.hasUnsavedArcChanges then
                     let! persistResult = vault.WriteArc()
@@ -1086,7 +1086,7 @@ type ArcVaults() =
                             match importResult with
                             | Ok _ -> window.close ()
                             | Error importError ->
-                                swatelogfn id "Active import failed while closing: %s" importError.Message
+                                mainlogfn id "Active import failed while closing: %s" importError.Message
 
                                 if not (window.isDestroyed ()) then
                                     dialog.showErrorBox (
@@ -1096,7 +1096,7 @@ type ArcVaults() =
                         }
                         |> Promise.start
                 elif vault.isInitializingArc then
-                    swatelogfn id "Closing window directly because ARC initialization is still in progress."
+                    mainlogfn id "Closing window directly because ARC initialization is still in progress."
                 elif
                     host
                     |> Option.exists (fun currentHost ->
@@ -1158,7 +1158,7 @@ type ArcVaults() =
                                             let stillRunning = currentHost.RunningOperationIdsForWindow id
 
                                             if stillRunning.Length > 0 then
-                                                swatelogfn
+                                                mainlogfn
                                                     id
                                                     "Timed out waiting for version control operations before close: %s"
                                                     (String.concat ", " stillRunning)
@@ -1174,7 +1174,7 @@ type ArcVaults() =
                             with closeError ->
                                 vault.isWaitingForOperationsOnClose <- false
 
-                                swatelogfn
+                                mainlogfn
                                     id
                                     "Unable to close while a version control operation is running: %s"
                                     closeError.Message
@@ -1189,7 +1189,7 @@ type ArcVaults() =
                         WindowSend.send<IMainSaveBeforeQuitApi> vault.window (fun api -> api.requestSaveBeforeQuit ())
                 else
                     cancelWindowReads ()
-                    swatelogfn id "Closing window directly because no unsaved ARC changes are present."
+                    mainlogfn id "Closing window directly because no unsaved ARC changes are present."
             else
                 cancelWindowReads ()
         )
@@ -1231,7 +1231,7 @@ type ArcVaults() =
                 do! initialize vault
 
                 window.focus ()
-                swatelogfn id "Register window"
+                mainlogfn id "Register window"
 
                 return vault
             with error ->
@@ -1240,7 +1240,7 @@ type ArcVaults() =
                     try
                         notifyFailure error
                     with notificationError ->
-                        swatelogfn id "Failed to report window registration error: %s" notificationError.Message
+                        mainlogfn id "Failed to report window registration error: %s" notificationError.Message
                 )
 
                 let targetWasDestroyed = window.isDestroyed ()

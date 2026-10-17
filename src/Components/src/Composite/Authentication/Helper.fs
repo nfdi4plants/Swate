@@ -1,7 +1,7 @@
-module Swate.Components.Composite.Authentication.Helper
+module ARCitISA.Components.Composite.Authentication.Helper
 
 open Types
-open Swate.Components
+open ARCitISA.Components
 
 type DataHubInformation = {
     Name: string

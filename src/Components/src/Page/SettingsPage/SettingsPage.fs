@@ -1,20 +1,21 @@
-namespace Swate.Components.PageComponents.SettingsPage
+namespace ARCitISA.Components.PageComponents.SettingsPage
 
 open System
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components
-open Swate.Components.Page.GitSidebarTypes
-open Swate.Components.Primitive.LayoutComponents
-open Swate.Components.Composite.ThemeSelector
-open Swate.Components.Composite.ThemeSelector.Context
-open Swate.Components.Composite.TermSearch
-open Swate.Components.Util.UserOS
+open ARCitISA.Components
+open ARCitISA.Components.Page.GitSidebarTypes
+open ARCitISA.Components.Primitive.LayoutComponents
+open ARCitISA.Components.Composite.ThemeSelector
+open ARCitISA.Components.Composite.ThemeSelector.Context
+open ARCitISA.Components.Composite.TermSearch
+open ARCitISA.Components.Util.UserOS
 
 module SettingsPageDefaults =
     [<Literal>]
-    let AutoCreateNotesFolderLocalStorageKey = "swate-settings-auto-create-notes-folder"
+    let AutoCreateNotesFolderLocalStorageKey =
+        "arcitisa-settings-auto-create-notes-folder"
 
 module private SettingsPageHelper =
 

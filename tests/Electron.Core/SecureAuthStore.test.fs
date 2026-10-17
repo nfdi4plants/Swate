@@ -6,7 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Auth
 open Main.Bindings.Path
-open Swate.Components.Composite.Authentication.Types
+open ARCitISA.Components.Composite.Authentication.Types
 open Vitest
 open ElectronCore.TestHelpers
 
@@ -33,7 +33,7 @@ let private ensureAuthDirectoryAsync rootPath : JS.Promise<string> = promise {
     return authDirectory
 }
 
-let private seedStoredCredentialAsync rootPath localSwateAccountId metadataJson (token: string) : JS.Promise<unit> = promise {
+let private seedStoredCredentialAsync rootPath localARCitISAAccountId metadataJson (token: string) : JS.Promise<unit> = promise {
     let! authDirectory = ensureAuthDirectoryAsync rootPath
     let encryptedToken = token |> Encoding.UTF8.GetBytes |> Convert.ToBase64String
 
@@ -41,11 +41,11 @@ let private seedStoredCredentialAsync rootPath localSwateAccountId metadataJson 
         writeUtf8FileAsync
             (join [|
                 authDirectory
-                $"{localSwateAccountId}-credentials.enc"
+                $"{localARCitISAAccountId}-credentials.enc"
             |])
             encryptedToken
 
-    do! writeUtf8FileAsync (join [| authDirectory; $"{localSwateAccountId}-meta.json" |]) metadataJson
+    do! writeUtf8FileAsync (join [| authDirectory; $"{localARCitISAAccountId}-meta.json" |]) metadataJson
 }
 
 let private seedActiveAccountAsync rootPath activeAccountJson : JS.Promise<unit> = promise {
@@ -54,8 +54,8 @@ let private seedActiveAccountAsync rootPath activeAccountJson : JS.Promise<unit>
 }
 
 let private withTempAuthStore (testBody: string -> JS.Promise<unit>) : JS.Promise<unit> = promise {
-    let! rootPath = createTempDirectoryAsync "swate-auth-store-"
-    Vitest.vi.stubEnv ("SWATE_TEST_USER_DATA", Some rootPath)
+    let! rootPath = createTempDirectoryAsync "arcitisa-auth-store-"
+    Vitest.vi.stubEnv ("ARCITISA_TEST_USER_DATA", Some rootPath)
 
     try
         do! testBody rootPath
@@ -73,14 +73,17 @@ let private expectStoredCredential (credential: SecureAuthStore.StoredCredential
     | None -> failwith "Expected stored credential to load."
 
 Vitest.describe (
-    "SecureAuthStore.generateLocalSwateAccountId",
+    "SecureAuthStore.generateLocalARCitISAAccountId",
     fun () ->
         Vitest.test (
             "produces distinct hashes for emails that previously collided",
             fun () ->
                 let targetDataHub = "https://datahub.example.org"
-                let dotted = SecureAuthStore.generateLocalSwateAccountId targetDataHub "a.b@x"
-                let underscored = SecureAuthStore.generateLocalSwateAccountId targetDataHub "a_b@x"
+                let dotted = SecureAuthStore.generateLocalARCitISAAccountId targetDataHub "a.b@x"
+
+                let underscored =
+                    SecureAuthStore.generateLocalARCitISAAccountId targetDataHub "a_b@x"
+
                 Vitest.expect(dotted <> underscored).toBe (true)
         )
 
@@ -88,10 +91,10 @@ Vitest.describe (
             "normalizes host casing, trailing slash, and email whitespace",
             fun () ->
                 let canonical =
-                    SecureAuthStore.generateLocalSwateAccountId "https://datahub.example.org" "user@example.org"
+                    SecureAuthStore.generateLocalARCitISAAccountId "https://datahub.example.org" "user@example.org"
 
                 let normalizedVariant =
-                    SecureAuthStore.generateLocalSwateAccountId "https://DATAHUB.example.org/" " User@Example.org "
+                    SecureAuthStore.generateLocalARCitISAAccountId "https://DATAHUB.example.org/" " User@Example.org "
 
                 Vitest.expect(normalizedVariant).toBe (canonical)
         )
@@ -100,7 +103,7 @@ Vitest.describe (
             "returns a filesystem-safe hex hash",
             fun () ->
                 let accountId =
-                    SecureAuthStore.generateLocalSwateAccountId "https://datahub.example.org" "user@example.org"
+                    SecureAuthStore.generateLocalARCitISAAccountId "https://datahub.example.org" "user@example.org"
 
                 Vitest.expect(accountId.Length).toBe (64)
                 Vitest.expect(isLowerHex accountId).toBe (true)
@@ -116,7 +119,7 @@ Vitest.describe (
                 withTempAuthStore (fun _ -> promise {
                     let credential: SecureAuthStore.StoredCredential = {
                         Metadata = {
-                            LocalSwateAccountId = "current-key"
+                            LocalARCitISAAccountId = "current-key"
                             Id = 42
                             Username = "current-user"
                             Name = "Current User"
@@ -163,12 +166,12 @@ Vitest.describe (
             fun () ->
                 withTempAuthStore (fun rootPath -> promise {
                     let metadataJson =
-                        """{"localSwateAccountId":"stored-key","id":42,"name":"Current User","email":"current@example.org","avatarUrl":"https://example.org/avatar.png","targetDataHub":"https://datahub.example.org"}"""
+                        """{"localARCitISAAccountId":"stored-key","id":42,"name":"Current User","email":"current@example.org","avatarUrl":"https://example.org/avatar.png","targetDataHub":"https://datahub.example.org"}"""
 
                     do! seedStoredCredentialAsync rootPath "filename-key" metadataJson "token"
 
                     let loaded = SecureAuthStore.tryLoad "filename-key" |> expectStoredCredential
-                    Vitest.expect(loaded.Metadata.LocalSwateAccountId).toBe ("filename-key")
+                    Vitest.expect(loaded.Metadata.LocalARCitISAAccountId).toBe ("filename-key")
                     Vitest.expect(loaded.Metadata.Id).toBe (42)
                 })
         )
@@ -188,8 +191,8 @@ Vitest.describe (
             "restores the current active account selection",
             fun () ->
                 withTempAuthStore (fun _ -> promise {
-                    SecureAuthStore.setActiveLocalSwateAccountId (Some "current-account")
-                    Vitest.expect(SecureAuthStore.getActiveLocalSwateAccountId ()).toBe (Some "current-account")
+                    SecureAuthStore.setActiveLocalARCitISAAccountId (Some "current-account")
+                    Vitest.expect(SecureAuthStore.getActiveLocalARCitISAAccountId ()).toBe (Some "current-account")
                 })
         )
 
@@ -197,14 +200,14 @@ Vitest.describe (
             "rejects unsafe and malformed active account selections",
             fun () ->
                 withTempAuthStore (fun rootPath -> promise {
-                    do! seedActiveAccountAsync rootPath """{"localSwateAccountId":"../unsafe"}"""
-                    Vitest.expect(SecureAuthStore.getActiveLocalSwateAccountId ()).toBe (None)
+                    do! seedActiveAccountAsync rootPath """{"localARCitISAAccountId":"../unsafe"}"""
+                    Vitest.expect(SecureAuthStore.getActiveLocalARCitISAAccountId ()).toBe (None)
 
                     do! seedActiveAccountAsync rootPath """{"accountId":"unsupported-account"}"""
-                    Vitest.expect(SecureAuthStore.getActiveLocalSwateAccountId ()).toBe (None)
+                    Vitest.expect(SecureAuthStore.getActiveLocalARCitISAAccountId ()).toBe (None)
 
-                    do! seedActiveAccountAsync rootPath """{"localSwateAccountId":"""
-                    Vitest.expect(SecureAuthStore.getActiveLocalSwateAccountId ()).toBe (None)
+                    do! seedActiveAccountAsync rootPath """{"localARCitISAAccountId":"""
+                    Vitest.expect(SecureAuthStore.getActiveLocalARCitISAAccountId ()).toBe (None)
                 })
         )
 )

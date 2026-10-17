@@ -1,14 +1,14 @@
 /// https://api.terminology.tib.eu/swagger-ui/index.html
-module Swate.Components.Api.TIBApi
+module ARCitISA.Components.Api.TIBApi
 
 
-open Swate.Components
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Shared
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Remoting.Client
 open Fetch
-open Swate.Components.Api.Helper
+open ARCitISA.Components.Api.Helper
 
 
 [<RequireQualifiedAccess>]

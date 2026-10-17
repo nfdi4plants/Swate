@@ -1,13 +1,13 @@
 namespace Spreadsheet
 
-open Swate.Components
+open ARCitISA.Components
 open ARCtrl
 open FileImport
-open Swate.Components.Shared
-open Swate.Components.Composite.TermSearch.Types
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Composite.TermSearch.Types
 
 
-type ActiveView = Swate.Components.Page.ArcFileEditor.Types.ActiveView
+type ActiveView = ARCitISA.Components.Page.ArcFileEditor.Types.ActiveView
 
 type ColumnType =
     | Main
@@ -145,8 +145,8 @@ type Msg =
     | SetCell of CellCoordinate * term: Term option
     | Clear of index: CellCoordinate[]
     | FillColumnWithTerm of index: CellCoordinate
-    // /// Update column of index to new column type defined by given SwateCell.emptyXXX
-    // | EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option
+    // /// Update column of index to new column type defined by given ARCitISACell.emptyXXX
+    // | EditColumn of index: int * newType: ARCitISACell * b_type: BuildingBlockType option
     /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
     | Reset
     | ImportXlsx of byte[]
@@ -170,7 +170,7 @@ type Msg =
     /// Starts chain to export active table to isa json
     | ExportJson of ArcFiles * JsonExportFormat
     | ImportJsonRaw of SpreadsheetInterface.ImportJsonRawDTO
-    /// Starts chain to export all tables to xlsx swate tables.
+    /// Starts chain to export all tables to xlsx tables.
     | ExportXlsx of ArcFiles
     | ExportXlsxDownload of filename: string * byte[]
 // <--> Result Messages <-->

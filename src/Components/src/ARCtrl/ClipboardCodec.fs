@@ -1,17 +1,17 @@
-module Swate.Components.ClipboardCodec
+module ARCitISA.Components.ClipboardCodec
 
 open ARCtrl
 open Browser.Dom
 open Fable.Core
 
 [<Literal>]
-let MimeType = "web application/x-swate-cells+json"
+let MimeType = "web application/x-arcitisa-cells+json"
 
 [<Literal>]
 let private CurrentVersion = 1
 
 [<Literal>]
-let private HtmlPayloadAttribute = "data-swate-cells"
+let private HtmlPayloadAttribute = "data-arcitisa-cells"
 
 type CellDto = {
     Kind: string
@@ -170,7 +170,7 @@ let private createHtmlTable (plainText: string) (payloadText: string) =
     let encodedPayload = payloadText |> JS.encodeURIComponent
 
     let tableRows =
-        plainText.Split(Swate.Components.ClipboardContract.Contract.LineBreaks, System.StringSplitOptions.None)
+        plainText.Split(ARCitISA.Components.ClipboardContract.Contract.LineBreaks, System.StringSplitOptions.None)
         |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
         |> Array.map (fun row ->
             row
@@ -224,9 +224,9 @@ let private tryReadHtmlPayload (item: ClipboardItem) = promise {
 
 let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     match cells with
-    | None -> do! Swate.Components.GlobalBindings.navigator.clipboard.writeText plainText
+    | None -> do! ARCitISA.Components.GlobalBindings.navigator.clipboard.writeText plainText
     | Some cells ->
-        let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
+        let clipboard = ARCitISA.Components.GlobalBindings.navigator.clipboard
         let payloadText = cells |> createPayload |> encode
         let htmlText = createHtmlTable plainText payloadText
 
@@ -245,13 +245,13 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
                 do! clipboard.writeText plainText
 }
 
-let private createContent cells plainText : Swate.Components.ClipboardContract.Types.ClipboardContent = {
+let private createContent cells plainText : ARCitISA.Components.ClipboardContract.Types.ClipboardContent = {
     Cells = cells
     PlainText = plainText
 }
 
 let read () = promise {
-    let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
+    let clipboard = ARCitISA.Components.GlobalBindings.navigator.clipboard
 
     try
         let! items = clipboard.read ()

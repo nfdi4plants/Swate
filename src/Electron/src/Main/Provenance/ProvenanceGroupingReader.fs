@@ -1,8 +1,8 @@
 module Main.Provenance.ProvenanceGroupingReader
 
 open ARCtrl
-open Swate.Components.Shared.ProvenanceGrouping.ARCtrlConverter
-open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
+open ARCitISA.Components.Shared.ProvenanceGrouping.ARCtrlConverter
+open ARCitISA.Electron.Shared.DTOs.ProvenanceGroupingDto
 
 let private selectionsFor scope parentIdentifier (tables: ResizeArray<ArcTable>) =
     tables

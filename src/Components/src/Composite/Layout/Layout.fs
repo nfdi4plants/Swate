@@ -1,10 +1,10 @@
-namespace Swate.Components.Composite.Layout
+namespace ARCitISA.Components.Composite.Layout
 
 open Feliz
 open Fable.Core
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Navbar
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Navbar
 
 module private Mocks =
 
@@ -14,8 +14,8 @@ module private Mocks =
         | Settings
         | Info
 
-open Swate.Components.Composite.Layout.LeftSidebarContext
-open Swate.Components.Composite.Layout.RightSidebarContext
+open ARCitISA.Components.Composite.Layout.LeftSidebarContext
+open ARCitISA.Components.Composite.Layout.RightSidebarContext
 
 module private LayoutHelper =
 

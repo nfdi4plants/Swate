@@ -4,8 +4,8 @@ open ARCtrl
 open ARCtrl.Contract
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOHelper
 
 
 [<AutoOpen>]

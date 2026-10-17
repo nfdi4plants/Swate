@@ -3,7 +3,7 @@ module Bundle
 
 open ProjectInfo
 
-let Client (forSwate: bool) =
+let Client (forServer: bool) =
 
     run
         "dotnet"
@@ -14,8 +14,8 @@ let Client (forSwate: bool) =
             "-s"
             "-e"
             "fs.js"
-            if forSwate then
-                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+            if forServer then
+                yield! DEFINE_ARCITISA_ENVIRONMENT_FABLE
             "--run"
             "npx"
             "vite"
@@ -46,7 +46,7 @@ let All () =
                 "-s"
                 "-e"
                 "fs.js"
-                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                yield! DEFINE_ARCITISA_ENVIRONMENT_FABLE
                 "--run"
                 "npx"
                 "vite"

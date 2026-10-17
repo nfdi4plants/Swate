@@ -1,4 +1,4 @@
-module internal Swate.Components.Page.ProvenanceGraph.ToCanvasTests
+module internal ARCitISA.Components.Page.ProvenanceGraph.ToCanvasTests
 
 // Ported from toCanvas.test.ts of arc-portal-ui and from the navigation and legend code of
 // ProvenanceExplorer.tsx and Legend.tsx. Every case of toCanvas.test.ts is ported.
@@ -14,14 +14,14 @@ module internal Swate.Components.Page.ProvenanceGraph.ToCanvasTests
 // the labels of the legend. The assertions keep the text built from data (labels, kinds, counts).
 
 open Vitest
-open Swate.Components.Shared.ProvenanceGraph.Types
-open Swate.Components.Shared.ProvenanceGraph.BuildIndex
-open Swate.Components.Shared.ProvenanceGraph.Queries
-open Swate.Components.Composite.GraphCanvas.Types
-open Swate.Components.Page.ProvenanceGraph.Types
-open Swate.Components.Page.ProvenanceGraph.ToCanvas
+open ARCitISA.Components.Shared.ProvenanceGraph.Types
+open ARCitISA.Components.Shared.ProvenanceGraph.BuildIndex
+open ARCitISA.Components.Shared.ProvenanceGraph.Queries
+open ARCitISA.Components.Composite.GraphCanvas.Types
+open ARCitISA.Components.Page.ProvenanceGraph.Types
+open ARCitISA.Components.Page.ProvenanceGraph.ToCanvas
 
-module Sample = Swate.Components.Page.ProvenanceGraphSample
+module Sample = ARCitISA.Components.Page.ProvenanceGraphSample
 
 // Builders
 

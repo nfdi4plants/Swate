@@ -5,8 +5,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.IPC.FileSystemIO
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -17,7 +17,7 @@ let private nodeError (message: string) (code: string) : exn = jsNative
 
 let private withAssayArc =
     TestHelpers.withTempArcWith
-        "swate-generic-fs-"
+        "arcitisa-generic-fs-"
         "GenericFileSystemArc"
         (fun arc -> arc.InitAssay("AssayA") |> ignore)
 
@@ -131,7 +131,7 @@ Vitest.describe (
             "temporary import directory name matches the watcher ignore convention",
             fun () ->
                 let directoryName = ArcFileSystemHelper.createTemporaryImportDirectoryName ()
-                let exactPattern = """^\.swate-import-[0-9a-f]{32}$"""
+                let exactPattern = """^\.arcitisa-import-[0-9a-f]{32}$"""
 
                 Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(directoryName, exactPattern)).toBe (true)
 
@@ -278,8 +278,8 @@ Vitest.describe (
 
                         Vitest.expect(firstExists).toBe (false)
                         Vitest.expect(secondExists).toBe (false)
-                        Vitest.expect(targetEntries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
-                        Vitest.expect(arcParentEntries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                        Vitest.expect(targetEntries |> Array.exists _.StartsWith(".arcitisa-import-")).toBe (false)
+                        Vitest.expect(arcParentEntries |> Array.exists _.StartsWith(".arcitisa-import-")).toBe (false)
                 })
         )
 
@@ -341,7 +341,7 @@ Vitest.describe (
                         let! entries = fsPromisesDynamic?readdir targetDirectory |> unbox<JS.Promise<string[]>>
 
                         Vitest.expect(firstExists).toBe (false)
-                        Vitest.expect(entries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                        Vitest.expect(entries |> Array.exists _.StartsWith(".arcitisa-import-")).toBe (false)
                 })
         )
 
@@ -856,7 +856,7 @@ Vitest.describe (
             "retries transient recursive remove errors",
             fun () -> promise {
                 let mutable attempts = 0
-                let targetPath = "/tmp/swate-retry-target"
+                let targetPath = "/tmp/arcitisa-retry-target"
 
                 let removePathAsync path = promise {
                     attempts <- attempts + 1

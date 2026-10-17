@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.SortableList
+namespace ARCitISA.Components.Composite.SortableList
 
 open Fable.Core
 open Feliz

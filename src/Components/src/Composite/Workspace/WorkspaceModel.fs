@@ -1,8 +1,8 @@
-module Swate.Components.Composite.Workspace.WorkspaceModel
+module ARCitISA.Components.Composite.Workspace.WorkspaceModel
 
 open System
 open Fable.Core
-open Swate.Components.Composite.Workspace.Types
+open ARCitISA.Components.Composite.Workspace.Types
 
 module private Helper =
 

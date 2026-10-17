@@ -1,8 +1,8 @@
-module Swate.Components.ClipboardContract.Actions
+module ARCitISA.Components.ClipboardContract.Actions
 
-open Swate.Components.ClipboardContract.Types
+open ARCitISA.Components.ClipboardContract.Types
 
 let cut (content: ClipboardContent) (clearSource: unit -> unit) = promise {
-    do! Swate.Components.ClipboardCodec.write content.PlainText content.Cells
+    do! ARCitISA.Components.ClipboardCodec.write content.PlainText content.Cells
     clearSource ()
 }

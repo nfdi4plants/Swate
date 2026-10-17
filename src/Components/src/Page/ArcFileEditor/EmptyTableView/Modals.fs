@@ -1,14 +1,14 @@
-namespace Swate.Components.Page.ArcFileEditor.EmptyTableView
+namespace ARCitISA.Components.Page.ArcFileEditor.EmptyTableView
 
 open Feliz
 open Fable.Core
 open ARCtrl
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Composite.Widgets
-open Swate.Components.Composite.Widgets.BuildingBlockWidget
-open Swate.Components.Page.ArcFileEditor.EmptyTableView
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Composite.Widgets
+open ARCitISA.Components.Composite.Widgets.BuildingBlockWidget
+open ARCitISA.Components.Page.ArcFileEditor.EmptyTableView
 
 [<Erase; Mangle(false)>]
 type Modals =
@@ -54,7 +54,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
             children =
-                Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(
+                ARCitISA.Components.Composite.Widgets.TemplateWidget.TemplateWidget(
                     arcFile,
                     activeTableIndex,
                     setArcFileAndClose

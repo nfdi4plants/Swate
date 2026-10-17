@@ -1,0 +1,35 @@
+<Solution>
+    <Folder Name="/src/" />
+    <Folder Name="/src/Electron/" />
+    <Folder Name="/src/Electron/src/" />
+    <Folder Name="/tests/" />
+    <Folder Name="/tests/Client/">
+        <Project Path="tests/Client/Client.Tests.fsproj" />
+    </Folder>
+    <Folder Name="/tests/Electron.Core/">
+        <Project Path="tests/Electron.Core/Electron.Core.Tests.fsproj" />
+    </Folder>
+    <Folder Name="/tests/Electron.Renderer/">
+        <Project Path="tests/Electron.Renderer/Electron.Renderer.Tests.fsproj" />
+    </Folder>
+    <Folder Name="/tests/Server/">
+        <Project Path="tests/Server/Server.Tests.fsproj" />
+    </Folder>
+    <Folder Name="/tests/Shared/">
+        <Project Path="tests/Shared/Shared.Tests.fsproj" />
+    </Folder>
+    <Project Path="src/Client/Client.fsproj" />
+    <Project Path="src/Server/Server.fsproj" />
+    <Project Path="src/Shared/ARCitISA.Components.Core.fsproj" />
+    <Project Path="src/Components/src/ARCitISA.Components.fsproj" />
+    <Folder Name="/build/">
+        <Project Path="build/Build.fsproj" />
+    </Folder>
+    <Folder Name="/Electron/">
+        <Project Path="src/Electron/src/ARCitISA.Electron.fsproj" />
+        <Project Path="src/Electron/src/Preload/Preload.fsproj" />
+        <Project Path="src/Electron/src/Renderer/Renderer.fsproj" />
+        <Project Path="src/Electron/src/Main/Main.fsproj" />
+        <Project Path="src/Electron/src/ARCitISA.Electron.Shared/ARCitISA.Electron.Shared.fsproj" />
+    </Folder>
+</Solution>

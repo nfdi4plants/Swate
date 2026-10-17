@@ -1,9 +1,9 @@
-namespace Swate.Components.Primitive.Buttons
+namespace ARCitISA.Components.Primitive.Buttons
 
 open Feliz
 open Fable.Core
-open Swate.Components
-open Swate.Components.Primitive
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
 
 [<Erase; Mangle(false)>]
 type Buttons =

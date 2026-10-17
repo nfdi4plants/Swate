@@ -1,8 +1,8 @@
-module Swate.Components.Page.ArcFileEditor.EmptyTableView.Helper
+module ARCitISA.Components.Page.ArcFileEditor.EmptyTableView.Helper
 
 open ARCtrl
-open Swate.Components
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Shared
 
 let tryGetActiveTable (arcFile: ArcFiles) (activeTableIndex: int option) =
     arcFile.TryGetActiveTable(activeTableIndex)

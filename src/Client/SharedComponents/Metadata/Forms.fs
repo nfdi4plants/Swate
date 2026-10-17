@@ -11,14 +11,14 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Fetch
 open ARCtrl.Json
-open Swate.Components
-open Swate.Components.Primitive
-open Swate.Components.Primitive.Buttons
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Composite.TermSearch
-open Swate.Components.Composite.TermSearch.Types
+open ARCitISA.Components
+open ARCitISA.Components.Primitive
+open ARCitISA.Components.Primitive.Buttons
+open ARCitISA.Components.Primitive.BaseModal
+open ARCitISA.Components.Composite.TermSearch
+open ARCitISA.Components.Composite.TermSearch.Types
 open Components
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 module API =
 

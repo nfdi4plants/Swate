@@ -1,10 +1,10 @@
-module Swate.Components.Page.DataHub.DataHubBrowserModel
+module ARCitISA.Components.Page.DataHub.DataHubBrowserModel
 
 open Fable.Core
-open Swate.Components
-open Swate.Components.Composite.Authentication.Types
-open Swate.Components.Api.GitLabApi
-open Swate.Components.Page.DataHub.DataHubTypes
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Components.Api.GitLabApi
+open ARCitISA.Components.Page.DataHub.DataHubTypes
 open Elmish
 
 type Msg =

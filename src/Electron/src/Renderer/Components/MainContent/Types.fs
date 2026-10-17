@@ -1,8 +1,8 @@
 module Renderer.Components.MainContent.Types
 
 
-open Swate.Components.Shared
-open Swate.Electron.Shared
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared
 open Renderer
 
 type ArcTargetProps = {

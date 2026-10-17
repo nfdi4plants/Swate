@@ -6,9 +6,9 @@ open Fable.Core.JsInterop
 open Main
 open Main.Bindings.Path
 open Main.VersionControl
-open Swate.Components.Composite.Authentication.Types
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Components.Composite.Authentication.Types
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 open Vitest
 open ElectronCore.TestHelpers
@@ -51,7 +51,7 @@ let private createTempDirectoryAsync () : Fable.Core.JS.Promise<string> =
     let prefix =
         join [|
             osDynamic?tmpdir () |> unbox<string>
-            "swate-electron-file-tree-"
+            "arcitisa-electron-file-tree-"
         |]
 
     fsPromisesDynamic?mkdtemp (prefix) |> unbox<Fable.Core.JS.Promise<string>>

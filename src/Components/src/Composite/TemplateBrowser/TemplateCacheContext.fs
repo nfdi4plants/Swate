@@ -1,8 +1,8 @@
-module Swate.Components.Composite.Template.TemplateCacheContext
+module ARCitISA.Components.Composite.Template.TemplateCacheContext
 
 open Feliz
 open ARCtrl
-open Swate.Components.Composite.Template.Types
+open ARCitISA.Components.Composite.Template.Types
 
 type TemplateCacheContext = {
     Templates: Template[]

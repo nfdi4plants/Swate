@@ -3,10 +3,10 @@ module Main.IPC.FileSystemIO
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.RenamePathRules
+open ARCitISA.Components.Shared
+open ARCitISA.Electron.Shared.FileIOTypes
+open ARCitISA.Electron.Shared.FileIOHelper
+open ARCitISA.Electron.Shared.RenamePathRules
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 
@@ -218,7 +218,7 @@ module ArcFileSystemHelper =
 
     let createTemporaryImportDirectoryName () =
         let guid = Guid.NewGuid().ToString("N")
-        $".swate-import-{guid}"
+        $".arcitisa-import-{guid}"
 
     let private resolveArcRootOrRelativePath arcPath relativePath =
         let normalizedPath = relativePath |> PathHelpers.normalizeCanonicalRelativePath
@@ -480,7 +480,7 @@ module ArcFileSystemHelper =
         let sourceParentAbsolutePath =
             pathDynamic?dirname (sourceAbsolutePath) |> unbox<string>
 
-        let tempFileName = ".swate-move-" + Guid.NewGuid().ToString("N") + ".tmp"
+        let tempFileName = ".arcitisa-move-" + Guid.NewGuid().ToString("N") + ".tmp"
 
         let tempAbsolutePath =
             pathDynamic?join (sourceParentAbsolutePath, tempFileName) |> unbox<string>

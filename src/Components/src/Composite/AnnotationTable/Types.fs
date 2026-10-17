@@ -1,9 +1,9 @@
-module Swate.Components.Composite.AnnotationTable.Types
+module ARCitISA.Components.Composite.AnnotationTable.Types
 
 open Fable.Core
 open Feliz
-open Swate.Components
-open Swate.Components.Composite.Table.Types
+open ARCitISA.Components
+open ARCitISA.Components.Composite.Table.Types
 
 module AnnotationTableContextMenu =
 

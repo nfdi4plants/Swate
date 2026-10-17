@@ -1,10 +1,10 @@
 module Main.Auth.GitLabApi
 
 open Fable.Core
-open Swate.Electron.Shared.AuthTypes
-open Swate.Components.Composite.Authentication.Types
+open ARCitISA.Electron.Shared.AuthTypes
+open ARCitISA.Components.Composite.Authentication.Types
 
-module ComponentsGitLabApi = Swate.Components.Api.GitLabApi
+module ComponentsGitLabApi = ARCitISA.Components.Api.GitLabApi
 
 type GitLabAuthFailure = {
     Kind: AuthFailureKind
@@ -47,12 +47,12 @@ let private mapGitLabError (error: ComponentsGitLabApi.GitLabError) : GitLabAuth
       }
 
 let private toAuthUserDto (baseUrl: string) (user: ComponentsGitLabApi.CurrentUserDto) : AuthUserDto =
-    let localSwateAccountId =
-        SecureAuthStore.generateLocalSwateAccountId baseUrl user.email
+    let localARCitISAAccountId =
+        SecureAuthStore.generateLocalARCitISAAccountId baseUrl user.email
 
     {
         Id = user.id
-        LocalSwateAccountId = localSwateAccountId
+        LocalARCitISAAccountId = localARCitISAAccountId
         Username = user.username
         Name = user.name
         Email = user.email

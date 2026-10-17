@@ -1,7 +1,7 @@
-module Swate.Components.Shared.ProvenanceGrouping.Fixtures
+module ARCitISA.Components.Shared.ProvenanceGrouping.Fixtures
 
-open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Session
+open ARCitISA.Components.Shared.ProvenanceGrouping.Types
+open ARCitISA.Components.Shared.ProvenanceGrouping.Session
 
 let term name = {
     Name = name

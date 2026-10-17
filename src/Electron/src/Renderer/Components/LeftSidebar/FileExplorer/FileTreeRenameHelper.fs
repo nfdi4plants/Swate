@@ -1,7 +1,7 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 
-open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Shared
+open ARCitISA.Components.Page.FileExplorer.Types
+open ARCitISA.Components.Shared
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 

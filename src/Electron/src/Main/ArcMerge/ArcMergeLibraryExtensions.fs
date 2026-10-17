@@ -2,7 +2,7 @@ namespace Main.ArcMerge
 
 open ARCtrl
 open Main.ARCtrlExtensions
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 
 module ArcMergeHelper =
 

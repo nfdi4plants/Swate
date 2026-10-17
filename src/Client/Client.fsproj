@@ -129,7 +129,6 @@
     <PackageReference Include="ExcelJS.Fable" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Components\src\Swate.Components.fsproj" />
-    <ProjectReference Include="..\Shared\Swate.Components.Core.fsproj" />
+    <ProjectReference Include="..\Components\src\ARCitISA.Components.fsproj" />
   </ItemGroup>
 </Project>

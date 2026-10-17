@@ -5,7 +5,7 @@ open ARCtrl
 open ARCtrl.Contract
 open Main.ARCtrlExtensions
 open Main.ArcMerge
-open Swate.Components.Shared
+open ARCitISA.Components.Shared
 open ARC
 
 [<RequireQualifiedAccess>]
@@ -63,7 +63,7 @@ module ArcDeleteHelper =
         | None -> Error(exn $"Could not determine the canonical ARC entity file for '{identifier}'.")
 
     let private mergeDeletedEntityFromDisk arcPath canonicalFilePath (arcLocal: ARC) = promise {
-        match! ARC.LoadAsyncSwate arcPath with
+        match! ARC.LoadAsyncARCitISA arcPath with
         | Error errors ->
             return
                 Error(
@@ -115,7 +115,7 @@ module ArcDeleteHelper =
         | Error validationError -> return Error validationError
         | Ok(fileType, identifier, normalizedRelativePath, canonicalFilePath) ->
             try
-                match! ARC.LoadAsyncSwate arcPath with
+                match! ARC.LoadAsyncARCitISA arcPath with
                 | Error errors ->
                     return
                         Error(

@@ -1,13 +1,13 @@
-namespace Swate.Components.Composite.ArcSelector
+namespace ARCitISA.Components.Composite.ArcSelector
 
 open Feliz
 open Fable.Core
 
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Primitive.Dropdown
-open Swate.Components.Composite.Actionbar
-open Swate.Components.Composite.Actionbar.Types
+open ARCitISA.Components
+open ARCitISA.Components.Shared
+open ARCitISA.Components.Primitive.Dropdown
+open ARCitISA.Components.Composite.Actionbar
+open ARCitISA.Components.Composite.Actionbar.Types
 
 [<Erase; Mangle(false)>]
 type ArcSelector =

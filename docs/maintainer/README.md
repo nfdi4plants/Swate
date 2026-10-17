@@ -42,7 +42,6 @@ flowchart TD
         r-nuget["nuget"]
         r-npm["npm"]
         r-docker["docker"]
-        r-web["electron-web"]
         r-story["storybook"]
     end
 
@@ -53,13 +52,12 @@ flowchart TD
         b-linux["linux x64"]
     end
 
-    rel-fork --> r-nuget & r-npm & r-docker & r-web & r-story
+    rel-fork --> r-nuget & r-npm & r-docker & r-story
     rel-fork --> b-win & b-mac-x64 & b-mac-arm & b-linux
 
-    r-web --> art-client["upload-artifact: SwateClient.zip"]
     b-win & b-mac-x64 & b-mac-arm & b-linux --> art-bin["upload-artifact: release-assets-electron-* (fails if nothing was built)"]
 
-    r-nuget & r-npm & r-docker & art-client & r-story --> rel-join{{"join"}}
+    r-nuget & r-npm & r-docker & r-story --> rel-join{{"join"}}
     art-bin --> bin-join{{"join"}}
 
     rel-join --> post
@@ -105,10 +103,6 @@ flowchart LR
         direction TB
         n6["docker build"] --> n7["docker push ghcr.io"]
         n7 --> n8[":next, :latest, :vX.Y.Z"]
-    end
-    subgraph electron-web["electron-web"]
-        direction TB
-        n9["Bundle.Client + Vite build"] --> n10["zip deploy/public → SwateClient.zip"]
     end
     subgraph electron-bin["electron-bin (per OS/arch)"]
         direction TB

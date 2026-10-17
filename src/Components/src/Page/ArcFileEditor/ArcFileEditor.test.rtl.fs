@@ -1,14 +1,14 @@
-module internal Swate.Components.Page.ArcFileEditor.DataAnnotatorTests
+module internal ARCitISA.Components.Page.ArcFileEditor.DataAnnotatorTests
 
 open ARCtrl
 open Browser.Types
 open Fable.Core
 open Feliz
 open Vitest
-open Swate.Components
-open Swate.Components.Composite.AnnotationTable
-open Swate.Components.Composite.AnnotationTable.Context
-open Swate.Components.Shared
+open ARCitISA.Components
+open ARCitISA.Components.Composite.AnnotationTable
+open ARCitISA.Components.Composite.AnnotationTable.Context
+open ARCitISA.Components.Shared
 
 module private TestHelpers =
 

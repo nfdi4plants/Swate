@@ -1,11 +1,11 @@
-module internal Swate.Components.Tests.ValidationPackageBrowser.Helper
+module internal ARCitISA.Components.Tests.ValidationPackageBrowser.Helper
 
 open ARCtrl.ValidationPackages
-open Swate.Components.Page.ValidationPackageBrowser.Helper
-open Swate.Components.Page.ValidationPackageBrowser.Types
+open ARCitISA.Components.Page.ValidationPackageBrowser.Helper
+open ARCitISA.Components.Page.ValidationPackageBrowser.Types
 open Vitest
 open ARCtrl.Helper.SemVer
-open Swate.Components.Util.SemVer
+open ARCitISA.Components.Util.SemVer
 
 let private mkTag (tagName: string) : OntologyAnnotationDTO = {
     Name = Some tagName

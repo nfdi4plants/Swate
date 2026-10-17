@@ -2,7 +2,7 @@
 /// window, opens (or reuses) its library session, registers the operation for
 /// cancellation, forwards progress to the window and maps the structured result.
 /// Mutations run under the vault's busy flag so the file watcher does not merge
-/// Swate's own writes, and they refresh the file tree afterwards.
+/// ARCitISA's own writes, and they refresh the file tree afterwards.
 module Main.IPC.IVersionControlApi
 
 open Fable.Core
@@ -11,9 +11,9 @@ open Fable.Electron.Main
 open Main
 open Main.VersionControl
 open Main.VersionControl.VersionControlSettings
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.VersionControlTypes
+open ARCitISA.Electron.Shared.IPCTypes
+open ARCitISA.Electron.Shared.IPCTypes.MainToRendererIpc
+open ARCitISA.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
 type private RendererBridge = {
@@ -1073,7 +1073,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                 let! fileSize = tryGetRegularFileSize hosted.Binding.WorkspaceRoot relativePath
 
                                 match
-                                    Swate.Components.Shared.GitLfsRules.tryGetToggleBlockedReason
+                                    ARCitISA.Components.Shared.GitLfsRules.tryGetToggleBlockedReason
                                         relativePath
                                         fileSize
                                         request.UseLargeObjectStorage
