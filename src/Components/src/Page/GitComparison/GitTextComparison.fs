@@ -148,15 +148,9 @@ module internal GitTextComparisonRendering =
             Html.div [
                 if props.RowTestId.IsSome then
                     prop.testId props.RowTestId.Value
-                prop.custom ("data-index", props.Index)
-                prop.ref (fun element -> props.MeasureElementRef(Option.ofObj element))
+                yield! Virtual.rowProps (props.Index, props.VirtualStart, measureElement = props.MeasureElementRef)
                 prop.className
                     "swt:absolute swt:left-0 swt:grid swt:w-full swt:min-w-232 swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
-                prop.style [
-                    style.top 0
-                    style.left 0
-                    style.custom ("transform", $"translateY({props.VirtualStart}px)")
-                ]
                 prop.children [
                     ComparisonSide(props.Row.Left, props.Theme.LeftChanged)
                     ComparisonSide(props.Row.Right, props.Theme.RightChanged)

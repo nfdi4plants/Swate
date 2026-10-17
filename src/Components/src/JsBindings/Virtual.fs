@@ -91,6 +91,31 @@ type Virtual =
     [<ImportMember(Virtual.ImportPath)>]
     static member defaultRangeExtractor(range: Virtual.Range) : int[] = jsNative
 
+    /// Keep specified rows mounted outside the viewport; TanStack requires sorted unique indices.
+    static member pinnedRangeExtractor(pinnedIndices: int[]) =
+        fun range ->
+            Array.append pinnedIndices (Virtual.defaultRangeExtractor range)
+            |> Array.distinct
+            |> Array.sort
+
+    /// Shared layout/measurement props for virtual div or table rows.
+    static member rowProps(index: int, start: int, ?measureElement: VirtualMeasureElementRef, ?height: int) = [|
+        prop.custom ("data-index", index)
+        match measureElement with
+        | Some measure -> prop.ref (fun element -> measure (Option.ofObj element))
+        | None -> ()
+        prop.style [
+            style.position.absolute
+            style.top 0
+            style.left 0
+            style.width (length.percent 100)
+            style.custom ("transform", $"translateY({start}px)")
+            match height with
+            | Some value -> style.height value
+            | None -> ()
+        ]
+    |]
+
     [<ImportMember(Virtual.ImportPath)>]
     [<NamedParamsAttribute>]
     static member useVirtualizer
