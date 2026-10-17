@@ -247,20 +247,22 @@ let private withMutatingOperation
                             (windowFromIpcEvent event |> Option.map _.id)
                             true
                             (fun context ->
-                                wrap vault (fun () -> promise {
-                                    let! result =
-                                        if context.Cancellation.IsCancellationRequested() then
-                                            JS.Constructors.Promise.resolve (
-                                                OperationResult.canceled "The operation was canceled."
-                                            )
-                                        else
-                                            operation host arcPath context |> Async.StartAsPromise
+                                wrap
+                                    vault
+                                    (fun () -> promise {
+                                        let! result =
+                                            if context.Cancellation.IsCancellationRequested() then
+                                                JS.Constructors.Promise.resolve (
+                                                    OperationResult.canceled "The operation was canceled."
+                                                )
+                                            else
+                                                operation host arcPath context |> Async.StartAsPromise
 
-                                    // A version control operation can change large-object state without a
-                                    // watched file event, so the shared listing is renewed on the next read.
-                                    vault.LargeObjectMetadata.Invalidate()
-                                    return result
-                                })
+                                        // A version control operation can change large-object state without a
+                                        // watched file event, so the shared listing is renewed on the next read.
+                                        vault.LargeObjectMetadata.Invalidate()
+                                        return result
+                                    })
                                 |> Async.AwaitPromise
                             )
 

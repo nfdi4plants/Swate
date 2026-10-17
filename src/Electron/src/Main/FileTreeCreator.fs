@@ -126,7 +126,8 @@ type LargeObjectMetadataCache() =
     let mutable version = 0
     let mutable listingCount = 0
 
-    let mutable snapshot: (string * Fable.Core.JS.Promise<LargeObjectIndex>) option = None
+    let mutable snapshot: (string * Fable.Core.JS.Promise<LargeObjectIndex>) option =
+        None
 
     // The modification time of the repository index when the current listing was started.
     let mutable indexModifiedAtListing: float option = None
@@ -165,7 +166,8 @@ type LargeObjectMetadataCache() =
     member private _.Get(repoRoot: string, canOpenSession: unit -> bool) =
         match snapshot with
         | Some(cachedRoot, cached) when PathHelpers.pathsEqual cachedRoot repoRoot -> cached
-        | _ when not (canOpenSession ()) -> Fable.Core.JS.Constructors.Promise.resolve (createLargeObjectIndex Map.empty)
+        | _ when not (canOpenSession ()) ->
+            Fable.Core.JS.Constructors.Promise.resolve (createLargeObjectIndex Map.empty)
         | _ ->
             let capturedVersion = version
             // Taken before listing, so a change made while the listing runs counts as a later change.

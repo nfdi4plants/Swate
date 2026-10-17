@@ -833,7 +833,9 @@ Vitest.describe (
         Vitest.test (
             "temporary import directory name matches the watcher ignore convention",
             fun () ->
-                let directoryName = Main.IPC.FileSystemIO.ArcFileSystemHelper.createTemporaryImportDirectoryName ()
+                let directoryName =
+                    Main.IPC.FileSystemIO.ArcFileSystemHelper.createTemporaryImportDirectoryName ()
+
                 let exactPattern = """^\.swate-import-[0-9a-f]{32}$"""
 
                 Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(directoryName, exactPattern)).toBe (true)

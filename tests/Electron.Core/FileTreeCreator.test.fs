@@ -45,7 +45,10 @@ let private createObjectState path =
     : ObjectStateDto)
 
 let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
-    FileTreeCreator.withFileEntriesLfsMetadata "/repo" (FileTreeCreator.createLargeObjectIndex (Map.ofList objects)) entries
+    FileTreeCreator.withFileEntriesLfsMetadata
+        "/repo"
+        (FileTreeCreator.createLargeObjectIndex (Map.ofList objects))
+        entries
 
 let private enrichFromRepository (repoPath: string) (entries: FileEntry[]) =
     FileTreeCreator.LargeObjectMetadataCache().Enrich(repoPath, entries, fun () -> true)
@@ -449,7 +452,12 @@ Vitest.describe (
                 }
 
                 let refreshed =
-                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot rootPath "studies" (fun _ -> false) snapshot initial
+                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot
+                        rootPath
+                        "studies"
+                        (fun _ -> false)
+                        snapshot
+                        initial
 
                 Vitest.expect(refreshed.[existing.path]).toEqual updated
                 Vitest.expect(refreshed.[added.path]).toEqual added
@@ -489,7 +497,12 @@ Vitest.describe (
                 }
 
                 let refreshed =
-                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot rootPath "studies" (fun _ -> false) snapshot initial
+                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot
+                        rootPath
+                        "studies"
+                        (fun _ -> false)
+                        snapshot
+                        initial
 
                 Vitest.expect(refreshed.ContainsKey((entry "studies/existing.txt" false).path)).toBe false
                 Vitest.expect(refreshed.ContainsKey((entry "studies/missing" true).path)).toBe false
@@ -509,7 +522,12 @@ Vitest.describe (
                 let snapshot: FileTreeCreator.FileTreeDirectoryPage = { Entries = [||]; HasMore = false }
 
                 let refreshed =
-                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot rootPath "studies" (fun _ -> false) snapshot initial
+                    FileTreeCreator.applyFreshFileTreeDirectorySnapshot
+                        rootPath
+                        "studies"
+                        (fun _ -> false)
+                        snapshot
+                        initial
 
                 let expected = [|
                     entry "" true
