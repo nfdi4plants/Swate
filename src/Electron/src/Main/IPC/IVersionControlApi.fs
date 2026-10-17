@@ -217,14 +217,15 @@ let private shouldRefreshObjectTree (request: ObjectPathRequestDto) (result: Res
         | _ -> true
     | None -> resultChangedState result
 
-/// Same as withSession, with the vault marked busy for the duration and the file tree
-/// refreshed afterwards when the result predicate allows it.
-let private withMutatingSessionUsingRefreshPredicate
+/// Runs a tracked mutation of the calling window's workspace with the vault marked busy for the
+/// duration. wrap runs the operation body, so the caller decides what surrounds it, such as the
+/// loaded-directory watcher suspension.
+let private withMutatingOperation
     (operationName: string)
     (event: IpcMainInvokeEvent)
     (operationId: string)
-    (shouldRefresh: Result<OperationResultDto<'U>, exn> -> bool)
-    (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<'T>>)
+    (wrap: ArcVault -> (unit -> JS.Promise<OperationResult<'T>>) -> JS.Promise<OperationResult<'T>>)
+    (operation: WorkspaceSessionHost.WorkspaceSessionHost -> string -> OperationContext -> Async<OperationResult<'T>>)
     (mapValue: 'T -> 'U)
     : JS.Promise<Result<OperationResultDto<'U>, exn>> =
     promise {
@@ -246,25 +247,18 @@ let private withMutatingSessionUsingRefreshPredicate
                             (windowFromIpcEvent event |> Option.map _.id)
                             true
                             (fun context ->
-                                vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                wrap vault (fun () -> promise {
                                     let! result =
                                         if context.Cancellation.IsCancellationRequested() then
                                             JS.Constructors.Promise.resolve (
                                                 OperationResult.canceled "The operation was canceled."
                                             )
                                         else
-                                            runSessionOperation host arcPath operation context
-                                            |> Async.StartAsPromise
-
-                                    let mappedResult = Ok(Mappings.result mapValue result)
+                                            operation host arcPath context |> Async.StartAsPromise
 
                                     // A version control operation can change large-object state without a
                                     // watched file event, so the shared listing is renewed on the next read.
                                     vault.LargeObjectMetadata.Invalidate()
-
-                                    if shouldRefresh mappedResult then
-                                        do! vault.RefreshLoadedFileTree()
-
                                     return result
                                 })
                                 |> Async.AwaitPromise
@@ -277,23 +271,52 @@ let private withMutatingSessionUsingRefreshPredicate
                 })
     }
 
-/// Same as withSession, with the vault marked busy for the duration and the file tree
-/// refreshed afterwards when the operation changed the workspace.
+/// Same as withSession, with the vault marked busy for the duration. An operation that can change the
+/// working tree runs with the loaded-directory watchers suspended, so no handle blocks it; the catch-up
+/// that ends the suspension re-reads every loaded directory.
 let private withMutatingSession
     (operationName: string)
     (event: IpcMainInvokeEvent)
     (operationId: string)
-    (refreshTree: bool)
+    (changesWorkingTree: bool)
     (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<'T>>)
     (mapValue: 'T -> 'U)
     : JS.Promise<Result<OperationResultDto<'U>, exn>> =
-    withMutatingSessionUsingRefreshPredicate
+    withMutatingOperation
         operationName
         event
         operationId
-        (fun result -> refreshTree && resultChangedState result)
-        operation
+        (fun vault run ->
+            if changesWorkingTree then
+                vault.WithLoadedDirectoryWatcherSuspended run
+            else
+                run ()
+        )
+        (fun host arcPath -> runSessionOperation host arcPath operation)
         mapValue
+
+/// Materializes or dematerializes one object. The file is rewritten in place and no directory moves,
+/// so the watchers stay; the loaded tree is refreshed afterwards when the request asks for it.
+let private withObjectSession
+    (operationName: string)
+    (event: IpcMainInvokeEvent)
+    (request: ObjectPathRequestDto)
+    (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<unit>>)
+    : JS.Promise<Result<OperationResultDto<unit>, exn>> =
+    withMutatingOperation
+        operationName
+        event
+        request.OperationId
+        (fun vault run -> promise {
+            let! result = run ()
+
+            if shouldRefreshObjectTree request (Ok(Mappings.result id result)) then
+                do! vault.RefreshLoadedFileTree()
+
+            return result
+        })
+        (fun host arcPath -> runSessionOperation host arcPath operation)
+        id
 
 let private withService
     (select: WorkspaceSession -> 'S option)
@@ -553,13 +576,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     // Bind changes the vault's repository configuration, so it runs as a mutation of
     // the open vault and refreshes the tree afterwards.
     bindWorkspace =
-        fun request -> promise {
-            match tryGetVaultAndArcPath event with
-            | Error error -> return Error error
-            | Ok(vault, arcPath) ->
-                let host = WorkspaceSessionHost.get ()
-                let bridge = tryBridgeFromEvent event
-
+        fun request ->
+            let bind (host: WorkspaceSessionHost.WorkspaceSessionHost) (arcPath: string) context =
                 let restoreSavedSettings savedSettings context = async {
                     try
                         let! restored = host.SetSettings(arcPath, savedSettings, context)
@@ -593,92 +611,45 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     return reopened
                 }
 
-                return!
-                    vault.WithBusyWritingScope(fun () -> promise {
-                        let! bound =
-                            runTracked
-                                host
-                                bridge
-                                "bindWorkspace"
-                                request.OperationId
-                                (Some arcPath)
-                                (windowFromIpcEvent event |> Option.map _.id)
-                                true
-                                (fun context ->
-                                    vault.WithLoadedDirectoryWatcherSuspended(fun () ->
-                                        let bindResultPromise =
-                                            if context.Cancellation.IsCancellationRequested() then
-                                                JS.Constructors.Promise.resolve (
-                                                    OperationResult.canceled "The bind was canceled."
-                                                )
-                                            else
-                                                async {
-                                                    match
-                                                        locationFor host request.ProviderLocation request.DisplayName
-                                                    with
-                                                    | Error failure -> return Failed failure
-                                                    | Ok(location, factory) ->
-                                                        let! bindResult =
-                                                            factory.Bind
-                                                                {
-                                                                    WorkspaceRoot = arcPath
-                                                                    Location = location
-                                                                }
-                                                                context
+                async {
+                    match locationFor host request.ProviderLocation request.DisplayName with
+                    | Error failure -> return Failed failure
+                    | Ok(location, factory) ->
+                        let! bindResult =
+                            factory.Bind
+                                {
+                                    WorkspaceRoot = arcPath
+                                    Location = location
+                                }
+                                context
 
-                                                        match persistProvisionedBinding host bindResult with
-                                                        | Succeeded _ ->
-                                                            // The open session keeps the location it was opened with.
-                                                            return! reopenWithSavedSettings context
-                                                        | PartiallySucceeded(_, failure) when
-                                                            failure.Code = VersionControlCodes.BindingNotPersisted
-                                                            ->
-                                                            return Failed failure
-                                                        | PartiallySucceeded(_, failure) ->
-                                                            // The binding is persisted, so the session is reopened and
-                                                            // the provider's partial failure rides along.
-                                                            let! reopened = reopenWithSavedSettings context
+                        match persistProvisionedBinding host bindResult with
+                        | Succeeded _ ->
+                            // The open session keeps the location it was opened with.
+                            return! reopenWithSavedSettings context
+                        | PartiallySucceeded(_, failure) when failure.Code = VersionControlCodes.BindingNotPersisted ->
+                            return Failed failure
+                        | PartiallySucceeded(_, failure) ->
+                            // The binding is persisted, so the session is reopened and
+                            // the provider's partial failure rides along.
+                            let! reopened = reopenWithSavedSettings context
 
-                                                            return
-                                                                match reopened with
-                                                                | Succeeded outcome ->
-                                                                    PartiallySucceeded(outcome, failure)
-                                                                | other -> other
-                                                        | Failed failure -> return Failed failure
-                                                }
-                                                |> Async.StartAsPromise
+                            return
+                                match reopened with
+                                | Succeeded outcome -> PartiallySucceeded(outcome, failure)
+                                | other -> other
+                        | Failed failure -> return Failed failure
+                }
 
-                                        bindResultPromise
-                                        |> Promise.bind (fun bound -> promise {
-                                            let result =
-                                                Ok(
-                                                    Mappings.result
-                                                        (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                                            Mappings.sessionInfo hosted.SessionId hosted.Session
-                                                        )
-                                                        bound
-                                                )
-
-                                            if resultChangedState result then
-                                                vault.LargeObjectMetadata.Invalidate()
-                                                do! vault.RefreshLoadedFileTree()
-
-                                            return bound
-                                        })
-                                    )
-                                    |> Async.AwaitPromise
-                                )
-
-                        return
-                            Ok(
-                                Mappings.result
-                                    (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                        Mappings.sessionInfo hosted.SessionId hosted.Session
-                                    )
-                                    bound
-                            )
-                    })
-        }
+            withMutatingOperation
+                "bindWorkspace"
+                event
+                request.OperationId
+                (fun vault run -> vault.WithLoadedDirectoryWatcherSuspended run)
+                bind
+                (fun (hosted: WorkspaceSessionHost.HostedSession) ->
+                    Mappings.sessionInfo hosted.SessionId hosted.Session
+                )
     cancelOperation =
         fun key -> promise {
             let operationName = "cancelOperation"
@@ -1020,28 +991,24 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (Array.map Mappings.objectState)
     materializeObject =
         fun request ->
-            withMutatingSessionUsingRefreshPredicate
+            withObjectSession
                 "materializeObject"
                 event
-                request.OperationId
-                (shouldRefreshObjectTree request)
+                request
                 (withService
                     _.ObjectMaterialization
                     "large object materialization"
                     (fun service context -> withPath request.Path (fun path -> service.Materialize path context)))
-                id
     dematerializeObject =
         fun request ->
-            withMutatingSessionUsingRefreshPredicate
+            withObjectSession
                 "dematerializeObject"
                 event
-                request.OperationId
-                (shouldRefreshObjectTree request)
+                request
                 (withService
                     _.ObjectMaterialization
                     "large object materialization"
                     (fun service context -> withPath request.Path (fun path -> service.Dematerialize path context)))
-                id
     getStoragePolicySettings =
         fun request ->
             withSession

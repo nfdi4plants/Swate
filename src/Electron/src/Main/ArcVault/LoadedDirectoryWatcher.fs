@@ -87,15 +87,6 @@ type internal LoadedDirectoryWatcherController() =
     member this.ActivateLifecycle() =
         this.Update(fun current -> { current with LifecycleActive = true })
 
-    member this.StopLifecycle() =
-        this.Update(fun current -> {
-            current with
-                LifecycleActive = false
-                LoadedDirectories = Set.empty
-                PendingHandoffs = Set.empty
-                Refreshes = Map.empty
-        })
-
     member this.ClearLifecycleData() =
         this.Update(fun current -> {
             current with
@@ -104,11 +95,9 @@ type internal LoadedDirectoryWatcherController() =
                 Refreshes = Map.empty
         })
 
-    member this.ClearLoadedDirectories() =
-        this.Update(fun current -> {
-            current with
-                LoadedDirectories = Set.empty
-        })
+    member this.StopLifecycle() =
+        this.ClearLifecycleData()
+        this.Update(fun current -> { current with LifecycleActive = false })
 
     /// Forgets a loaded directory and every loaded directory below it. The root is always loaded.
     member this.RemoveLoadedDirectory(path: string) =

@@ -39,7 +39,9 @@ let NotesDraftTarget () =
                         current with
                             Error = Some $"Failed to load note targets: {error.Message}"
                     })
-            dependencies = [| box fileStateCtx.state.FileTree |]
+            // The targets come from the ARC model, which the main process waits for, so the page loads them
+            // once when it opens instead of on every File Explorer update.
+            dependencies = [||]
         }
 
     let setSubmitState isSubmitting error =

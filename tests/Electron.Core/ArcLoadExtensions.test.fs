@@ -1,11 +1,13 @@
 module ElectronCore.ArcLoadExtensionsTests
 
+open ARCtrl
 open System
 open Fable.Core
 open Main.ARCtrlExtensions
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOHelper
 open Vitest
 
 let private dirent name isDirectory isFile =
@@ -22,34 +24,6 @@ let private file name = dirent name false true
 Vitest.describe (
     "bounded ARC structural discovery",
     fun () ->
-        Vitest.test (
-            "the worker pool bounds concurrency and preserves input order",
-            fun () -> promise {
-                let mutable active = 0
-                let mutable maximumActive = 0
-
-                let! results =
-                    Array.init 32 id
-                    |> mapBoundedAsync
-                        4
-                        (fun value -> promise {
-                            active <- active + 1
-                            maximumActive <- max maximumActive active
-
-                            let! result =
-                                JS.Constructors.Promise.Create(fun resolve _ ->
-                                    JS.setTimeout (fun () -> resolve value) (32 - value) |> ignore
-                                )
-
-                            active <- active - 1
-                            return result
-                        })
-
-                Vitest.expect(maximumActive).toBe (4)
-                Vitest.expect(results |> Array.toList).toEqual (Array.init 32 id |> Array.toList)
-            }
-        )
-
         Vitest.test (
             "discovers many immediate entities deterministically without descending into payload",
             fun () -> promise {
@@ -148,5 +122,79 @@ Vitest.describe (
                 with error ->
                     Vitest.expect(error.Message).toContain ("permission denied")
             }
+        )
+)
+
+Vitest.describe (
+    "bounded ARC loading",
+    fun () ->
+        Vitest.test (
+            "bounded ARC loading reconstructs every entity type",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-arc-load-"
+                    "BoundedArc"
+                    TestHelpers.addDataMapToAllEntityTypes
+                    (fun arcPath -> promise {
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+
+                        Vitest.expect(loadedArc.Identifier).toBe ("BoundedArc")
+                        Vitest.expect(loadedArc.GetStudy("Study With DataMap").DataMap.IsSome).toBe (true)
+                        Vitest.expect(loadedArc.GetAssay("Assay With DataMap").DataMap.IsSome).toBe (true)
+                        Vitest.expect(loadedArc.GetWorkflow("Workflow With DataMap").DataMap.IsSome).toBe (true)
+                        Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.IsSome).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "bounded ARC loading allows missing optional structural zones",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-missing-zones-"
+                    "MissingZonesArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        for zone in ArcEntityPathRules.allAddZones do
+                            let zonePath = join [| arcPath; ArcEntityPathRules.zoneFolderName zone |]
+                            do! rmAsync zonePath (RmOptions(recursive = true, force = true))
+
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+
+                        Vitest.expect(loadedArc.Identifier).toBe ("MissingZonesArc")
+                    })
+        )
+
+        Vitest.test (
+            "bounded ARC loading migrates a legacy entity DataMap",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-legacy-datamap-"
+                    "LegacyDataMapArc"
+                    (fun arc ->
+                        let assay = ArcAssay("Legacy Assay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let assayFolder =
+                            join [|
+                                arcPath
+                                ArcPathHelper.AssaysFolderName
+                                "Legacy Assay"
+                            |]
+
+                        let canonicalPath = join [| assayFolder; ArcPathHelper.DataMapFileName |]
+                        let legacyPath = join [| assayFolder; LegacyDataMapFileName |]
+                        do! renameAsync canonicalPath legacyPath
+
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+
+                        Vitest.expect(loadedArc.GetAssay("Legacy Assay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(existsSync legacyPath).toBe (false)
+                        Vitest.expect(existsSync canonicalPath).toBe (true)
+                    })
         )
 )

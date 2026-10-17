@@ -2458,7 +2458,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a queued mutation is tracked and can be canceled before its body runs",
+            "queued mutations, a bind included, are tracked and can be canceled before their bodies run",
             fun () ->
                 withFixture (fun fixture -> promise {
                     let coreOnlyRoot = join [| fixture.Root; "core-overlap" |]
@@ -2517,77 +2517,7 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = "v1"
                             }
 
-                        Vitest.expect(vault.isBusyWriting).toBe true
-
-                        Vitest.expect(fakeHost.RunningMutationIdsForWindow 52 |> Array.sort).toEqual [|
-                            "restore-first"
-                            "restore-second"
-                        |]
-
-                        Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
-
-                        let! canceled = api.cancelOperation { OperationId = "restore-second" }
-                        Vitest.expect(canceled).toEqual (Ok true)
-
-                        releaseFirst ()
-                        let! _ = first
-                        Vitest.expect(vault.isBusyWriting).toBe true
-                        let! secondResult = second
-                        let failure = expectDtoFailure "queued canceled restore" secondResult
-                        Vitest.expect(failure.Category).toEqual FailureCategoryDto.Canceled
-                        Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
-                        Vitest.expect(vault.isBusyWriting).toBe false
-                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
-
-                        Vitest
-                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
-                            .toBe
-                            true
-                    finally
-                        restoreGates.Clear()
-                        restoreInvocations.Clear()
-                        WorkspaceSessionHost.initialize fixture.Host
-                })
-        )
-
-        Vitest.test (
-            "a queued bind is tracked and can be canceled before its provider mutation runs",
-            fun () ->
-                withFixture (fun fixture -> promise {
-                    let coreOnlyRoot = join [| fixture.Root; "core-queued-bind" |]
-
-                    Main.Bindings.Filesystem.mkdirSync
-                        coreOnlyRoot
-                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
-
-                    let fakeHost =
-                        WorkspaceSessionHost.WorkspaceSessionHost(
-                            fakeProviderRuntime coreOnlyRoot (join [| fixture.Root; "unused-bind-root" |])
-                        )
-
-                    WorkspaceSessionHost.initialize fakeHost
-
-                    try
-                        let vault = registerVault 92 coreOnlyRoot
-                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 92)
-                        let firstGate, releaseFirst = deferred ()
                         let targetLocation = "https://example.invalid/queued-bind.git"
-                        restoreGates.["first.txt"] <- firstGate
-
-                        let first =
-                            api.restorePaths {
-                                OperationId = "restore-before-bind"
-                                Paths = [| "first.txt" |]
-                                ExpectedWorkspaceVersion = "v1"
-                            }
-
-                        do!
-                            waitUntil
-                                "first mutation before bind to start"
-                                (fun () ->
-                                    fakeHost.RunningMutationIdsForWindow 92 = [| "restore-before-bind" |]
-                                    && vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty
-                                )
 
                         let bind =
                             api.bindWorkspace {
@@ -2596,22 +2526,40 @@ Vitest.describe (
                                 DisplayName = None
                             }
 
-                        Vitest.expect(fakeHost.RunningMutationIdsForWindow 92 |> Array.sort).toEqual [|
+                        Vitest.expect(vault.isBusyWriting).toBe true
+
+                        Vitest.expect(fakeHost.RunningMutationIdsForWindow 52 |> Array.sort).toEqual [|
                             "queued-bind"
-                            "restore-before-bind"
+                            "restore-first"
+                            "restore-second"
                         |]
 
+                        Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
                         Vitest.expect(bindInvocations.Contains targetLocation).toBe false
 
-                        let! canceled = api.cancelOperation { OperationId = "queued-bind" }
-                        Vitest.expect(canceled).toEqual (Ok true)
+                        let! canceledRestore = api.cancelOperation { OperationId = "restore-second" }
+                        let! canceledBind = api.cancelOperation { OperationId = "queued-bind" }
+                        Vitest.expect(canceledRestore).toEqual (Ok true)
+                        Vitest.expect(canceledBind).toEqual (Ok true)
+
                         releaseFirst ()
                         let! _ = first
+                        Vitest.expect(vault.isBusyWriting).toBe true
+                        let! secondResult = second
                         let! bindResult = bind
-                        let failure = expectDtoFailure "queued canceled bind" bindResult
-                        Vitest.expect(failure.Category).toEqual FailureCategoryDto.Canceled
+                        let restoreFailure = expectDtoFailure "queued canceled restore" secondResult
+                        let bindFailure = expectDtoFailure "queued canceled bind" bindResult
+                        Vitest.expect(restoreFailure.Category).toEqual FailureCategoryDto.Canceled
+                        Vitest.expect(bindFailure.Category).toEqual FailureCategoryDto.Canceled
+                        Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
                         Vitest.expect(bindInvocations.Contains targetLocation).toBe false
                         Vitest.expect(vault.isBusyWriting).toBe false
+                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+
+                        Vitest
+                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
+                            .toBe
+                            true
                     finally
                         restoreGates.Clear()
                         restoreInvocations.Clear()

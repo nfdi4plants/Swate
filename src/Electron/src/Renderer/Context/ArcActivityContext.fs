@@ -7,7 +7,6 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 let private initialState: ArcActivityState = {
     isInitializing = false
-    isBusyWriting = false
     hasUnsavedChanges = false
 }
 

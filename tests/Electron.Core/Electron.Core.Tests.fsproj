@@ -20,7 +20,6 @@
     <Compile Include="ArcLoadExtensions.test.fs" />
     <Compile Include="FileTreeCreator.test.fs" />
     <Compile Include="LoadedDirectoryWatcher.test.fs" />
-    <Compile Include="WatcherConfiguration.test.fs" />
     <Compile Include="ArcFileMutationHelper.test.fs" />
     <Compile Include="ArcVaultHelper.test.fs" />
     <Compile Include="ArcAddExtensions.test.fs" />
@@ -28,8 +27,7 @@
     <Compile Include="JsonDTOUnwrapper.test.fs" />
     <Compile Include="NoteConversion.test.fs" />
     <Compile Include="NoteSearchReader.test.fs" />
-    <Compile Include="EnsureNotesFolder.test.fs" />
-    <Compile Include="NotesTargets.test.fs" />
+    <Compile Include="Notes.test.fs" />
     <Compile Include="IpcArchitectureReview.test.fs" />
     <Compile Include="ArcFileSystemHelper.test.fs" />
     <Compile Include="RenamePathRules.test.fs" />

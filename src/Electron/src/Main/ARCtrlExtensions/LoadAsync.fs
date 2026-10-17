@@ -10,42 +10,6 @@ open Swate.Electron.Shared.FileIOHelper
 [<AutoOpen>]
 module ArcLoadExtensions =
 
-    // Limit outstanding filesystem reads without introducing threads, Web Workers, or background services.
-    // These reads still run through JavaScript promises on the existing event loop.
-    let private maxConcurrentStructuralReads = 8
-
-    /// Maps an array through a fixed number of asynchronous promise loops.
-    /// Each loop claims the next input only after its current operation completes, while results are
-    /// written back to their original indices so promise completion order cannot reorder the output.
-    let internal mapBoundedAsync
-        (maxConcurrency: int)
-        (operation: 'Input -> Fable.Core.JS.Promise<'Output>)
-        (inputs: 'Input[])
-        : Fable.Core.JS.Promise<'Output[]> =
-        promise {
-            if maxConcurrency < 1 then
-                invalidArg (nameof maxConcurrency) "Concurrency must be at least one."
-
-            let results = Array.zeroCreate<'Output> inputs.Length
-            let mutable nextIndex = 0
-
-            let rec runWorker () = promise {
-                let index = nextIndex
-                nextIndex <- nextIndex + 1
-
-                if index < inputs.Length then
-                    let! result = operation inputs.[index]
-                    results.[index] <- result
-                    return! runWorker ()
-            }
-
-            let workers = Array.init (min maxConcurrency inputs.Length) (fun _ -> runWorker ())
-
-            // Await every loop so a read failure is propagated to structural discovery.
-            let! _ = Fable.Core.JS.Constructors.Promise.all workers
-            return results
-        }
-
     type private StructuralEntityDirectory = {
         Zone: ArcEntityPathRules.AddZone
         ZoneName: string
@@ -86,14 +50,14 @@ module ArcLoadExtensions =
                 )
                 |> List.toArray
 
+            // Node's thread pool bounds how many of these reads run at once.
             let! zoneEntries =
                 existingZones
-                |> mapBoundedAsync
-                    maxConcurrentStructuralReads
-                    (fun (zone, zoneName, zonePath) -> promise {
-                        let! entries = readDirectory zonePath (ReaddirOptions(withFileTypes = true))
-                        return zone, zoneName, zonePath, entries
-                    })
+                |> Array.map (fun (zone, zoneName, zonePath) -> promise {
+                    let! entries = readDirectory zonePath (ReaddirOptions(withFileTypes = true))
+                    return zone, zoneName, zonePath, entries
+                })
+                |> Promise.all
 
             // Zone reads reveal only immediate entity directories; discovery never descends into payload folders.
             let entityDirectories =
@@ -115,30 +79,29 @@ module ArcLoadExtensions =
 
             let! entityMetadataPaths =
                 entityDirectories
-                |> mapBoundedAsync
-                    maxConcurrentStructuralReads
-                    (fun entity -> promise {
-                        let entityPath = join [| entity.ZonePath; entity.EntityName |]
-                        let! metadataEntries = readDirectory entityPath (ReaddirOptions(withFileTypes = true))
+                |> Array.map (fun entity -> promise {
+                    let entityPath = join [| entity.ZonePath; entity.EntityName |]
+                    let! metadataEntries = readDirectory entityPath (ReaddirOptions(withFileTypes = true))
 
-                        let allowedFileNames = [|
-                            ArcEntityPathRules.zoneEntityFileName entity.Zone
-                            ArcPathHelper.DataMapFileName
-                            LegacyDataMapFileName
-                        |]
+                    let allowedFileNames = [|
+                        ArcEntityPathRules.zoneEntityFileName entity.Zone
+                        ArcPathHelper.DataMapFileName
+                        LegacyDataMapFileName
+                    |]
 
-                        return
-                            metadataEntries
-                            |> Array.choose (fun metadataEntry ->
-                                if
-                                    metadataEntry.isFile ()
-                                    && allowedFileNames |> Array.exists (PathHelpers.pathsEqual metadataEntry.name)
-                                then
-                                    Some $"{entity.ZoneName}/{entity.EntityName}/{metadataEntry.name}"
-                                else
-                                    None
-                            )
-                    })
+                    return
+                        metadataEntries
+                        |> Array.choose (fun metadataEntry ->
+                            if
+                                metadataEntry.isFile ()
+                                && allowedFileNames |> Array.exists (PathHelpers.pathsEqual metadataEntry.name)
+                            then
+                                Some $"{entity.ZoneName}/{entity.EntityName}/{metadataEntry.name}"
+                            else
+                                None
+                        )
+                })
+                |> Promise.all
 
             // Normalize and sort after all reads so filesystem enumeration and promise completion order
             // cannot affect the paths passed to ARC.fromFilePaths.

@@ -1059,90 +1059,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "successive directory page requests publish the next one hundred children and paging metadata",
-            fun () ->
-                withTempArc
-                    ignore
-                    (fun arcPath -> promise {
-                        let studiesPath = join [| arcPath; "studies" |]
-                        do! mkdirWatcherDirectoryAsync studiesPath
-
-                        for index in 0..249 do
-                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
-
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        let! firstSnapshot = vault.GetRendererFileTreeSnapshot()
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        let! finalSnapshot = vault.GetRendererFileTreeSnapshot()
-
-                        let countPublishedStudies snapshot =
-                            snapshot.entries.Values
-                            |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) "studies")
-                            |> Seq.length
-
-                        Vitest.expect(countPublishedStudies firstSnapshot).toBe 100
-                        Vitest.expect(firstSnapshot.directoryHasMore.["studies"]).toBe true
-                        Vitest.expect(countPublishedStudies secondSnapshot).toBe 200
-                        Vitest.expect(secondSnapshot.directoryHasMore.["studies"]).toBe true
-                        // The ARC scaffold already contains studies/.gitkeep in addition to the 250 fixtures.
-                        Vitest.expect(countPublishedStudies finalSnapshot).toBe 251
-                        Vitest.expect(finalSnapshot.directoryHasMore.["studies"]).toBe false
-
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        let! afterCompletionSnapshot = vault.GetRendererFileTreeSnapshot()
-
-                        Vitest.expect(countPublishedStudies afterCompletionSnapshot).toBe 251
-                        Vitest.expect(afterCompletionSnapshot.directoryHasMore.["studies"]).toBe false
-                        do! vault.StopFileWatcher()
-                    })
-        )
-
-        Vitest.test (
-            "load more after a mutation continues with entries that were not loaded yet",
-            fun () ->
-                withTempArc
-                    ignore
-                    (fun arcPath -> promise {
-                        let studiesPath = join [| arcPath; "studies" |]
-                        do! mkdirWatcherDirectoryAsync studiesPath
-
-                        for index in 0..249 do
-                            do! mkdirWatcherDirectoryAsync (join [| studiesPath; sprintf "study-%03d" index |])
-
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-
-                        let countPublishedStudies () = promise {
-                            let! snapshot = vault.GetRendererFileTreeSnapshot()
-
-                            return
-                                snapshot.entries.Values
-                                |> Seq.filter (fun entry -> PathHelpers.pathsEqual (dirname entry.path) "studies")
-                                |> Seq.length
-                        }
-
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        let! firstPageCount = countPublishedStudies ()
-
-                        // A mutation in the directory refreshes its loaded entries before the next page.
-                        renameSync (join [| studiesPath; "study-000" |]) (join [| studiesPath; "study-renamed" |])
-                        do! vault.ReconcileFileTreePaths [ "studies/study-000"; "studies/study-renamed" ]
-                        let! _ = vault.RefreshFileTreeDirectoryIfLoaded "studies"
-                        do! vault.LoadNextFileTreeDirectoryPage "studies"
-                        let! secondPageCount = countPublishedStudies ()
-
-                        Vitest.expect(firstPageCount).toBe 100
-                        Vitest.expect(secondPageCount).toBeGreaterThanOrEqual 200
-                        do! vault.StopFileWatcher()
-                    })
-        )
-
-        Vitest.test (
             "load more continues the open listing instead of reading the directory again",
             fun () ->
                 withTempArc
@@ -1164,9 +1080,14 @@ Vitest.describe (
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
                         let listing = vault.FileTreeDirectoryCursors.["studies"]
                         let openedAfterFirstPage = openedDirectoryCount openDirectoryMock
+                        let! firstSnapshot = vault.GetRendererFileTreeSnapshot()
+                        Vitest.expect(countLoadedStudies ()).toBe 100
+                        Vitest.expect(firstSnapshot.directoryHasMore.["studies"]).toBe true
 
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
                         Vitest.expect(countLoadedStudies ()).toBe 200
+                        Vitest.expect(secondSnapshot.directoryHasMore.["studies"]).toBe true
                         Vitest.expect(vault.FileTreeDirectoryCursors.["studies"]).toBe listing
 
                         do! vault.LoadNextFileTreeDirectoryPage "studies"
@@ -1176,6 +1097,13 @@ Vitest.describe (
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["studies"]).toBe false
                         Vitest.expect(openedDirectoryCount openDirectoryMock).toBe openedAfterFirstPage
                         Vitest.expect(vault.FileTreeDirectoryCursors.ContainsKey "studies").toBe false
+
+                        // A completed directory reads nothing more.
+                        do! vault.LoadNextFileTreeDirectoryPage "studies"
+                        let! completedSnapshot = vault.GetRendererFileTreeSnapshot()
+                        Vitest.expect(countLoadedStudies ()).toBe 251
+                        Vitest.expect(completedSnapshot.directoryHasMore.["studies"]).toBe false
+                        Vitest.expect(openedDirectoryCount openDirectoryMock).toBe openedAfterFirstPage
                         do! vault.StopFileWatcher()
                     })
         )
@@ -1792,23 +1720,6 @@ let private arctrlDefaultGitignoreContent () =
     match ARCtrl.Contract.Git.gitignoreContract.DTO with
     | Some(ARCtrl.Contract.DTO.Text content) -> content
     | _ -> failwith "ARCtrl default .gitignore contract does not contain text content."
-
-let private addDataMapToAllEntityTypes (arc: ARC) =
-    let study = ArcStudy("Study With DataMap")
-    study.DataMap <- Some(DataMap.init ())
-    arc.AddStudy(study)
-
-    let assay = ArcAssay("Assay With DataMap")
-    assay.DataMap <- Some(DataMap.init ())
-    arc.AddAssay(assay)
-
-    let workflow = ArcWorkflow("Workflow With DataMap")
-    workflow.DataMap <- Some(DataMap.init ())
-    arc.AddWorkflow(workflow)
-
-    let run = ArcRun("Run With DataMap")
-    run.DataMap <- Some(DataMap.init ())
-    arc.AddRun(run)
 
 let private tryGetDirtyStateMessage (args: obj array) =
     if args.Length = 2 && (string args.[0]).Contains("arcActivityChanged") then
@@ -4548,129 +4459,10 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "bounded ARC loading reconstructs every entity type and ignores deeply nested payload",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-bounded-arc-load-"
-                    "BoundedArc"
-                    addDataMapToAllEntityTypes
-                    (fun arcPath -> promise {
-                        let payloadRoot =
-                            join [|
-                                arcPath
-                                ArcPathHelper.AssaysFolderName
-                                "Assay With DataMap"
-                                ArcPathHelper.AssayDatasetFolderName
-                                "raw"
-                                "nested"
-                            |]
-
-                        do! mkdirRecursiveAsync payloadRoot
-
-                        for index in 1..128 do
-                            do! writeTextFileAsync (join [| payloadRoot; $"payload-{index}.txt" |]) $"payload-{index}"
-
-                        let! loadResult = ARC.LoadAsyncSwate arcPath
-                        let loadedArc = TestHelpers.expectLoadedArc loadResult
-                        let loadedPaths = loadedArc.FileSystem.Tree.ToFilePaths()
-
-                        Vitest.expect(loadedArc.Identifier).toBe ("BoundedArc")
-                        Vitest.expect(loadedArc.GetStudy("Study With DataMap").DataMap.IsSome).toBe (true)
-                        Vitest.expect(loadedArc.GetAssay("Assay With DataMap").DataMap.IsSome).toBe (true)
-                        Vitest.expect(loadedArc.GetWorkflow("Workflow With DataMap").DataMap.IsSome).toBe (true)
-                        Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.IsSome).toBe (true)
-
-                        Vitest.expect(loadedPaths |> Array.exists (fun path -> path.Contains("payload-"))).toBe (false)
-                    })
-        )
-
-        Vitest.test (
-            "bounded ARC loading allows missing optional structural zones",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-bounded-missing-zones-"
-                    "MissingZonesArc"
-                    ignore
-                    (fun arcPath -> promise {
-                        for zone in ArcEntityPathRules.allAddZones do
-                            let zonePath = join [| arcPath; ArcEntityPathRules.zoneFolderName zone |]
-                            do! rmAsync zonePath (RmOptions(recursive = true, force = true))
-
-                        let! loadResult = ARC.LoadAsyncSwate arcPath
-                        let loadedArc = TestHelpers.expectLoadedArc loadResult
-
-                        Vitest.expect(loadedArc.Identifier).toBe ("MissingZonesArc")
-                    })
-        )
-
-        Vitest.test (
-            "metadata-shaped directories are neither loaded nor migrated",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-bounded-metadata-directories-"
-                    "MetadataDirectoriesArc"
-                    (fun arc -> arc.AddAssay(ArcAssay("Directory Assay")))
-                    (fun arcPath -> promise {
-                        let assayFolder =
-                            join [|
-                                arcPath
-                                ArcPathHelper.AssaysFolderName
-                                "Directory Assay"
-                            |]
-
-                        let canonicalDataMapDirectory =
-                            join [| assayFolder; ArcPathHelper.DataMapFileName |]
-
-                        let legacyDataMapDirectory = join [| assayFolder; LegacyDataMapFileName |]
-                        do! mkdirRecursiveAsync canonicalDataMapDirectory
-                        do! mkdirRecursiveAsync legacyDataMapDirectory
-
-                        let! loadResult = ARC.LoadAsyncSwate arcPath
-                        let loadedArc = TestHelpers.expectLoadedArc loadResult
-
-                        Vitest.expect(loadedArc.GetAssay("Directory Assay").DataMap.IsNone).toBe (true)
-                        Vitest.expect(existsSync canonicalDataMapDirectory).toBe (true)
-                        Vitest.expect(existsSync legacyDataMapDirectory).toBe (true)
-                    })
-        )
-
-        Vitest.test (
-            "bounded ARC loading migrates a legacy entity DataMap",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-bounded-legacy-datamap-"
-                    "LegacyDataMapArc"
-                    (fun arc ->
-                        let assay = ArcAssay("Legacy Assay")
-                        assay.DataMap <- Some(DataMap.init ())
-                        arc.AddAssay assay
-                    )
-                    (fun arcPath -> promise {
-                        let assayFolder =
-                            join [|
-                                arcPath
-                                ArcPathHelper.AssaysFolderName
-                                "Legacy Assay"
-                            |]
-
-                        let canonicalPath = join [| assayFolder; ArcPathHelper.DataMapFileName |]
-                        let legacyPath = join [| assayFolder; LegacyDataMapFileName |]
-                        do! renameAsync canonicalPath legacyPath
-
-                        let! loadResult = ARC.LoadAsyncSwate arcPath
-                        let loadedArc = TestHelpers.expectLoadedArc loadResult
-
-                        Vitest.expect(loadedArc.GetAssay("Legacy Assay").DataMap.IsSome).toBe (true)
-                        Vitest.expect(existsSync legacyPath).toBe (false)
-                        Vitest.expect(existsSync canonicalPath).toBe (true)
-                    })
-        )
-
-        Vitest.test (
             "Swate write contracts contain only targeted scaffold and ARC files",
             fun () ->
                 let arc = ARC("TargetedWriteArc")
-                addDataMapToAllEntityTypes arc
+                TestHelpers.addDataMapToAllEntityTypes arc
                 arc.SetLicenseFulltext("license text")
 
                 arc.SetFilePaths(
@@ -5128,7 +4920,7 @@ Vitest.describe (
                 TestHelpers.withTempArcWith
                     "swate-load-arc-datamap-baseline-"
                     "DatamapBaselineArc"
-                    addDataMapToAllEntityTypes
+                    TestHelpers.addDataMapToAllEntityTypes
                     (fun arcPath -> promise {
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath

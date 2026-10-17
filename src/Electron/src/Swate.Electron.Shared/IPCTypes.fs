@@ -20,7 +20,6 @@ type FileTreeSnapshot = {
 
 type ArcActivityState = {
     isInitializing: bool
-    isBusyWriting: bool
     hasUnsavedChanges: bool
 }
 

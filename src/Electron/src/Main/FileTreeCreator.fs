@@ -103,16 +103,21 @@ let private buildLargeObjectsByComparisonKey (largeObjectsByRelativePath: Map<st
     )
     |> Map.ofSeq
 
-let withFileEntriesLfsMetadata
-    (repoRoot: string)
-    (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
-    (entries: FileEntry[])
-    : FileEntry[] =
-    let largeObjectsByComparisonKey =
-        buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+/// A repository-wide large-object listing with its two lookups: the exact path, and a comparison key
+/// for paths whose case or Unicode form differs. Both are built once per listing.
+type LargeObjectIndex = {
+    ByRelativePath: Map<string, ObjectStateDto>
+    ByComparisonKey: Map<string, ObjectStateDto>
+}
 
+let createLargeObjectIndex (largeObjectsByRelativePath: Map<string, ObjectStateDto>) = {
+    ByRelativePath = largeObjectsByRelativePath
+    ByComparisonKey = buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+}
+
+let withFileEntriesLfsMetadata (repoRoot: string) (index: LargeObjectIndex) (entries: FileEntry[]) : FileEntry[] =
     entries
-    |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
+    |> Array.map (withFileEntryLfsMetadata repoRoot index.ByRelativePath index.ByComparisonKey)
 
 /// Shares one repository-wide large-object listing across File Explorer reads.
 /// Directory pages, refreshes and watcher batches reuse the snapshot until Invalidate is called
@@ -121,8 +126,7 @@ type LargeObjectMetadataCache() =
     let mutable version = 0
     let mutable listingCount = 0
 
-    let mutable snapshot: (string * Fable.Core.JS.Promise<Map<string, ObjectStateDto>>) option =
-        None
+    let mutable snapshot: (string * Fable.Core.JS.Promise<LargeObjectIndex>) option = None
 
     // The modification time of the repository index when the current listing was started.
     let mutable indexModifiedAtListing: float option = None
@@ -161,7 +165,7 @@ type LargeObjectMetadataCache() =
     member private _.Get(repoRoot: string, canOpenSession: unit -> bool) =
         match snapshot with
         | Some(cachedRoot, cached) when PathHelpers.pathsEqual cachedRoot repoRoot -> cached
-        | _ when not (canOpenSession ()) -> Fable.Core.JS.Constructors.Promise.resolve Map.empty
+        | _ when not (canOpenSession ()) -> Fable.Core.JS.Constructors.Promise.resolve (createLargeObjectIndex Map.empty)
         | _ ->
             let capturedVersion = version
             // Taken before listing, so a change made while the listing runs counts as a later change.
@@ -173,13 +177,13 @@ type LargeObjectMetadataCache() =
                 match listed with
                 | Some largeObjects ->
                     listingCount <- listingCount + 1
-                    return largeObjects
+                    return createLargeObjectIndex largeObjects
                 | None ->
                     // An unavailable listing is not kept, so the next read tries again.
                     if capturedVersion = version then
                         snapshot <- None
 
-                    return Map.empty
+                    return createLargeObjectIndex Map.empty
             }
 
             snapshot <- Some(repoRoot, listing)
@@ -189,8 +193,8 @@ type LargeObjectMetadataCache() =
     member this.Enrich(repoRoot: string, entries: FileEntry[], canOpenSession: unit -> bool) = promise {
         if entries |> Array.exists (fun entry -> not entry.isDirectory) then
             let normalizedRepoRoot = normalizeRootPath repoRoot
-            let! largeObjectsByRelativePath = this.Get(normalizedRepoRoot, canOpenSession)
-            return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
+            let! index = this.Get(normalizedRepoRoot, canOpenSession)
+            return withFileEntriesLfsMetadata normalizedRepoRoot index entries
         else
             return entries
     }
@@ -385,22 +389,6 @@ let readFileTreeDirectoryPrefixWithCursor
             return raise error
     }
 
-/// Reads the first entryCount entries of a directory and closes the listing.
-let readFileTreeDirectoryPrefix
-    (arcPath: string)
-    (relativeDirectoryPath: string)
-    (entryCount: int)
-    : Fable.Core.JS.Promise<FileTreeDirectoryPage> =
-    promise {
-        let! page, cursor = readFileTreeDirectoryPrefixWithCursor arcPath relativeDirectoryPath entryCount
-
-        match cursor with
-        | Some cursor -> do! cursor.Directory.close ()
-        | None -> ()
-
-        return page
-    }
-
 /// Moves every entry of a file tree to a new ARC root, for example after the open ARC folder was renamed.
 let remapFileTreeRoot (sourceRoot: string) (targetRoot: string) (fileTree: Dictionary<string, FileEntry>) =
     let normalizedSourceRoot = PathHelpers.normalizePath sourceRoot
@@ -430,34 +418,34 @@ let mergeFileTreeDirectoryPage (entries: FileEntry[]) (fileTree: Dictionary<stri
     entries |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
     nextTree
 
-/// Applies a fresh listing read from the start of a directory: only an exhaustive
-/// snapshot may remove missing children. Incremental cursor pages, including the
-/// final page, must use mergeFileTreeDirectoryPage instead.
+/// Applies a fresh listing read from the start of a directory. A child the listing did not return is
+/// removed with its descendants: after a complete listing always, after a partial listing only when
+/// isGone confirms it, because the child may simply come later in the directory. Incremental cursor
+/// pages, including the final page, must use mergeFileTreeDirectoryPage instead.
 let applyFreshFileTreeDirectorySnapshot
     (arcPath: string)
     (relativeDirectoryPath: string)
+    (isGone: string -> bool)
     (snapshot: FileTreeDirectoryPage)
     (fileTree: Dictionary<string, FileEntry>)
     : Dictionary<string, FileEntry> =
     let nextTree = mergeFileTreeDirectoryPage snapshot.Entries fileTree
+    let directoryPath = resolveFileTreeDirectory arcPath relativeDirectoryPath
 
-    if not snapshot.HasMore then
-        let directoryPath = resolveFileTreeDirectory arcPath relativeDirectoryPath
+    let listedPaths =
+        snapshot.Entries
+        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path)
+        |> Set.ofArray
 
-        let currentPaths =
-            snapshot.Entries
-            |> Array.map (fun entry -> PathHelpers.normalizePath entry.path)
-            |> Set.ofArray
+    let removedPaths =
+        fileTree.Values
+        |> Seq.map (fun entry -> PathHelpers.normalizePath entry.path)
+        |> Seq.filter (fun path ->
+            PathHelpers.pathsEqual (dirname path) directoryPath
+            && not (listedPaths.Contains path)
+            && (not snapshot.HasMore || isGone path)
+        )
+        |> Seq.toArray
 
-        let removedPaths =
-            fileTree.Values
-            |> Seq.map (fun entry -> PathHelpers.normalizePath entry.path)
-            |> Seq.filter (fun path ->
-                PathHelpers.pathsEqual (dirname path) directoryPath
-                && not (currentPaths.Contains path)
-            )
-            |> Seq.toArray
-
-        removePathsAndDescendantsInPlace removedPaths nextTree
-
+    removePathsAndDescendantsInPlace removedPaths nextTree
     nextTree

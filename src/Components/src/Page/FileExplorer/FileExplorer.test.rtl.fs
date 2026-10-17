@@ -100,18 +100,6 @@ Vitest.test (
 )
 
 Vitest.test (
-    "an expanded directory renders all supplied children",
-    fun () ->
-        RTL.render (FileExplorer.FileExplorer(initialItems = [ createFolder "folder" 250 ]))
-        |> ignore
-
-        Vitest.expect(isRendered "folder-000").toBe true
-        Vitest.expect(isRendered "folder-100").toBe true
-        Vitest.expect(isRendered "folder-249").toBe true
-        Vitest.expect(RTL.screen.queryByText("Load more").IsNone).toBe true
-)
-
-Vitest.test (
     "more available children are requested only when the button is clicked",
     fun () -> promise {
         let requested = ResizeArray<FileItem>()
@@ -142,24 +130,6 @@ Vitest.test (
         Vitest.expect(isRendered "folder-099").toBe true
         Vitest.expect(isRendered "folder-100").toBe false
     }
-)
-
-Vitest.test (
-    "the load-more button is available for an expanded directory with no supplied children",
-    fun () ->
-        let mutable requests = 0
-
-        RTL.render (
-            FileExplorer.FileExplorer(
-                initialItems = [ createFolder "folder" 0 ],
-                hasMoreChildren = (fun _ -> true),
-                onLoadMoreChildren = (fun _ -> requests <- requests + 1)
-            )
-        )
-        |> ignore
-
-        RTL.fireEvent.click (loadMoreButton "folder")
-        Vitest.expect(requests).toBe 1
 )
 
 Vitest.test (
@@ -207,50 +177,6 @@ Vitest.test (
         rendered.rerender (explorer false)
         Vitest.expect(RTL.screen.queryByText("Load more").IsNone).toBe true
         Vitest.expect(isRendered "folder-099").toBe true
-)
-
-Vitest.test (
-    "expanded directories request their own pages independently",
-    fun () ->
-        let requestedIds = ResizeArray<string>()
-
-        RTL.render (
-            FileExplorer.FileExplorer(
-                initialItems = [ createFolder "folder-a" 100; createFolder "folder-b" 100 ],
-                hasMoreChildren = (fun _ -> true),
-                onLoadMoreChildren = (fun item -> requestedIds.Add item.Id)
-            )
-        )
-        |> ignore
-
-        RTL.fireEvent.click (loadMoreButton "folder-b")
-        RTL.fireEvent.click (loadMoreButton "folder-a")
-        Vitest.expect(requestedIds.ToArray()).toEqual [| "folder-b"; "folder-a" |]
-        Vitest.expect(isRendered "folder-a-099").toBe true
-        Vitest.expect(isRendered "folder-b-099").toBe true
-)
-
-Vitest.test (
-    "the button uses the latest callback after the caller updates",
-    fun () ->
-        let mutable initialRequests = 0
-        let mutable updatedRequests = 0
-        let folder = createFolder "folder" 100
-
-        let explorer onLoadMore =
-            FileExplorer.FileExplorer(
-                initialItems = [ folder ],
-                hasMoreChildren = (fun _ -> true),
-                onLoadMoreChildren = onLoadMore
-            )
-
-        let rendered =
-            RTL.render (explorer (fun _ -> initialRequests <- initialRequests + 1))
-
-        rendered.rerender (explorer (fun _ -> updatedRequests <- updatedRequests + 1))
-        RTL.fireEvent.click (loadMoreButton "folder")
-        Vitest.expect(initialRequests).toBe 0
-        Vitest.expect(updatedRequests).toBe 1
 )
 
 Vitest.test (

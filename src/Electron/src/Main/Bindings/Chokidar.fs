@@ -27,7 +27,6 @@ type WatchOptions
         ?cwd: string,
         ?awaitWriteFinish: bool,
         ?usePolling: bool,
-        ?depth: int,
         ?interval: int,
         ?binaryInterval: int
     ) =
@@ -38,7 +37,6 @@ type WatchOptions
     member val cwd: string option = cwd with get, set
     member val awaitWriteFinish: bool option = awaitWriteFinish with get, set
     member val usePolling: bool option = usePolling with get, set
-    member val depth: int option = depth with get, set
     member val interval: int option = interval with get, set
     member val binaryInterval: int option = binaryInterval with get, set
 
