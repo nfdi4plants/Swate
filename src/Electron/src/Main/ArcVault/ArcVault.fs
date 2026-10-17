@@ -115,6 +115,8 @@ type ArcVault(window: BrowserWindow) =
     member val internal FileTreeDirectoryCursors = Dictionary<string, FileTreeDirectoryCursor>() with get
     /// One repository-wide large-object listing shared by File Explorer reads until it is invalidated.
     member val internal LargeObjectMetadata = LargeObjectMetadataCache() with get
+    /// The number of large-object listings already applied to every loaded entry.
+    member val internal AnnotatedListingCount = 0 with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -138,17 +140,6 @@ type ArcVault(window: BrowserWindow) =
     member internal this.IncrementWatcherEpoch() = watcherEpoch <- watcherEpoch + 1
 
     member internal _.LoadedDirectoryWatcherController = loadedDirectoryWatcherController
-
-    /// Adds large-object metadata from the shared listing. A closing vault never reopens the
-    /// version control session that its window close releases.
-    member internal this.WithLargeObjectMetadata(arcPath: string, entries: FileEntry[]) =
-        this.LargeObjectMetadata.Enrich(
-            arcPath,
-            entries,
-            fun () ->
-                loadedDirectoryWatcherController.Current.LifecycleActive
-                && WindowSend.isAlive this.window
-        )
 
     /// Keeps the open listing of a directory for its next page. A replaced or removed cursor is closed.
     member internal this.SetFileTreeDirectoryCursor
@@ -301,6 +292,77 @@ module ArcVaultExtensions =
             let queuedUpdate = this.FileTreeUpdateTail |> Promise.bind operation
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.map (fun _ -> ()) |> Promise.catch (fun _ -> ())
             queuedUpdate
+
+        /// Annotates entries from the shared large-object listing. A closing vault never reopens the
+        /// version control session that its window close releases.
+        member private this.AnnotateFromLargeObjectListing(arcPath: string, entries: FileEntry[]) =
+            this.LargeObjectMetadata.Enrich(
+                arcPath,
+                entries,
+                fun () ->
+                    this.LoadedDirectoryWatcherController.Current.LifecycleActive
+                    && WindowSend.isAlive this.window
+            )
+
+        /// Applies the shared large-object listing to every loaded file entry and publishes the tree once,
+        /// if an annotation changed. Runs inside the FileTree queue.
+        member private this.AnnotateLoadedEntries(arcPath: string) = promise {
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            match this.path with
+            | Some currentPath when PathHelpers.pathsEqual currentPath arcPath ->
+                let fileEntries =
+                    this.fileTree.Values |> Seq.filter (fun entry -> not entry.isDirectory) |> Seq.toArray
+
+                let! annotated = this.AnnotateFromLargeObjectListing(arcPath, fileEntries)
+                this.AnnotatedListingCount <- this.LargeObjectMetadata.ListingCount
+
+                let changed =
+                    annotated
+                    |> Array.filter (fun entry ->
+                        match this.fileTree.TryGetValue entry.path with
+                        | true, current -> current.largeObject <> entry.largeObject
+                        | _ -> false
+                    )
+
+                if changed.Length > 0 && capturedWatcherEpoch = this.WatcherEpoch then
+                    let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+
+                    for entry in changed do
+                        nextFileTree.[entry.path] <- entry
+
+                    this.SetFileTree nextFileTree
+            | _ -> ()
+        }
+
+        /// Annotates entries from the shared large-object listing. A listing that is newer than the one
+        /// applied to the loaded tree is applied to every loaded entry as well, so entries of directories
+        /// that are not read again never keep a stale state.
+        member internal this.WithLargeObjectMetadata(arcPath: string, entries: FileEntry[]) : JS.Promise<FileEntry[]> = promise {
+            let! annotated = this.AnnotateFromLargeObjectListing(arcPath, entries)
+
+            if this.LargeObjectMetadata.ListingCount > this.AnnotatedListingCount then
+                this.AnnotatedListingCount <- this.LargeObjectMetadata.ListingCount
+
+                this.EnqueueFileTreeUpdate(fun () -> this.AnnotateLoadedEntries arcPath)
+                |> Promise.catch (fun error ->
+                    swatelogfn this.window.id "Unable to apply the large-object listing: %s" error.Message
+                )
+                |> Promise.start
+
+            return annotated
+        }
+
+        /// Renews the large-object state of the loaded tree when the repository changed outside Swate,
+        /// for example through git lfs pull. Called when the window gains focus.
+        member internal this.RefreshLargeObjectStateIfRepositoryChanged() =
+            match this.path with
+            | Some arcPath when this.LargeObjectMetadata.InvalidateIfRepositoryChanged arcPath ->
+                this.EnqueueFileTreeUpdate(fun () -> this.AnnotateLoadedEntries arcPath)
+                |> Promise.catch (fun error ->
+                    swatelogfn this.window.id "Unable to renew the large-object state: %s" error.Message
+                )
+            | _ -> JS.Constructors.Promise.resolve ()
 
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
             try
@@ -1980,9 +2042,8 @@ type ArcVaults() =
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
         // The root and every loaded directory are watched, so focus does not re-read the tree. External
-        // tools may have changed large-object state in the meantime, so the shared listing is dropped;
-        // it is listed again only when File Explorer next reads entries.
-        window.onFocus (fun () -> vault.LargeObjectMetadata.Invalidate())
+        // tools may have changed large-object state in the meantime, which the repository index shows.
+        window.onFocus (fun () -> vault.RefreshLargeObjectStateIfRepositoryChanged() |> Promise.start)
 
         window.onClose (fun closeEvent ->
             let operationCloseApproved = vault.isOperationCloseApproved

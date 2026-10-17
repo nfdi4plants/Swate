@@ -119,13 +119,43 @@ let withFileEntriesLfsMetadata
 /// after something that can change large-object state, such as a file change or a version control operation.
 type LargeObjectMetadataCache() =
     let mutable version = 0
+    let mutable listingCount = 0
 
     let mutable snapshot: (string * Fable.Core.JS.Promise<Map<string, ObjectStateDto>>) option =
         None
 
+    // The modification time of the repository index when the current listing was started.
+    let mutable indexModifiedAtListing: float option = None
+
+    let indexModified (repoRoot: string) =
+        try
+            Some (statSync (join [| repoRoot; ".git"; "index" |])).mtimeMs
+        with _ ->
+            None
+
     member _.Invalidate() =
         version <- version + 1
         snapshot <- None
+
+    /// Counts the listings read so far, so a reader can tell that a newer listing arrived.
+    member _.ListingCount = listingCount
+
+    /// Drops the listing when the repository index changed since the listing was started, and returns
+    /// true then, because the listing should be renewed. Git rewrites the index whenever it checks files
+    /// out, including git lfs pull and checkout, so large-object changes made outside Swate show there.
+    /// Without a readable index the listing is dropped as well but false is returned: it is read again
+    /// only when File Explorer next reads entries.
+    member this.InvalidateIfRepositoryChanged(repoRoot: string) =
+        let normalizedRepoRoot = normalizeRootPath repoRoot
+
+        match indexModifiedAtListing, indexModified normalizedRepoRoot with
+        | Some atListing, Some current when snapshot.IsSome && atListing = current -> false
+        | _, Some _ ->
+            this.Invalidate()
+            true
+        | _, None ->
+            this.Invalidate()
+            false
 
     /// canOpenSession prevents reopening a version control session for a vault that is closing.
     member private _.Get(repoRoot: string, canOpenSession: unit -> bool) =
@@ -134,12 +164,16 @@ type LargeObjectMetadataCache() =
         | _ when not (canOpenSession ()) -> Fable.Core.JS.Constructors.Promise.resolve Map.empty
         | _ ->
             let capturedVersion = version
+            // Taken before listing, so a change made while the listing runs counts as a later change.
+            indexModifiedAtListing <- indexModified repoRoot
 
             let listing = promise {
                 let! listed = tryListLargeObjects repoRoot
 
                 match listed with
-                | Some largeObjects -> return largeObjects
+                | Some largeObjects ->
+                    listingCount <- listingCount + 1
+                    return largeObjects
                 | None ->
                     // An unavailable listing is not kept, so the next read tries again.
                     if capturedVersion = version then

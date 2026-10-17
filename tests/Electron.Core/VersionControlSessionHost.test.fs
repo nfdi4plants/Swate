@@ -773,6 +773,71 @@ let private withCreateArcSetup
             WorkspaceSessionHost.resetForTests ()
     }
 
+/// Runs a test body against a registered vault over a provider that lists two large objects, one at the
+/// root and one in the nested folder, next to a repository index file. The body switches the listed
+/// state with setMaterialized and reads the number of listings with listings.
+let private withListedLargeObjects (windowId: int) testBody = promise {
+    let! root = createTempDirectoryAsync "swate-large-object-state-"
+    let workspace = join [| root; "workspace" |]
+
+    for directory in [ "nested"; ".git" ] do
+        Main.Bindings.Filesystem.mkdirSync
+            (join [| workspace; directory |])
+            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+    writeText (join [| workspace; ".git"; "index" |]) "index"
+
+    for name in [ "root.bin"; "nested/nested.bin" ] do
+        writeText (join [| workspace; name |]) "content"
+
+    let mutable materialized = false
+    let mutable listings = 0
+
+    let objectState name = {
+        Path = RepositoryPath.tryCreate name |> Result.defaultWith failwith
+        IsMaterialized = materialized
+        IsLocallyAvailable = true
+        SizeBytes = Some 7.0
+        ObjectId = Some(String.replicate 64 "b")
+    }
+
+    let materialization: ObjectMaterializationService = {
+        ListObjects =
+            fun _ -> async {
+                listings <- listings + 1
+                return OperationResult.succeeded [| objectState "root.bin"; objectState "nested/nested.bin" |]
+            }
+        Materialize = fun _ _ -> async { return OperationResult.succeeded () }
+        Dematerialize = fun _ _ -> async { return OperationResult.succeeded () }
+    }
+
+    let runtime =
+        fakeProviderRuntimeWithStoragePolicy workspace (join [| root; "unused" |]) None (Some materialization)
+
+    let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+    WorkspaceSessionHost.initialize host
+    let vault = registerVault windowId workspace
+
+    let isMaterialized relativePath =
+        vault.fileTree.[join [| workspace; relativePath |] |> Swate.Components.Shared.PathHelpers.normalizePath].largeObject
+        |> Option.map _.IsMaterialized
+
+    let cleanup () = promise {
+        do! vault.StopFileWatcher()
+        ARC_VAULTS.Vaults.Remove windowId |> ignore
+        electronMock?reset () |> ignore
+        do! host.CloseAll() |> Async.StartAsPromise
+        do! removeDirectoryAsync root
+    }
+
+    try
+        do! testBody vault workspace isMaterialized (fun value -> materialized <- value) (fun () -> listings)
+        do! cleanup ()
+    with error ->
+        do! cleanup ()
+        return raise error
+}
+
 Vitest.describe (
     "Version control IPC over a git vault",
     fun () ->
@@ -970,6 +1035,60 @@ Vitest.describe (
                     do! cleanup ()
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "a renewed large-object listing updates entries of directories that are not read again",
+            fun () ->
+                withListedLargeObjects
+                    6062
+                    (fun vault workspace isMaterialized setMaterialized listings -> promise {
+                        let! _ = vault.EnsureInitialFileTreeRootPage workspace
+                        do! vault.RefreshFileTreeDirectory "nested"
+                        Vitest.expect(isMaterialized "nested/nested.bin").toEqual (Some false)
+                        Vitest.expect(listings ()).toBe 1
+
+                        // Only the root is read again; the renewed listing still reaches the nested entry.
+                        setMaterialized true
+                        vault.LargeObjectMetadata.Invalidate()
+                        do! vault.RefreshFileTreeDirectory ""
+
+                        do!
+                            waitUntil
+                                "renewed state of the nested entry"
+                                (fun () -> isMaterialized "nested/nested.bin" = Some true)
+
+                        Vitest.expect(isMaterialized "root.bin").toEqual (Some true)
+                        Vitest.expect(listings ()).toBe 2
+                    })
+        )
+
+        Vitest.test (
+            "focus renews the large-object state only after the repository index changed",
+            fun () ->
+                withListedLargeObjects
+                    6063
+                    (fun vault workspace isMaterialized setMaterialized listings -> promise {
+                        let! _ = vault.EnsureInitialFileTreeRootPage workspace
+                        Vitest.expect(listings ()).toBe 1
+
+                        setMaterialized true
+                        do! vault.RefreshLargeObjectStateIfRepositoryChanged()
+                        Vitest.expect(listings ()).toBe 1
+                        Vitest.expect(isMaterialized "root.bin").toEqual (Some false)
+
+                        // A checkout outside Swate, such as git lfs pull, rewrites the index.
+                        let later = System.DateTime.UtcNow.AddMinutes(1.0)
+
+                        VersionControlService.Runtime.Node.FileSystem.utimesSync
+                            (join [| workspace; ".git"; "index" |])
+                            later
+                            later
+
+                        do! vault.RefreshLargeObjectStateIfRepositoryChanged()
+                        Vitest.expect(listings ()).toBe 2
+                        Vitest.expect(isMaterialized "root.bin").toEqual (Some true)
+                    })
         )
 
         Vitest.test (

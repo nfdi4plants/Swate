@@ -64,6 +64,9 @@ let tryGetNodeErrorCode (error: exn) : string option = jsNative
 [<Import("mkdirSync", "fs")>]
 let mkdirSync (path: string) (options: MkdirOptions) : unit = jsNative
 
+[<Import("statSync", "fs")>]
+let statSync (path: string) : Stats = jsNative
+
 [<Import("existsSync", "fs")>]
 let existsSync (path: string) : bool = jsNative
 
