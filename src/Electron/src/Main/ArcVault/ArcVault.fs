@@ -108,6 +108,8 @@ type ArcVault(window: BrowserWindow) =
     /// Settles when the in-memory ARC model for the currently opening path is ready.
     member val internal ArcInitialization: Fable.Core.JS.Promise<unit> option = None with get, set
     member val internal FileTreeUpdateTail: JS.Promise<unit> = JS.Constructors.Promise.resolve () with get, set
+    /// Starts the watcher of one covered File Explorer directory. Tests replace it to observe or fail watchers.
+    member val internal StartDirectoryWatcher = createDirectoryWatcher with get, set
     /// The open listing of each partially loaded directory, so its next page continues where the
     /// previous read ended.
     member val internal FileTreeDirectoryCursors = Dictionary<string, FileTreeDirectoryCursor>() with get
@@ -489,7 +491,20 @@ module ArcVaultExtensions =
                 this.CloseFileTreeDirectoryCursors(underPath = relativeDirectoryPath)
                 |> Promise.start
 
-                this.LoadedDirectoryWatcherController.RemoveLoadedDirectory relativeDirectoryPath
+                let controller = this.LoadedDirectoryWatcherController
+                controller.RemoveLoadedDirectory relativeDirectoryPath
+
+                // A native watcher stays on the directory it was opened on, so a directory created again at
+                // the same path needs a new one.
+                let watchedBelow =
+                    controller.Current.Watchers
+                    |> Map.toSeq
+                    |> Seq.map fst
+                    |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path relativeDirectoryPath)
+                    |> Seq.toArray
+
+                for observer in controller.RetireWatchers watchedBelow do
+                    observer.Close()
 
         member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string) =
             let controller = this.LoadedDirectoryWatcherController
@@ -537,135 +552,89 @@ module ArcVaultExtensions =
 
                     refreshWhileDirty () |> Promise.start
 
-        /// Turns a change of a polled directory into a refresh of that directory. Returns false while the
-        /// poller is not the directory's active observer yet, so the poller reports the change again after
-        /// activation.
-        member private this.HandleDirectoryModification(directory: string, observer: DirectoryObserver) =
+        /// Turns a change in a watched directory into a refresh of that directory. Changes reported by a
+        /// watcher that is no longer the directory's active watcher are dropped.
+        /// The shared large-object listing is kept: adding, removing or renaming an entry does not change
+        /// the large-object state of other entries, and renewing it costs seconds in a large repository.
+        /// Window focus and version control operations renew it.
+        member private this.HandleDirectoryChange(directory: string, observer: DirectoryObserver) =
             let controller = this.LoadedDirectoryWatcherController
 
-            if not (controller.OwnsDirectory(directory, observer)) then
-                false
-            else
-                if controller.Current.LifecycleActive && this.IsFileTreeDirectoryLoaded directory then
-                    // An added or replaced file can be a pointer or content, so the shared listing is renewed.
-                    this.LargeObjectMetadata.Invalidate()
-                    this.QueueLoadedDirectoryRefresh directory
+            if
+                controller.OwnsDirectory(directory, observer)
+                && controller.Current.LifecycleActive
+                && this.IsFileTreeDirectoryLoaded directory
+            then
+                this.QueueLoadedDirectoryRefresh directory
 
-                true
-
-        /// The sole owner of loaded-directory observer creation, readiness and retirement.
-        /// The root and every loaded directory have their own modification-time poller, so covering a new
-        /// directory leaves the observers of all other directories untouched. Directories that are no
-        /// longer loaded lose their observer. A newer request cancels the establishment of an older one.
-        member internal this.RequestLoadedDirectoryWatcherCoverage(shouldWatch: bool, ?allowDuringMutation: bool) =
+        /// Retires the watcher of a directory that was removed or moved, or whose watcher failed, and forgets
+        /// the directory. Until File Explorer loads it again, which starts a new watcher, it is not watched.
+        member private this.HandleDirectoryWatcherLost(directory: string, observer: DirectoryObserver, reason: exn) =
             let controller = this.LoadedDirectoryWatcherController
-            let generation, cancelled = controller.BeginEstablishment()
-            let precedingLifecycle = controller.Current.WatcherTransitionTail
+
+            if controller.OwnsDirectory(directory, observer) then
+                swatelogfn this.window.id "Loaded-directory watcher for '%s' ended: %s" directory reason.Message
+                controller.RetireWatchers [ directory ] |> ignore
+                this.ForgetFileTreeDirectoryState directory
+
+        /// The sole owner of loaded-directory watcher creation and retirement. The root and every loaded
+        /// directory have their own native watcher, which watches as soon as it exists, so covering a new
+        /// directory leaves the watchers of all other directories untouched. Directories that are no longer
+        /// loaded lose their watcher. A directory that cannot be watched stays uncovered and keeps its
+        /// pending handoff, so the next coverage tries it again. Returns whether coverage is established.
+        member internal this.UpdateLoadedDirectoryWatcherCoverage(shouldWatch: bool, ?allowDuringMutation: bool) =
+            let controller = this.LoadedDirectoryWatcherController
             let allowDuringMutation = defaultArg allowDuringMutation false
 
-            let coverageIsAllowed () =
-                controller.Current.Generation = generation
-                && controller.Current.LifecycleActive
-                && (not controller.Current.MutationActive || allowDuringMutation)
-
-            let closeWatchers (observers: DirectoryObserver seq) = promise {
-                for observer in observers do
-                    try
-                        do! observer.Close()
-                    with _ ->
-                        ()
-            }
-
-            let createObserver arcPath directory =
-                let logError (error: exn) =
-                    swatelogfn this.window.id "Loaded-directory watcher error for '%s': %s" directory error.Message
-
+            let startWatcher arcPath directory =
                 let observer = ref None
 
-                let stop, ready =
-                    createDirectoryModificationPoller
-                        (join [| arcPath; directory |])
-                        directoryPollIntervalMilliseconds
-                        (fun () ->
-                            observer.Value
-                            |> Option.exists (fun observer -> this.HandleDirectoryModification(directory, observer))
-                        )
-                        logError
+                let forObserver handle = observer.Value |> Option.iter handle
 
-                let poller = DirectoryObserver stop
-                observer.Value <- Some poller
-                poller, ready
-
-            let lifecycle = promise {
-                do! precedingLifecycle
-
-                if generation <> controller.Current.Generation then
-                    return None
-                else
-                    match this.path with
-                    | Some arcPath when shouldWatch && coverageIsAllowed () ->
-                        this.RemoveUnavailableLoadedDirectories arcPath
-
-                        let desired = controller.Current.LoadedDirectories |> Set.add RootDirectory
-
-                        let covered = controller.Current.Watchers |> Map.toSeq |> Seq.map fst |> Set.ofSeq
-
-                        do! controller.RetireWatchers(Set.difference covered desired) |> closeWatchers
-
-                        let candidates =
-                            Set.difference desired covered
-                            |> Set.toArray
-                            |> Array.map (fun directory ->
-                                let candidate, ready = createObserver arcPath directory
-                                directory, candidate, ready
+                try
+                    let stop =
+                        this.StartDirectoryWatcher
+                            (join [| arcPath; directory |])
+                            (fun () -> forObserver (fun observer -> this.HandleDirectoryChange(directory, observer)))
+                            (fun reason ->
+                                forObserver (fun observer ->
+                                    this.HandleDirectoryWatcherLost(directory, observer, reason)
+                                )
                             )
 
-                        let! readiness =
-                            race [|
-                                candidates
-                                |> Array.map (fun (_, _, ready) -> ready)
-                                |> Promise.all
-                                |> Promise.map Some
-                                cancelled |> Promise.map (fun () -> None)
-                            |]
+                    let watcher = DirectoryObserver stop
+                    observer.Value <- Some watcher
+                    controller.ActivateWatcher(directory, watcher)
+                with error ->
+                    swatelogfn this.window.id "Unable to watch loaded directory '%s': %s" directory error.Message
 
-                        match readiness with
-                        | Some outcomes when
-                            coverageIsAllowed ()
-                            && this.path |> Option.exists (PathHelpers.pathsEqual arcPath)
-                            ->
-                            // A directory whose watcher failed stays uncovered and keeps its pending
-                            // handoff; the next coverage request tries it again.
-                            let failed =
-                                Array.zip candidates outcomes
-                                |> Array.choose (fun ((directory, candidate, _), outcome) ->
-                                    match outcome with
-                                    | Ok() ->
-                                        controller.ActivateWatcher(directory, candidate)
-                                        None
-                                    | Error _ -> Some candidate
-                                )
+            match this.path with
+            | Some arcPath when
+                shouldWatch
+                && controller.Current.LifecycleActive
+                && (not controller.Current.MutationActive || allowDuringMutation)
+                ->
+                this.RemoveUnavailableLoadedDirectories arcPath
+                let desired = controller.Current.LoadedDirectories |> Set.add RootDirectory
+                let covered = controller.Current.Watchers |> Map.toSeq |> Seq.map fst |> Set.ofSeq
 
-                            do! closeWatchers failed
-                            controller.CompleteEstablishment generation
-                            return Some generation
-                        | _ ->
-                            do! candidates |> Array.map (fun (_, candidate, _) -> candidate) |> closeWatchers
-                            controller.CompleteEstablishment generation
-                            return None
-                    | currentPath ->
-                        if currentPath.IsNone then
-                            controller.ClearLoadedDirectories()
+                for observer in controller.RetireWatchers(Set.difference covered desired) do
+                    observer.Close()
 
-                        do! controller.RetireWatchers() |> closeWatchers
-                        controller.CompleteEstablishment generation
-                        return None
-            }
+                for directory in Set.difference desired covered do
+                    startWatcher arcPath directory
 
-            controller.SetLifecycleTail(lifecycle |> Promise.map ignore |> Promise.catch (fun _ -> ()))
-            lifecycle
+                true
+            | currentPath ->
+                if currentPath.IsNone then
+                    controller.ClearLoadedDirectories()
 
-        /// Re-reads each directory whose watcher became ready after its listing was read. Runs inside the
+                for observer in controller.RetireWatchers() do
+                    observer.Close()
+
+                false
+
+        /// Re-reads each directory whose watcher started after its listing was read. Runs inside the
         /// FileTree queue. Parents go first, so a vanished parent is forgotten before its children.
         member private this.CatchUpPendingLoadedDirectoryHandoffs(arcPath: string) = promise {
             let controller = this.LoadedDirectoryWatcherController
@@ -703,15 +672,14 @@ module ArcVaultExtensions =
         }
 
         /// Establishes watcher coverage for the root and every loaded directory, then catches up every
-        /// directory whose changes may have been missed before its watcher became ready.
+        /// directory whose changes may have been missed before its watcher started.
         member internal this.EnsureLoadedDirectoryWatcherCoverage(?allowDuringMutation: bool) = promise {
-            match! this.RequestLoadedDirectoryWatcherCoverage(true, ?allowDuringMutation = allowDuringMutation) with
-            | None -> ()
-            | Some _ ->
-                match this.path with
-                | None -> ()
-                | Some arcPath ->
-                    do! this.EnqueueFileTreeUpdate(fun () -> this.CatchUpPendingLoadedDirectoryHandoffs arcPath)
+            match this.path with
+            | Some arcPath when
+                this.UpdateLoadedDirectoryWatcherCoverage(true, ?allowDuringMutation = allowDuringMutation)
+                ->
+                do! this.EnqueueFileTreeUpdate(fun () -> this.CatchUpPendingLoadedDirectoryHandoffs arcPath)
+            | _ -> ()
         }
 
         member this.WithLoadedDirectoryWatcherSuspended<'T>(operation: unit -> JS.Promise<'T>) =
@@ -730,7 +698,7 @@ module ArcVaultExtensions =
 
                 try
                     controller.AddCoveredDirectoriesToPendingHandoffs()
-                    do! this.RequestLoadedDirectoryWatcherCoverage false |> Promise.map ignore
+                    this.UpdateLoadedDirectoryWatcherCoverage false |> ignore
                     // Open listings hold directory handles as well. Releasing them keeps the operation from
                     // being blocked; the catch-up after the operation hands every directory a fresh listing.
                     do! this.EnqueueFileTreeUpdate(fun () -> this.CloseFileTreeDirectoryCursors())
@@ -1203,15 +1171,19 @@ module ArcVaultExtensions =
                     |> Array.map (fun entry -> PathHelpers.normalizePath entry.path)
                     |> Set.ofArray
 
-                this.fileTree.Values
-                |> Seq.map (fun entry -> PathHelpers.normalizePath entry.path)
-                |> Seq.filter (fun path ->
-                    PathHelpers.pathsEqual (dirname path) directoryPath
-                    && not (listedPaths.Contains path)
-                    && not (WatcherHelpers.existsSyncWithExactName path)
-                )
-                |> Seq.toArray
-                |> Array.iter (fun path -> removePathAndDescendantsInPlace path nextFileTree)
+                let existsWithExactName = WatcherHelpers.existsSyncWithExactNameIn directoryPath
+
+                let vanishedPaths =
+                    this.fileTree.Values
+                    |> Seq.map (fun entry -> PathHelpers.normalizePath entry.path)
+                    |> Seq.filter (fun path ->
+                        PathHelpers.pathsEqual (dirname path) directoryPath
+                        && not (listedPaths.Contains path)
+                        && not (existsWithExactName path)
+                    )
+                    |> Seq.toArray
+
+                removePathsAndDescendantsInPlace vanishedPaths nextFileTree
 
             // A directory that was just read exists, so its own entry belongs to the tree even when it was
             // created after its parent was listed. Its children are never published without it.
@@ -1324,8 +1296,8 @@ module ArcVaultExtensions =
             }
 
         /// Loads one directory through the shared read path. chooseRead decides how the directory is read.
-        /// Watcher coverage for a newly loaded directory is established after the FileTree queue entry, so
-        /// waiting for readiness never blocks other tree updates.
+        /// Watcher coverage for a newly loaded directory is established after the FileTree queue entry,
+        /// because the catch-up read that follows it runs in that queue.
         member private this.LoadFileTreeDirectory
             (relativeDirectoryPath: string, chooseRead: string -> string -> FileTreeDirectoryRead)
             =
@@ -1612,13 +1584,10 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
             this.CancelFileWatcherReadyWait |> Option.iter (fun cancel -> cancel ())
             this.CancelFileWatcherReadyWait <- None
-            // Reject callbacks synchronously. Requesting retirement below also advances the watcher
-            // generation before either close is awaited, so callbacks owned by the retiring watcher
-            // cannot join a later restarted lifecycle.
+            // Reject callbacks synchronously. The loaded-directory watchers are retired at once, so their
+            // callbacks are no longer owned and cannot join a later restarted lifecycle.
             this.LoadedDirectoryWatcherController.StopLifecycle()
-
-            let loadedDirectoryWatcherClose =
-                this.RequestLoadedDirectoryWatcherCoverage false |> Promise.map ignore
+            this.UpdateLoadedDirectoryWatcherCoverage false |> ignore
 
             match this.watcher with
             | None -> ()
@@ -1632,9 +1601,8 @@ module ArcVaultExtensions =
             this.FileWatcherReady <- None
             this.SchedulePendingFileWatcherEvents <- None
 
-            do! loadedDirectoryWatcherClose
-            // A lifecycle queued ahead of retirement may have touched these collections before it
-            // observed cancellation. Reassert the completed-stop invariants after it drains.
+            // Work that started before the stop may have touched these collections while the permanent
+            // watcher closed. Reassert the completed-stop invariants.
             this.LoadedDirectoryWatcherController.ClearLifecycleData()
             this.ClearPendingFileWatcherState()
             this.LargeObjectMetadata.Invalidate()

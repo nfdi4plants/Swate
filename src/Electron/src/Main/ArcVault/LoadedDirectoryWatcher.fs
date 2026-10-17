@@ -6,24 +6,20 @@ open Fable.Core
 [<Literal>]
 let RootDirectory = ""
 
-/// The observation of one covered directory: a poller of its modification time. Swate never holds a
-/// handle on a covered directory, and covering one costs a stat call per interval, whatever its size.
-type internal DirectoryObserver(stop: unit -> JS.Promise<unit>) =
+/// The observation of one covered directory: a native watcher of its direct children, which holds one
+/// handle, whatever the number of entries.
+type internal DirectoryObserver(stop: unit -> unit) =
     member _.Close() = stop ()
 
 type internal LoadedDirectoryWatcherState = {
     LifecycleActive: bool
     MutationActive: bool
-    /// Counts coverage requests. A newer request cancels the establishment of an older one.
-    Generation: int
-    EstablishmentCancellation: (int * (unit -> unit)) option
     /// One observer per covered directory, keyed by ARC-relative path ("" is the root).
     /// A directory keeps its observer while other directories are added or removed.
     Watchers: Map<string, DirectoryObserver>
     LoadedDirectories: Set<string>
     PendingHandoffs: Set<string>
     MutationQueueTail: JS.Promise<unit>
-    WatcherTransitionTail: JS.Promise<unit>
     Refreshes: Map<string, bool>
 }
 
@@ -33,13 +29,10 @@ module private LoadedDirectoryWatcherState =
     let initial = {
         LifecycleActive = true
         MutationActive = false
-        Generation = 0
-        EstablishmentCancellation = None
         Watchers = Map.empty
         LoadedDirectories = Set.empty
         PendingHandoffs = Set.empty
         MutationQueueTail = JS.Constructors.Promise.resolve ()
-        WatcherTransitionTail = JS.Constructors.Promise.resolve ()
         Refreshes = Map.empty
     }
 
@@ -51,35 +44,6 @@ type internal LoadedDirectoryWatcherController() =
     member _.Current = state.Value
 
     member private _.Update transition = state.Value <- transition state.Value
-
-    member this.BeginEstablishment() =
-        state.Value.EstablishmentCancellation
-        |> Option.iter (fun (_, cancel) -> cancel ())
-
-        let cancel = ref ignore
-
-        let cancellation =
-            JS.Constructors.Promise.Create(fun resolve _ -> cancel.Value <- fun () -> resolve ())
-
-        let generation = state.Value.Generation + 1
-
-        state.Value <- {
-            state.Value with
-                Generation = generation
-                EstablishmentCancellation = Some(generation, cancel.Value)
-        }
-
-        generation, cancellation
-
-    member this.CompleteEstablishment generation =
-        this.Update(fun current ->
-            match current.EstablishmentCancellation with
-            | Some(currentGeneration, _) when currentGeneration = generation -> {
-                current with
-                    EstablishmentCancellation = None
-              }
-            | _ -> current
-        )
 
     member this.ActivateWatcher(directory, watcher) =
         this.Update(fun current -> {
@@ -200,12 +164,6 @@ type internal LoadedDirectoryWatcherController() =
         this.Update(fun current -> {
             current with
                 MutationQueueTail = promise
-        })
-
-    member this.SetLifecycleTail promise =
-        this.Update(fun current -> {
-            current with
-                WatcherTransitionTail = promise
         })
 
     member this.UpdateRefreshes update =

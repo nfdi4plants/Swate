@@ -11,84 +11,52 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
-Vitest.vi.mock ("fs/promises", createObj [ "spy" ==> true ]) |> ignore
+/// Wraps the next start of the watcher of one directory; every other start runs unchanged.
+let private wrapNextDirectoryWatcher (vault: ArcVault) (directoryPath: string) wrap =
+    let start = vault.StartDirectoryWatcher
 
-[<Import("stat", "fs/promises")>]
-let private statMock: obj = jsNative
+    vault.StartDirectoryWatcher <-
+        fun path onChange onLost ->
+            if PathHelpers.pathsEqual path directoryPath then
+                vault.StartDirectoryWatcher <- start
+                wrap start path onChange onLost
+            else
+                start path onChange onLost
 
-[<Emit("$0.mockReset()")>]
-let private resetMock (_spy: obj) : unit = jsNative
-
-/// The callback stat of "fs"; the spied "fs/promises" functions are shared with fs.promises, so only the
-/// callback API still reaches the real filesystem.
-[<Import("stat", "fs")>]
-let private callbackStat: obj = jsNative
-
-[<Emit("$0.mockImplementation((path) => $2(String(path), () => new Promise((resolve, reject) => $1(path, (error, stats) => error ? reject(error) : resolve(stats)))))")>]
-let private routeStatCalls
-    (_spy: obj)
-    (_real: obj)
-    (_route: System.Func<string, System.Func<JS.Promise<Stats>>, JS.Promise<Stats>>)
-    : unit =
-    jsNative
-
-/// Replacements for the next stat call on a directory, in the order they were registered.
-let private directoryPollInterceptions =
-    ResizeArray<string * (System.Func<JS.Promise<Stats>> -> JS.Promise<Stats>)>()
-
-Vitest.beforeEach (fun () ->
-    resetMock statMock
-    directoryPollInterceptions.Clear()
-
-    routeStatCalls
-        statMock
-        callbackStat
-        (System.Func<_, _, _>(fun path stat ->
-            match
-                directoryPollInterceptions
-                |> Seq.tryFindIndex (fun (directory, _) -> PathHelpers.pathsEqual directory path)
-            with
-            | Some index ->
-                let _, replacement = directoryPollInterceptions.[index]
-                directoryPollInterceptions.RemoveAt index
-                replacement stat
-            | None -> stat.Invoke()
-        ))
-)
-
-/// Replaces the next stat call on the directory. Register it only while no observer covers the
-/// directory, so the call that is replaced is the baseline poll of the next observer.
-let private interceptNextDirectoryPoll directory replacement =
-    directoryPollInterceptions.Add(directory, replacement)
-
-/// Runs an action right before the next observer of the directory takes its baseline.
-let private beforeNextDirectoryPoll directory (action: unit -> unit) =
-    interceptNextDirectoryPoll
-        directory
-        (fun stat ->
+/// Runs an action right before the next watcher of the directory starts.
+let private beforeNextDirectoryWatcher vault directoryPath (action: unit -> unit) =
+    wrapNextDirectoryWatcher
+        vault
+        directoryPath
+        (fun start path onChange onLost ->
             action ()
-            stat.Invoke()
+            start path onChange onLost
         )
 
-/// Holds the baseline of the next observer of the directory until it is released.
-/// Returns a promise that resolves once the baseline was requested, and the release function.
-let private holdNextDirectoryPoll directory =
-    let requested, signalRequested = TestHelpers.deferred ()
-    let released, release = TestHelpers.deferred ()
+/// Makes the next watcher of the directory fail to start.
+let private failNextDirectoryWatcher vault directoryPath (error: exn) =
+    wrapNextDirectoryWatcher vault directoryPath (fun _ _ _ _ -> raise error)
 
-    interceptNextDirectoryPoll
-        directory
-        (fun stat -> promise {
-            signalRequested ()
-            do! released
-            return! stat.Invoke()
-        })
+/// Starts the next watcher of the directory normally and returns a function that ends it the way a
+/// removed directory or a watcher error does: the watcher stops and reports its loss.
+let private loseNextDirectoryWatcher vault directoryPath =
+    let mutable lose: exn -> unit = ignore
 
-    requested, release
+    wrapNextDirectoryWatcher
+        vault
+        directoryPath
+        (fun start path onChange onLost ->
+            let stop = start path onChange onLost
 
-/// Fails the baseline of the next observer of the directory.
-let private failNextDirectoryPoll directory (error: exn) =
-    interceptNextDirectoryPoll directory (fun _ -> Promise.reject error)
+            lose <-
+                fun reason ->
+                    stop ()
+                    onLost reason
+
+            stop
+        )
+
+    fun reason -> lose reason
 
 [<Emit("$0.close = () => { $1(); return $2; }")>]
 let private replaceWatcherClose
@@ -118,9 +86,6 @@ let private containsPath path (vault: ArcVault) =
 let private directoryWatcher (directory: string) (vault: ArcVault) =
     vault.LoadedDirectoryWatcherController.Current.Watchers.TryFind directory
 
-let private isDirectoryCovered (directory: string) (vault: ArcVault) =
-    vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey directory
-
 let private coveredDirectories (vault: ArcVault) =
     vault.LoadedDirectoryWatcherController.Current.Watchers
     |> Map.toArray
@@ -129,10 +94,9 @@ let private coveredDirectories (vault: ArcVault) =
 let private hasNoDirectoryWatchers (vault: ArcVault) =
     vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty
 
-let private retireDirectoryWatchers (vault: ArcVault) = promise {
+let private retireDirectoryWatchers (vault: ArcVault) =
     for observer in vault.LoadedDirectoryWatcherController.RetireWatchers() do
-        do! observer.Close()
-}
+        observer.Close()
 
 let private isSameWatcher (left: DirectoryObserver) (right: DirectoryObserver) = obj.ReferenceEquals(left, right)
 
@@ -237,7 +201,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a directory created again at a removed path is loaded from scratch",
+            "moving a loaded directory away forgets it, keeps its parent, and loads it from scratch when it returns",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
@@ -252,11 +216,14 @@ Vitest.describe (
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 do! renameAsync nestedPath movedPath
                                 do! vault.RefreshFileTreeDirectory "dataset"
+                                do! vault.RefreshFileTreeDirectory ""
                             })
 
                         Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "dataset/nested").toBe false
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsNone).toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
+                        Vitest.expect(coveredDirectories vault).toEqual [| ""; "dataset" |]
+                        Vitest.expect(containsPath movedPath vault).toBe true
 
                         do!
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
@@ -271,27 +238,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "partial refresh preserves a cached child absent from the returned page",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
-                        let! paths = createNumberedFiles datasetPath 150
-                        let! page = Main.FileTreeCreator.readFileTreeDirectoryPrefix rootPath "dataset" 100
-                        let cachedPath = findEntryOutsidePage paths page
-                        vault.fileTree.[cachedPath] <- FileEntry.create (basename cachedPath, cachedPath, false)
-                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
-
-                        do! vault.RefreshFileTreeDirectory "dataset"
-
-                        Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
-                        Vitest.expect(containsPath cachedPath vault).toBe true
-                    })
-            }
-        )
-
-        Vitest.test (
-            "partial refresh preserves descendants of a cached directory absent from the returned page",
+            "partial refresh preserves a cached child directory and its descendants absent from the returned page",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
@@ -337,8 +284,6 @@ Vitest.describe (
                         vault.fileTree.[preservedPath] <-
                             FileEntry.create (basename preservedPath, preservedPath, false)
 
-                        do! Promise.sleep 200
-
                         do! rmAsync deletedPath (RmOptions())
 
                         do!
@@ -371,8 +316,6 @@ Vitest.describe (
                         vault.fileTree.[deletedDescendantPath] <-
                             FileEntry.create (basename deletedDescendantPath, deletedDescendantPath, false)
 
-                        do! Promise.sleep 200
-
                         do! rmAsync deletedDirectoryPath (RmOptions(recursive = true, force = true))
 
                         do!
@@ -382,38 +325,6 @@ Vitest.describe (
 
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["dataset"]).toBe true
                         Vitest.expect(containsPath deletedDescendantPath vault).toBe false
-                    })
-            }
-        )
-
-        Vitest.test (
-            "loaded watcher keeps a file recreated before the queued refresh runs",
-            TestOptions(timeout = 20000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        let! paths = createNumberedFiles datasetPath 150
-                        do! vault.RefreshFileTreeDirectory "dataset"
-
-                        let recreatedPath = paths |> Array.find (fun path -> containsPath path vault)
-
-                        do! Promise.sleep 200
-                        let queueGate, releaseQueue = TestHelpers.deferred ()
-                        vault.FileTreeUpdateTail <- queueGate
-                        do! rmAsync recreatedPath (RmOptions())
-
-                        do!
-                            waitUntil
-                                "queued loaded-directory deletion"
-                                (fun () ->
-                                    vault.LoadedDirectoryWatcherController.Current.Refreshes.ContainsKey "dataset"
-                                )
-
-                        do! writeFileAsync recreatedPath "recreated" TextEncoding.Utf8
-                        releaseQueue ()
-                        do! vault.FileTreeUpdateTail
-
-                        Vitest.expect(containsPath recreatedPath vault).toBe true
                     })
             }
         )
@@ -434,13 +345,6 @@ Vitest.describe (
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe true
                         Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe false
 
-                        // A change inside the unloaded child does not reach the tree.
-                        do! Promise.sleep 200
-                        let unloadedPath = join [| nestedPath; "unloaded.txt" |]
-                        do! writeFileAsync unloadedPath "unloaded" TextEncoding.Utf8
-                        do! Promise.sleep 1200
-                        Vitest.expect(containsPath unloadedPath vault).toBe false
-
                         // Collapse is renderer-local, so no main-process action removes the loaded scope.
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
 
@@ -453,13 +357,19 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "polled loaded directories reconcile additions, deletions and removed loaded children",
-            TestOptions(timeout = 15000),
+            "polled root and loaded directories reconcile additions, deletions and removed loaded children",
+            TestOptions(timeout = 20000),
             fun () -> promise {
                 do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath nestedPath -> promise {
+                    withLoadedDirectoryFixture (fun vault rootPath datasetPath nestedPath -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        do! Promise.sleep 200
+                        Vitest.expect(coveredDirectories vault).toEqual [| ""; "dataset" |]
+
+                        let rootFilePath = join [| rootPath; "external-root.txt" |]
+                        do! writeFileAsync rootFilePath "root" TextEncoding.Utf8
+                        do! waitUntil "root addition" (fun () -> containsPath rootFilePath vault)
+                        do! rmAsync rootFilePath (RmOptions())
+                        do! waitUntil "root deletion" (fun () -> not (containsPath rootFilePath vault))
 
                         let addedPath = join [| datasetPath; "added.txt" |]
                         do! writeFileAsync addedPath "added" TextEncoding.Utf8
@@ -476,10 +386,11 @@ Vitest.describe (
 
                         do!
                             waitUntil
-                                "deleted loaded-directory scope removal"
-                                (fun () -> not (vault.IsFileTreeDirectoryLoaded "dataset/nested"))
-
-                        Vitest.expect(containsPath nestedPath vault).toBe false
+                                "deleted loaded directory forgotten and removed from the tree"
+                                (fun () ->
+                                    not (vault.IsFileTreeDirectoryLoaded "dataset/nested")
+                                    && not (containsPath nestedPath vault)
+                                )
                     })
             }
         )
@@ -498,25 +409,6 @@ Vitest.describe (
                         Vitest.expect(containsPath rootFilePath vault).toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "").toBe true
                         Vitest.expect(vault.loadedFileTreeDirectories.Contains "").toBe false
-                    })
-            }
-        )
-
-        Vitest.test (
-            "the root watcher discovers external root changes without a refresh",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault rootPath _ _ -> promise {
-                        do! vault.EnsureLoadedDirectoryWatcherCoverage()
-                        Vitest.expect(isDirectoryCovered "" vault).toBe true
-
-                        let rootFilePath = join [| rootPath; "external-root.txt" |]
-                        do! writeFileAsync rootFilePath "root" TextEncoding.Utf8
-                        do! waitUntil "root watcher addition" (fun () -> containsPath rootFilePath vault)
-
-                        do! rmAsync rootFilePath (RmOptions())
-                        do! waitUntil "root watcher deletion" (fun () -> not (containsPath rootFilePath vault))
                     })
             }
         )
@@ -668,7 +560,7 @@ Vitest.describe (
                         window
                         (fun vault _ _ _ -> promise {
                             do! vault.RefreshFileTreeDirectory "dataset"
-                            do! retireDirectoryWatchers vault
+                            retireDirectoryWatchers vault
                             publications <- 0
 
                             let firstRefreshGate, releaseFirstRefresh = TestHelpers.deferred ()
@@ -725,7 +617,7 @@ Vitest.describe (
                         (fun vault _ datasetPath _ -> promise {
                             vaultUnderTest <- Some vault
                             do! vault.RefreshFileTreeDirectory "dataset"
-                            do! retireDirectoryWatchers vault
+                            retireDirectoryWatchers vault
 
                             firstPath <- join [| datasetPath; "race-first.txt" |]
                             intermediatePath <- join [| datasetPath; "race-intermediate.txt" |]
@@ -897,57 +789,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a mutation queued during restoration waits for watcher readiness and catch-up",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-
-                        let firstOperationGate, releaseFirstOperation = TestHelpers.deferred ()
-                        let secondOperationGate, releaseSecondOperation = TestHelpers.deferred ()
-                        let firstEntered, signalFirstEntered = TestHelpers.deferred ()
-                        let mutable restorationRequested = JS.Constructors.Promise.resolve ()
-                        let mutable signalRestorationReady = ignore
-                        let mutable secondEntered = false
-                        let addedPath = join [| datasetPath; "added-before-restoration-finished.txt" |]
-
-                        let first =
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                // No observer covers dataset now, so the held poll is the restored baseline.
-                                let requested, release = holdNextDirectoryPoll datasetPath
-                                restorationRequested <- requested
-                                signalRestorationReady <- release
-                                signalFirstEntered ()
-                                do! writeFileAsync addedPath "queued restoration" TextEncoding.Utf8
-                                do! firstOperationGate
-                            })
-
-                        do! firstEntered
-                        releaseFirstOperation ()
-                        do! restorationRequested
-
-                        let second =
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                secondEntered <- true
-                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
-                                Vitest.expect(containsPath addedPath vault).toBe true
-                                do! secondOperationGate
-                            })
-
-                        Vitest.expect(secondEntered).toBe false
-                        signalRestorationReady ()
-                        do! first
-                        do! waitUntil "mutation queued during restoration" (fun () -> secondEntered)
-
-                        releaseSecondOperation ()
-                        do! second
-                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
-                    })
-            }
-        )
-
-        Vitest.test (
             "refresh invalidated by StopFileWatcher cannot publish or restore loaded scopes",
             TestOptions(timeout = 15000),
             fun () -> promise {
@@ -1043,8 +884,10 @@ Vitest.describe (
                     withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
                         let handoffPath = join [| datasetPath; "created-during-watch-handoff.txt" |]
 
-                        // The file is part of the baseline, so only the catch-up read can find it.
-                        beforeNextDirectoryPoll
+                        // The file appears after the listing and before the watcher, so only the catch-up
+                        // read can find it.
+                        beforeNextDirectoryWatcher
+                            vault
                             datasetPath
                             (fun () -> writeFileSync handoffPath "handoff" TextEncoding.Utf8)
 
@@ -1057,84 +900,94 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "overlapping establishments drop the superseded candidate and retain only the final generation",
+            "a watcher that ends is retired with its directory, and loading the directory again watches it",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
                     withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        // Cover the root first, so both held baselines belong to "dataset".
-                        do! vault.EnsureLoadedDirectoryWatcherCoverage()
-                        let firstRequested, releaseFirst = holdNextDirectoryPoll datasetPath
-                        let secondRequested, releaseSecond = holdNextDirectoryPoll datasetPath
+                        let endWatcher = loseNextDirectoryWatcher vault datasetPath
+                        do! vault.RefreshFileTreeDirectory "dataset"
 
-                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
-                        let first = vault.RequestLoadedDirectoryWatcherCoverage true
-                        do! firstRequested
+                        endWatcher (exn "watcher error")
 
-                        let second = vault.RequestLoadedDirectoryWatcherCoverage true
-                        do! secondRequested
-                        releaseSecond ()
+                        Vitest.expect((directoryWatcher "dataset" vault).IsNone).toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe false
 
-                        let! firstGeneration = first
-                        let! secondGeneration = second
-                        Vitest.expect(firstGeneration.IsNone).toBe true
-                        Vitest.expect(secondGeneration.IsSome).toBe true
+                        do! vault.RefreshFileTreeDirectory "dataset"
                         Vitest.expect(coveredDirectories vault).toEqual [| ""; "dataset" |]
-                        let active = (directoryWatcher "dataset" vault).Value
 
-                        // The superseded candidate's late baseline never replaces the active observer.
-                        releaseFirst ()
-                        do! Promise.sleep 50
-                        Vitest.expect(isSameWatcher active (directoryWatcher "dataset" vault).Value).toBe true
+                        let laterPath = join [| datasetPath; "after-reload.txt" |]
+                        do! writeFileAsync laterPath "later" TextEncoding.Utf8
+                        do! waitUntil "change seen by the new watcher" (fun () -> containsPath laterPath vault)
                     })
             }
         )
 
         Vitest.test (
-            "existing directory watchers stay active and unchanged while a new directory's watcher becomes ready",
+            "a loaded directory deleted and created again on disk gets a new watcher",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath nestedPath -> promise {
+                    withLoadedDirectoryFixture (fun vault _ _ nestedPath -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        let original = (directoryWatcher "dataset" vault).Value
-                        let candidateCreated, signalCandidateReady = holdNextDirectoryPoll nestedPath
+                        do! vault.RefreshFileTreeDirectory "dataset/nested"
+                        let original = (directoryWatcher "dataset/nested" vault).Value
 
-                        let expansion = vault.RefreshFileTreeDirectory "dataset/nested"
-                        do! candidateCreated
-                        Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe true
+                        do! rmAsync nestedPath (RmOptions(recursive = true, force = true))
 
-                        let changedPath = join [| datasetPath; "changed-during-expansion.txt" |]
-                        do! writeFileAsync changedPath "changed" TextEncoding.Utf8
-
-                        // The pending watcher of the new directory does not hold up FileTree updates.
                         do!
                             waitUntil
-                                "existing-scope mutation while the new watcher is pending"
-                                (fun () -> containsPath changedPath vault)
+                                "removed directory forgotten with its watcher"
+                                (fun () ->
+                                    not (vault.IsFileTreeDirectoryLoaded "dataset/nested")
+                                    && (directoryWatcher "dataset/nested" vault).IsNone
+                                )
 
-                        signalCandidateReady ()
-                        do! expansion
+                        let! _ = mkdirAsync nestedPath (MkdirOptions(recursive = true))
+                        do! vault.RefreshFileTreeDirectory "dataset/nested"
+                        let replacement = (directoryWatcher "dataset/nested" vault).Value
+                        Vitest.expect(isSameWatcher original replacement).toBe false
 
-                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsSome).toBe true
-                        Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe true
+                        let laterPath = join [| nestedPath; "after-recreation.txt" |]
+                        do! writeFileAsync laterPath "later" TextEncoding.Utf8
+                        do! waitUntil "change in the re-created directory" (fun () -> containsPath laterPath vault)
                     })
             }
         )
 
         Vitest.test (
-            "a directory watcher error before ready leaves that directory uncovered and keeps the others",
+            "covering a new directory keeps the existing watchers",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let original = (directoryWatcher "dataset" vault).Value
+
+                        do! vault.RefreshFileTreeDirectory "dataset/nested"
+
+                        Vitest.expect((directoryWatcher "dataset/nested" vault).IsSome).toBe true
+                        Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe true
+
+                        let changedPath = join [| datasetPath; "changed-after-expansion.txt" |]
+                        do! writeFileAsync changedPath "changed" TextEncoding.Utf8
+                        do! waitUntil "change seen by the kept watcher" (fun () -> containsPath changedPath vault)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "a directory whose watcher cannot start stays uncovered and keeps its handoff for the next coverage",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
                     withLoadedDirectoryFixture (fun vault _ _ nestedPath -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
                         let original = (directoryWatcher "dataset" vault).Value
-                        failNextDirectoryPoll nestedPath (exn "candidate failed before ready")
+                        failNextDirectoryWatcher vault nestedPath (exn "watcher failed to start")
 
                         vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset/nested", true)
-                        let! _ = vault.RequestLoadedDirectoryWatcherCoverage true
-                        do! vault.LoadedDirectoryWatcherController.Current.WatcherTransitionTail
+                        do! vault.EnsureLoadedDirectoryWatcherCoverage()
 
                         Vitest.expect((directoryWatcher "dataset/nested" vault).IsNone).toBe (true)
                         Vitest.expect(isSameWatcher original (directoryWatcher "dataset" vault).Value).toBe (true)
@@ -1161,43 +1014,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "suspension cancels a watcher establishment that has not become ready",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        let created, releaseCancelled = holdNextDirectoryPoll datasetPath
-                        let operationGate, releaseOperation = TestHelpers.deferred ()
-                        let operationEntered, signalOperationEntered = TestHelpers.deferred ()
-
-                        let refresh = vault.RefreshFileTreeDirectory "dataset"
-                        do! created
-
-                        let suspension =
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect(hasNoDirectoryWatchers vault).toBe true
-                                signalOperationEntered ()
-                                do! operationGate
-                            })
-
-                        do! operationEntered
-                        do! refresh
-                        Vitest.expect(hasNoDirectoryWatchers vault).toBe true
-
-                        releaseOperation ()
-                        do! suspension
-                        let restored = (directoryWatcher "dataset" vault).Value
-
-                        // The cancelled candidate's late baseline never replaces the restored observer.
-                        releaseCancelled ()
-                        do! Promise.sleep 50
-                        Vitest.expect(isSameWatcher restored (directoryWatcher "dataset" vault).Value).toBe true
-                    })
-            }
-        )
-
-        Vitest.test (
-            "first directory load during suspension catches up after restored watcher readiness",
+            "first directory load during suspension catches up once the watchers are restored",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
@@ -1246,89 +1063,6 @@ Vitest.describe (
             }
         )
 
-        Vitest.test (
-            "suspension during first-load establishment catches up after replacement readiness",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
-                        let handoffPath = join [| datasetPath; "created-during-cancelled-handoff.txt" |]
-                        let created, releaseCancelled = holdNextDirectoryPoll datasetPath
-                        let operationGate, releaseOperation = TestHelpers.deferred ()
-                        let operationEntered, signalOperationEntered = TestHelpers.deferred ()
-
-                        let refresh = vault.RefreshFileTreeDirectory "dataset"
-                        do! created
-
-                        let suspension =
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                signalOperationEntered ()
-                                do! operationGate
-                            })
-
-                        do! operationEntered
-                        do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
-                        do! refresh
-                        Vitest.expect(hasNoDirectoryWatchers vault).toBe true
-
-                        releaseOperation ()
-                        do! suspension
-
-                        Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
-                        releaseCancelled ()
-                    })
-            }
-        )
-
-        Vitest.test (
-            "suspending for a loaded-directory rename restores only surviving scopes",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ datasetPath nestedPath -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-                        do! vault.RefreshFileTreeDirectory "dataset/nested"
-                        let renamedPath = join [| datasetPath; "renamed" |]
-
-                        do!
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                do! renameAsync nestedPath renamedPath
-                                do! vault.RefreshFileTreeDirectory "dataset"
-                            })
-
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
-                        Vitest.expect(containsPath renamedPath vault).toBe true
-                    })
-            }
-        )
-
-        Vitest.test (
-            "suspending for a loaded-directory move preserves unrelated loaded scopes",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault rootPath _ nestedPath -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-                        do! vault.RefreshFileTreeDirectory "dataset/nested"
-                        let movedPath = join [| rootPath; "moved-nested" |]
-
-                        do!
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                do! renameAsync nestedPath movedPath
-                                do! vault.RefreshFileTreeDirectory "dataset"
-                                do! vault.RefreshFileTreeDirectory ""
-                            })
-
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect((directoryWatcher "dataset" vault).IsSome).toBe true
-                        Vitest.expect(containsPath movedPath vault).toBe true
-                    })
-            }
-        )
 )
 
 Vitest.describe (

@@ -92,112 +92,185 @@ let private waitUntil description predicate =
 
     loop 200
 
-/// Runs a test body against a temporary directory observed by a poller with a short interval.
-/// handleChange decides, per reported change, whether the poller treats it as handled.
-let private withPolledDirectory (handleChange: int -> bool) testBody = promise {
-    let! directoryPath = TestHelpers.createTempDirectoryAsync "swate-directory-poller-"
+/// Waits until no change was reported for 200 ms.
+let private waitForQuiet (changes: unit -> int) =
+    let rec loop remaining = promise {
+        let before = changes ()
+        do! Promise.sleep 200
+
+        if changes () = before then
+            return ()
+        elif remaining = 0 then
+            return failwith "Timed out waiting for the watcher to go quiet."
+        else
+            return! loop (remaining - 1)
+    }
+
+    loop 20
+
+/// Stands in for a native watcher, so a test emits events and errors itself and sees whether the watcher
+/// was closed.
+type private FakeNativeWatcher() =
+    let mutable listener: WatchEventType -> string option -> unit = fun _ _ -> ()
+    let mutable errorListener: exn -> unit = ignore
+
+    member val Closed = false with get, set
+    member _.Listen value = listener <- value
+    member _.Emit(eventType, name) = listener eventType name
+    member _.Fail error = errorListener error
+
+    interface FSWatcher with
+        member this.close() = this.Closed <- true
+
+        member this.on(_, callback) =
+            errorListener <- callback
+            this :> FSWatcher
+
+/// Starts a directory watcher on a fake native watcher and counts what it reports.
+let private watchFake () =
+    let native = FakeNativeWatcher()
     let mutable changes = 0
-    let errors = ResizeArray<exn>()
+    let losses = ResizeArray<exn>()
 
-    let stop, ready =
-        createDirectoryModificationPoller
-            directoryPath
-            20
-            (fun () ->
-                changes <- changes + 1
-                handleChange changes
+    let stop =
+        createDirectoryWatcherWith
+            (fun _ listener ->
+                native.Listen listener
+                native :> FSWatcher
             )
-            errors.Add
+            "C:/arc/dataset"
+            (fun () -> changes <- changes + 1)
+            losses.Add
 
-    try
-        let! baseline = ready
-        Vitest.expect(baseline).toEqual (Ok())
-        do! testBody directoryPath (fun () -> changes) errors
-    finally
-        stop () |> ignore
-
-    do! TestHelpers.removeDirectoryAsync directoryPath
-}
+    native, (fun () -> changes), losses, stop
 
 Vitest.describe (
-    "directory modification poller",
+    "directory watcher",
     fun () ->
         Vitest.test (
-            "reports an added child once and then observes the new state",
-            TestOptions(timeout = 10000),
+            "reports added, removed or renamed children and ignores content changes",
             fun () ->
-                withPolledDirectory
-                    (fun _ -> true)
-                    (fun directoryPath changes errors -> promise {
-                        do! Promise.sleep 50
-                        do! writeFileAsync (join [| directoryPath; "added.txt" |]) "added" TextEncoding.Utf8
-                        do! waitUntil "reported addition" (fun () -> changes () = 1)
-                        do! Promise.sleep 200
+                let native, changes, losses, _ = watchFake ()
 
-                        Vitest.expect(changes ()).toBe 1
-                        Vitest.expect(errors.Count).toBe 0
-                    })
+                native.Emit(WatchEventType.Rename, Some "added.csv")
+                native.Emit(WatchEventType.Change, Some "added.csv")
+                native.Emit(WatchEventType.Rename, Some "renamed.csv")
+
+                Vitest.expect(changes ()).toBe 2
+                Vitest.expect(losses.Count).toBe 0
         )
 
         Vitest.test (
-            "reports an unhandled change again until it is handled",
-            TestOptions(timeout = 10000),
+            "reports an event without a child name, which means the system dropped events",
             fun () ->
-                withPolledDirectory
-                    (fun change -> change >= 3)
-                    (fun directoryPath changes _ -> promise {
-                        do! Promise.sleep 50
-                        do! writeFileAsync (join [| directoryPath; "added.txt" |]) "added" TextEncoding.Utf8
-                        do! waitUntil "handled change" (fun () -> changes () = 3)
-                        do! Promise.sleep 200
+                let native, changes, _, _ = watchFake ()
 
-                        Vitest.expect(changes ()).toBe 3
-                    })
+                native.Emit(WatchEventType.Change, None)
+                native.Emit(WatchEventType.Rename, None)
+
+                Vitest.expect(changes ()).toBe 2
         )
 
         Vitest.test (
-            "reports a vanished directory once without errors and reports its return",
-            TestOptions(timeout = 10000),
+            "closes itself and reports the loss once when an event names the directory itself",
             fun () ->
-                withPolledDirectory
-                    (fun _ -> true)
-                    (fun directoryPath changes errors -> promise {
-                        do! TestHelpers.removeDirectoryAsync directoryPath
-                        do! waitUntil "reported removal" (fun () -> changes () = 1)
-                        do! Promise.sleep 200
+                let native, changes, losses, _ = watchFake ()
 
-                        Vitest.expect(changes ()).toBe 1
-                        Vitest.expect(errors.Count).toBe 0
+                // Windows reports a removed watched directory as a stream of events with its own path.
+                native.Emit(WatchEventType.Rename, Some @"\\?\C:\arc\dataset")
+                native.Emit(WatchEventType.Rename, Some @"\\?\C:\arc\dataset")
+                native.Emit(WatchEventType.Rename, Some "later.csv")
 
-                        let! _ = Main.Bindings.Filesystem.mkdirAsync directoryPath (MkdirOptions(recursive = true))
-                        do! waitUntil "reported return" (fun () -> changes () = 2)
-                    })
+                Vitest.expect(native.Closed).toBe true
+                Vitest.expect(losses.Count).toBe 1
+                Vitest.expect(changes ()).toBe 0
+        )
+
+        Vitest.test (
+            "closes itself and reports the loss once on a watcher error",
+            fun () ->
+                let native, changes, losses, _ = watchFake ()
+
+                native.Fail(exn "EPERM")
+                native.Fail(exn "EPERM")
+                native.Emit(WatchEventType.Rename, Some "later.csv")
+
+                Vitest.expect(native.Closed).toBe true
+                Vitest.expect(losses.Count).toBe 1
+                Vitest.expect(changes ()).toBe 0
         )
 
         Vitest.test (
             "reports nothing after it was stopped",
-            TestOptions(timeout = 10000),
+            fun () ->
+                let native, changes, losses, stop = watchFake ()
+
+                stop ()
+                native.Emit(WatchEventType.Rename, Some "later.csv")
+                native.Fail(exn "late error")
+
+                Vitest.expect(native.Closed).toBe true
+                Vitest.expect(changes ()).toBe 0
+                Vitest.expect(losses.Count).toBe 0
+        )
+
+        Vitest.test (
+            "reports a child added on disk and stays quiet while its content is rewritten",
+            TestOptions(timeout = 15000),
             fun () -> promise {
-                let! directoryPath = TestHelpers.createTempDirectoryAsync "swate-directory-poller-stopped-"
+                let! directoryPath = TestHelpers.createTempDirectoryAsync "swate-directory-watcher-"
                 let mutable changes = 0
+                let losses = ResizeArray<exn>()
 
-                let stop, ready =
-                    createDirectoryModificationPoller
-                        directoryPath
-                        20
-                        (fun () ->
-                            changes <- changes + 1
-                            true
-                        )
-                        ignore
+                let stop =
+                    createDirectoryWatcher directoryPath (fun () -> changes <- changes + 1) losses.Add
 
-                let! _ = ready
-                do! stop ()
-                do! writeFileAsync (join [| directoryPath; "added.txt" |]) "added" TextEncoding.Utf8
-                do! Promise.sleep 200
-                do! TestHelpers.removeDirectoryAsync directoryPath
+                try
+                    let filePath = join [| directoryPath; "added.csv" |]
+                    do! writeFileAsync filePath "added" TextEncoding.Utf8
+                    do! waitUntil "reported addition" (fun () -> changes >= 1)
+                    do! waitForQuiet (fun () -> changes)
+                    let afterAddition = changes
 
-                Vitest.expect(changes).toBe 0
+                    for content in [ "more"; "even more"; "most" ] do
+                        do! writeFileAsync filePath content TextEncoding.Utf8
+
+                    do! Promise.sleep 300
+
+                    Vitest.expect(changes).toBe afterAddition
+                    Vitest.expect(losses.Count).toBe 0
+                    stop ()
+                    do! TestHelpers.removeDirectoryAsync directoryPath
+                with error ->
+                    stop ()
+                    do! TestHelpers.removeDirectoryAsync directoryPath
+                    return raise error
+            }
+        )
+)
+
+Vitest.describe (
+    "exact-name existence check",
+    fun () ->
+        Vitest.test (
+            "accepts only children that exist with exactly the checked name",
+            fun () -> promise {
+                let! directoryPath = TestHelpers.createTempDirectoryAsync "swate-exact-name-"
+
+                try
+                    do! writeFileAsync (join [| directoryPath; "Sample.csv" |]) "sample" TextEncoding.Utf8
+
+                    let existsWithExactName =
+                        Main.WatcherHelpers.existsSyncWithExactNameIn directoryPath
+
+                    Vitest.expect(existsWithExactName (join [| directoryPath; "Sample.csv" |])).toBe true
+                    // A case-only difference counts as gone, also on case-insensitive file systems.
+                    Vitest.expect(existsWithExactName (join [| directoryPath; "sample.csv" |])).toBe false
+                    Vitest.expect(existsWithExactName (join [| directoryPath; "missing.csv" |])).toBe false
+                    do! TestHelpers.removeDirectoryAsync directoryPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync directoryPath
+                    return raise error
             }
         )
 )

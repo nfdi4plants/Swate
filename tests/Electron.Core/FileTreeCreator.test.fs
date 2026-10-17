@@ -371,6 +371,37 @@ Vitest.describe (
                 Vitest.expect(tree.ContainsKey("C:/arc/assays/AB")).toBe (true)
                 Vitest.expect(tree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
         )
+
+        Vitest.test (
+            "removes several paths with their descendants and keeps siblings that share a name prefix",
+            fun () ->
+                let tree = Dictionary<string, FileEntry>()
+
+                for path in
+                    [
+                        "C:/arc/dataset"
+                        "C:/arc/dataset/sample-1.csv"
+                        "C:/arc/dataset/sample-10.csv"
+                        "C:/arc/dataset/run"
+                        "C:/arc/dataset/run/raw.bin"
+                        "C:/arc/dataset/runs"
+                        "C:/arc/dataset/runs/raw.bin"
+                    ] do
+                    tree.Add(path, createTreeEntry path (not (path.EndsWith ".csv" || path.EndsWith ".bin")))
+
+                // Descendants match case-insensitively, like PathHelpers.isSameOrDescendantPath.
+                FileTreeCreator.removePathsAndDescendantsInPlace
+                    [ "C:/arc/dataset/sample-1.csv"; "C:\\arc\\dataset\\RUN\\" ]
+                    tree
+
+                Vitest.expect(tree.Keys |> Seq.sort |> Seq.toArray).toEqual [|
+                    "C:/arc/dataset"
+                    "C:/arc/dataset/run"
+                    "C:/arc/dataset/runs"
+                    "C:/arc/dataset/runs/raw.bin"
+                    "C:/arc/dataset/sample-10.csv"
+                |]
+        )
 )
 
 Vitest.describe (

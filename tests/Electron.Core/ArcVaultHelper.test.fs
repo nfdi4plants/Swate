@@ -1317,12 +1317,13 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "external directory removal forgets the paging state of the removed subtree",
+            "an external entity folder removal forgets the paging state of the removed subtree",
             fun () ->
                 withTempArc
                     ignore
                     (fun arcPath -> promise {
-                        let parentPath = join [| arcPath; "parent" |]
+                        let parentPath = join [| arcPath; "assays" |]
+                        // An assay folder is an ARC entity, so the permanent watcher reports its removal.
                         let removedPath = join [| parentPath; "removed" |]
                         let removedDescendantPath = join [| removedPath; "nested" |]
                         do! mkdirWatcherDirectoryAsync removedDescendantPath
@@ -1336,27 +1337,32 @@ Vitest.describe (
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath
 
-                        do! vault.LoadNextFileTreeDirectoryPage "parent"
+                        do! vault.LoadNextFileTreeDirectoryPage "assays"
                         let! firstSnapshot = vault.GetRendererFileTreeSnapshot()
                         let firstPagePaths = firstSnapshot.entries.Keys |> Set.ofSeq
 
-                        Vitest.expect(firstSnapshot.directoryHasMore.["parent"]).toBe true
+                        Vitest.expect(firstSnapshot.directoryHasMore.["assays"]).toBe true
 
                         vault.fileTree.[removedPath] <- FileEntry.create (basename removedPath, removedPath, true)
 
                         vault.fileTree.[removedDescendantPath] <-
                             FileEntry.create (basename removedDescendantPath, removedDescendantPath, true)
 
-                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("parent/removed", false)
-                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("parent/removed/nested", false)
-                        vault.fileTreeDirectoryHasMore.["parent/removed"] <- false
-                        vault.fileTreeDirectoryHasMore.["parent/removed/nested"] <- false
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("assays/removed", false)
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("assays/removed/nested", false)
+                        vault.fileTreeDirectoryHasMore.["assays/removed"] <- false
+                        vault.fileTreeDirectoryHasMore.["assays/removed/nested"] <- false
+
+                        // The removal reaches the tree through the permanent watcher's event below, so the
+                        // loaded-directory watchers must not refresh the parent first.
+                        for observer in vault.LoadedDirectoryWatcherController.RetireWatchers() do
+                            observer.Close()
 
                         do! rmAsync removedPath (RmOptions(recursive = true, force = true))
 
                         let externalRemoval = {
                             EventName = "unlinkDir"
-                            RelativePath = "parent/removed"
+                            RelativePath = "assays/removed"
                             AbsolutePath = removedPath
                         }
 
@@ -1364,13 +1370,13 @@ Vitest.describe (
 
                         Vitest.expect(vault.fileTree.ContainsKey removedPath).toBe false
                         Vitest.expect(vault.fileTree.ContainsKey removedDescendantPath).toBe false
-                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "parent").toBe true
-                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "parent/removed").toBe false
-                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "parent/removed/nested").toBe false
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "parent/removed").toBe false
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "parent/removed/nested").toBe false
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "assays").toBe true
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "assays/removed").toBe false
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.ContainsKey "assays/removed/nested").toBe false
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "assays/removed").toBe false
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "assays/removed/nested").toBe false
 
-                        do! vault.LoadNextFileTreeDirectoryPage "parent"
+                        do! vault.LoadNextFileTreeDirectoryPage "assays"
                         let! secondSnapshot = vault.GetRendererFileTreeSnapshot()
 
                         let newlyDiscoveredPaths =
@@ -1378,7 +1384,7 @@ Vitest.describe (
                             |> Seq.filter (fun path -> not (firstPagePaths.Contains path))
                             |> Seq.toArray
 
-                        Vitest.expect(secondSnapshot.directoryHasMore.["parent"]).toBe true
+                        Vitest.expect(secondSnapshot.directoryHasMore.["assays"]).toBe true
                         Vitest.expect(newlyDiscoveredPaths.Length).toBe 100
 
                         // A directory created again at the removed path is loaded from scratch.
@@ -1393,7 +1399,7 @@ Vitest.describe (
                                 }
                             ]
 
-                        do! vault.LoadNextFileTreeDirectoryPage "parent/removed"
+                        do! vault.LoadNextFileTreeDirectoryPage "assays/removed"
 
                         Vitest
                             .expect(

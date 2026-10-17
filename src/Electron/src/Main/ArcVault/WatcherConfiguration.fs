@@ -97,80 +97,54 @@ let createFileWatcherWithReady (path: string) (usePolling: bool option) (onError
 
     watcher, captureWatcherReadiness onError watcher
 
-/// Polling interval of the File Explorer directory observation.
-let directoryPollIntervalMilliseconds = 500
-
-/// Observes a directory through its modification time, which changes whenever a direct child is
-/// added, removed or renamed. Only stat calls are made, so no handle stays open on the directory and
-/// the cost does not grow with the number of entries, unlike a native watcher, which keeps one handle
-/// per entry.
-/// A directory that disappears is reported as one change, and its absence becomes the new baseline.
-/// onChange returns whether it handled the change; an unhandled change keeps the previous baseline, so
-/// it is reported again by the next poll instead of being lost.
-/// Returns the stop function and a readiness promise that settles once the baseline is taken.
-let createDirectoryModificationPoller
+/// Observes the direct children of a directory with one native watcher, so the cost does not grow with
+/// the number of entries. Adding, removing or renaming a child is reported through onChange, and so is
+/// an event without a child name, which means the system dropped events. A content change of a child
+/// is not reported.
+/// The watcher ends when the directory itself is removed or moved, which Windows reports as a stream of
+/// events that name the directory instead of a child, or when the system reports an error. It then
+/// closes itself and calls onLost once: a native watcher never follows a directory that is created again
+/// at the same path.
+/// Returns the stop function. Creating the watcher of a missing directory throws.
+let createDirectoryWatcherWith
+    (startWatch: string -> (Filesystem.WatchEventType -> string option -> unit) -> Filesystem.FSWatcher)
     (directoryPath: string)
-    (intervalMilliseconds: int)
-    (onChange: unit -> bool)
-    (onError: exn -> unit)
+    (onChange: unit -> unit)
+    (onLost: exn -> unit)
     =
-    let mutable stopped = false
-    let mutable timeout: int option = None
-    // None until the baseline is taken; Some None while the directory does not exist.
-    let mutable baseline: float option option = None
-
-    let observe () = promise {
-        try
-            let! stats = Filesystem.statAsync directoryPath
-            return Ok(Some stats.mtimeMs)
-        with error ->
-            match Filesystem.tryGetNodeErrorCode error with
-            | Some "ENOENT"
-            | Some "ENOTDIR" -> return Ok None
-            | _ -> return Error error
-    }
-
-    let poll () = promise {
-        match! observe () with
-        | Ok observed ->
-            match baseline with
-            | Some previous when previous <> observed ->
-                if not stopped && onChange () then
-                    baseline <- Some observed
-            | Some _ -> ()
-            | None -> baseline <- Some observed
-
-            return Ok()
-        | Error error ->
-            if not stopped then
-                onError error
-
-            return Error error
-    }
-
-    let rec schedule () =
-        if not stopped then
-            timeout <-
-                Some(
-                    JS.setTimeout
-                        (fun () -> poll () |> Promise.map (fun _ -> schedule ()) |> Promise.start)
-                        intervalMilliseconds
-                )
-
-    let ready = promise {
-        let! baseline = poll ()
-
-        match baseline with
-        | Ok() -> schedule ()
-        | Error _ -> ()
-
-        return baseline
-    }
+    let mutable active = true
+    let mutable watcher: Filesystem.FSWatcher option = None
 
     let stop () =
-        stopped <- true
-        timeout |> Option.iter JS.clearTimeout
-        timeout <- None
-        JS.Constructors.Promise.resolve ()
+        if active then
+            active <- false
+            watcher |> Option.iter (fun watcher -> watcher.close ())
 
-    stop, ready
+    let lose (reason: exn) =
+        if active then
+            stop ()
+            onLost reason
+
+    // A non-recursive watcher reports child names only, so a name with a separator is the directory itself.
+    let isChildName (name: string) =
+        not (name.Contains "/" || name.Contains "\\")
+
+    let created =
+        startWatch
+            directoryPath
+            (fun eventType name ->
+                if active then
+                    match eventType, name with
+                    | _, Some name when not (isChildName name) ->
+                        lose (exn $"The watched directory '{directoryPath}' was removed or moved.")
+                    | Filesystem.WatchEventType.Change, Some _ -> ()
+                    | _ -> onChange ()
+            )
+
+    watcher <- Some created
+    created.on ("error", lose) |> ignore
+    stop
+
+/// Observes the direct children of a directory with a native fs.watch; see createDirectoryWatcherWith.
+let createDirectoryWatcher =
+    createDirectoryWatcherWith (fun path listener -> Filesystem.NativeWatch.watch (path, listener))

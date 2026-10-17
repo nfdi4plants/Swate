@@ -38,6 +38,25 @@ type Directory =
     abstract member read: unit -> JS.Promise<Dirent>
     abstract member close: unit -> JS.Promise<unit>
 
+/// The kind of a native directory change: Rename when an entry appears, disappears or is renamed,
+/// Change when the content or metadata of an entry changes.
+[<StringEnum(CaseRules.LowerFirst)>]
+type WatchEventType =
+    | Rename
+    | Change
+
+/// A native watcher of one directory. It holds one handle, whatever the number of entries.
+type FSWatcher =
+    abstract member close: unit -> unit
+    abstract member on: eventName: string * callback: (exn -> unit) -> FSWatcher
+
+[<Erase>]
+type NativeWatch =
+    /// Watches the direct entries of a directory. The listener receives the event type and the entry
+    /// name; the name is None when the system dropped events and the changed entry is unknown.
+    [<Import("watch", "fs")>]
+    static member watch(path: string, listener: WatchEventType -> string option -> unit) : FSWatcher = jsNative
+
 /// Returns the Node.js system error code of a filesystem failure, such as ENOENT.
 [<Emit("(typeof $0?.code === 'string' ? $0.code : undefined)")>]
 let tryGetNodeErrorCode (error: exn) : string option = jsNative

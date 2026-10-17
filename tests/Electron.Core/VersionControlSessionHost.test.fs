@@ -918,6 +918,21 @@ Vitest.describe (
                     do! vault.RefreshFileTreeDirectory ""
                     Vitest.expect(listings).toBe 1
 
+                    // An entry added to a watched directory is shown without renewing the listing.
+                    writeText (join [| workspace; "nested/added.txt" |]) "added"
+
+                    do!
+                        waitUntil
+                            "entry added to a watched directory"
+                            (fun () ->
+                                vault.fileTree.ContainsKey(
+                                    join [| workspace; "nested/added.txt" |]
+                                    |> Swate.Components.Shared.PathHelpers.normalizePath
+                                )
+                            )
+
+                    Vitest.expect(listings).toBe 1
+
                     // A watcher batch with changed files renews the listing once for the whole batch.
                     objects <- objects |> Array.map (fun state -> { state with IsMaterialized = true })
 

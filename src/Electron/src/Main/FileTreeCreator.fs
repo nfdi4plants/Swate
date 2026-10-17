@@ -174,17 +174,50 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-/// Removes a path and all descendants from a mutable file tree in place.
-let internal removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : unit =
-    let normalizedTargetPath = PathHelpers.normalizePath targetPath
+/// Removes paths and all their descendants from a mutable file tree in place, with the matching of
+/// PathHelpers.isSameOrDescendantPath. The tree is scanned once, however many paths are removed.
+let internal removePathsAndDescendantsInPlace
+    (targetPaths: string seq)
+    (fileTree: Dictionary<string, FileEntry>)
+    : unit =
+    let normalizedTargetPaths =
+        targetPaths
+        |> Seq.map PathHelpers.normalizePath
+        |> Seq.filter (String.IsNullOrWhiteSpace >> not)
+        |> Seq.toArray
 
-    if not (String.IsNullOrWhiteSpace normalizedTargetPath) then
+    if normalizedTargetPaths.Length > 0 then
+        let exactTargets = HashSet<string>(normalizedTargetPaths)
+        // Descendants match case-insensitively.
+        let ancestorTargets =
+            HashSet<string>(normalizedTargetPaths |> Array.map _.ToLowerInvariant())
+
+        let hasRemovedAncestor (normalizedPath: string) =
+            let lowered = normalizedPath.ToLowerInvariant()
+            let mutable separator = lowered.IndexOf '/'
+            let mutable found = false
+
+            while not found && separator >= 0 do
+                if separator > 0 && ancestorTargets.Contains(lowered.Substring(0, separator)) then
+                    found <- true
+
+                separator <- lowered.IndexOf('/', separator + 1)
+
+            found
+
         let keysToRemove =
             fileTree.Keys
-            |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.filter (fun path ->
+                let normalizedPath = PathHelpers.normalizePath path
+                exactTargets.Contains normalizedPath || hasRemovedAncestor normalizedPath
+            )
             |> Seq.toArray
 
         keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
+
+/// Removes a path and all descendants from a mutable file tree in place.
+let internal removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : unit =
+    removePathsAndDescendantsInPlace [ targetPath ] fileTree
 
 let getFileEntry (path: string) = promise {
     let! stats = statAsync path
@@ -382,16 +415,15 @@ let applyFreshFileTreeDirectorySnapshot
             |> Array.map (fun entry -> PathHelpers.normalizePath entry.path)
             |> Set.ofArray
 
-        // Enumerate the unchanged input while pruning the merged copy.
-        fileTree.Values
-        |> Seq.iter (fun entry ->
-            let path = PathHelpers.normalizePath entry.path
-
-            if
+        let removedPaths =
+            fileTree.Values
+            |> Seq.map (fun entry -> PathHelpers.normalizePath entry.path)
+            |> Seq.filter (fun path ->
                 PathHelpers.pathsEqual (dirname path) directoryPath
                 && not (currentPaths.Contains path)
-            then
-                removePathAndDescendantsInPlace path nextTree
-        )
+            )
+            |> Seq.toArray
+
+        removePathsAndDescendantsInPlace removedPaths nextTree
 
     nextTree

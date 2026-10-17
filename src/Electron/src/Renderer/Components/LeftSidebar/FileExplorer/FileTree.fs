@@ -142,16 +142,21 @@ type FileTree =
 
         React.useEffect ((fun () -> directoriesLoadingPage.current <- Set.empty), [| box arcScopeId |])
 
-        let reconciledMaterializedState =
-            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
+        let treeDirectories =
+            React.useMemo ((fun () -> collectTreeDirectories fileTree), [| box fileTree |])
+
+        // Every update reconciles the latest state instead of the one this render saw: a tree update and
+        // an expansion can land at the same moment, and neither may discard the other's change.
+        let reconcileWithTree current =
+            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath treeDirectories current
+
+        let reconciledMaterializedState = reconcileWithTree materializedState
 
         React.useEffect (
             (fun () ->
                 setMaterializedState (fun current ->
-                    if reconciledMaterializedState = current then
-                        current
-                    else
-                        reconciledMaterializedState
+                    let reconciled = reconcileWithTree current
+                    if reconciled = current then current else reconciled
                 )
             ),
             [|
@@ -317,11 +322,11 @@ type FileTree =
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
             match item.Path with
             | Some path when willExpand ->
-                setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+                setMaterializedState (reconcileWithTree >> materialize path)
 
                 if needsInitialDirectoryLoad path fileStateCtx.state.FileTreeDirectoryHasMore then
                     loadNextDirectoryPage path
-            | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
+            | Some path -> setMaterializedState (reconcileWithTree >> dematerialize path)
             | None -> ()
 
         let openDialog dialog =

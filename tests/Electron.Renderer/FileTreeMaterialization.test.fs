@@ -178,7 +178,11 @@ Vitest.describe (
                 }
 
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
+                    reconcileMaterializedState
+                        (Some "C:/arc")
+                        (Some "arc/selected/selected.txt")
+                        (collectTreeDirectories (Some root))
+                        current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
         )
@@ -197,7 +201,7 @@ Vitest.describe (
                 }
 
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) current
+                    reconcileMaterializedState (Some "C:/new-arc") None (collectTreeDirectories (Some root)) current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])

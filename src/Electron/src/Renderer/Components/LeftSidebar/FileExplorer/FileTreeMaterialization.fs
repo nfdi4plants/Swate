@@ -37,20 +37,35 @@ let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<
     else
         directoryPaths
 
+/// A file tree with its directory paths, collected once so that every reconciliation against the same
+/// tree only intersects sets instead of walking the tree again.
+type TreeDirectories = {
+    Root: FileTreeNode
+    DirectoryPaths: Set<string>
+}
+
+let collectTreeDirectories (root: FileTreeNode option) =
+    root
+    |> Option.map (fun root -> {
+        Root = root
+        DirectoryPaths = collectDirectoryPaths root Set.empty
+    })
+
 let reconcileMaterializedState
     (arcScopeId: string option)
     (selectedTreeItemPath: string option)
-    (root: FileTreeNode option)
+    (tree: TreeDirectories option)
     (current: MaterializedState)
     =
-    match root with
+    match tree with
     | None -> {
         ArcScopeId = arcScopeId
         Paths = Set.empty
       }
-    | Some root ->
-        let validDirectoryPaths = collectDirectoryPaths root Set.empty
-
+    | Some {
+               Root = root
+               DirectoryPaths = validDirectoryPaths
+           } ->
         let requiredPaths =
             selectedTreeItemPath
             |> Option.map (fun selectedPath ->
