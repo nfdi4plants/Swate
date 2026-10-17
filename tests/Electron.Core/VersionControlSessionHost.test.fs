@@ -805,7 +805,12 @@ let private withListedLargeObjects (windowId: int) testBody = promise {
         ListObjects =
             fun _ -> async {
                 listings <- listings + 1
-                return OperationResult.succeeded [| objectState "root.bin"; objectState "nested/nested.bin" |]
+
+                return
+                    OperationResult.succeeded [|
+                        objectState "root.bin"
+                        objectState "nested/nested.bin"
+                    |]
             }
         Materialize = fun _ _ -> async { return OperationResult.succeeded () }
         Dematerialize = fun _ _ -> async { return OperationResult.succeeded () }
@@ -819,7 +824,9 @@ let private withListedLargeObjects (windowId: int) testBody = promise {
     let vault = registerVault windowId workspace
 
     let isMaterialized relativePath =
-        vault.fileTree.[join [| workspace; relativePath |] |> Swate.Components.Shared.PathHelpers.normalizePath].largeObject
+        vault.fileTree
+            .[join [| workspace; relativePath |]
+              |> Swate.Components.Shared.PathHelpers.normalizePath].largeObject
         |> Option.map _.IsMaterialized
 
     let cleanup () = promise {

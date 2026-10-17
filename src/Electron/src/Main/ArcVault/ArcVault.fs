@@ -312,7 +312,9 @@ module ArcVaultExtensions =
             match this.path with
             | Some currentPath when PathHelpers.pathsEqual currentPath arcPath ->
                 let fileEntries =
-                    this.fileTree.Values |> Seq.filter (fun entry -> not entry.isDirectory) |> Seq.toArray
+                    this.fileTree.Values
+                    |> Seq.filter (fun entry -> not entry.isDirectory)
+                    |> Seq.toArray
 
                 let! annotated = this.AnnotateFromLargeObjectListing(arcPath, fileEntries)
                 this.AnnotatedListingCount <- this.LargeObjectMetadata.ListingCount
