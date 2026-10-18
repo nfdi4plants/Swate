@@ -1101,7 +1101,7 @@ module ArcVaultExtensions =
         member this.WriteArc() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.isBusyWriting, this.path, this.arc with
             | true, _, _ ->
-                return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
+                return Error(exn "ARCitISA is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arc ->
                 return!
                     this.WithBusyWritingScope(fun () -> promise {
@@ -1122,7 +1122,7 @@ module ArcVaultExtensions =
         member this.AddArcFile(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.isBusyWriting, this.path, this.arc with
             | true, _, _ ->
-                return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
+                return Error(exn "ARCitISA is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arcLocal ->
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
@@ -1793,7 +1793,7 @@ module ArcVaultExtensions =
             // ARC folder. Moving the folder under it would make its next step fail, so the rename is refused until the write ends.
             let busyWritingError () =
                 exn
-                    "Cannot rename the ARC folder while Swate is still writing to it. Wait until the running operation finishes, then try again."
+                    "Cannot rename the ARC folder while ARCitISA is still writing to it. Wait until the running operation finishes, then try again."
 
             match this.path with
             | None -> return Error(arcNotOpenError ())
@@ -1975,7 +1975,7 @@ type ArcVaults() =
 
             vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
             this.BroadcastRecentARCs()
-            printfn $"[Swate] Removed vault '{id}'"
+            printfn $"[ARCitISA] Removed vault '{id}'"
 
     member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
         match this.TryGetVault(windowId) with
@@ -2064,7 +2064,7 @@ type ArcVaults() =
 
                                 if not (window.isDestroyed ()) then
                                     dialog.showErrorBox (
-                                        "Could not close Swate",
+                                        "Could not close ARCitISA",
                                         $"The active file import could not be rolled back completely. The window was kept open to avoid hiding a partial import.\n\n{importError.Message}"
                                     )
                         }

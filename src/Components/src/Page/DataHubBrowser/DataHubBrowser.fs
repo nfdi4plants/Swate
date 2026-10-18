@@ -161,6 +161,8 @@ type DataHubBrowser =
 
     [<ReactComponent>]
     static member private Tabs(tab, setTab, isAuthenticated) =
+        let tooltipIdPrefix = React.useId ()
+
         Html.div [
             prop.testId "GitLabExploreTabs"
             prop.role.tabList
@@ -178,36 +180,39 @@ type DataHubBrowser =
                         (not isAuthenticated)
                         && (mode = ExploreTab.YourRepos || mode = ExploreTab.YourOrganisations)
 
-                    Html.div [
-                        prop.className (
+                    let tooltipId = $"{tooltipIdPrefix}-{tid}-tooltip"
+
+                    // daisyUI styles a tab only when it is a direct child of the tabs container,
+                    // so the tooltip classes go on the tab itself.
+                    Html.a [
+                        prop.testId ("GitLabExploreTab-" + tid)
+                        prop.tabIndex 0
+                        // The label keeps the tooltip text out of the accessible name of the tab.
+                        // A restricted tab gets the tooltip as its description instead.
+                        prop.ariaLabel label
+                        if isRestricted then
+                            prop.ariaDescribedBy tooltipId
+                        prop.custom ("aria-disabled", if isRestricted then "true" else "false")
+                        prop.className [
+                            "swt:tab"
+                            if tab = mode then
+                                "swt:tab-active"
                             if isRestricted then
-                                "swt:tooltip swt:tooltip-bottom"
-                            else
-                                ""
+                                // Opacity would fade the tooltip inside as well, so only the text color fades.
+                                "swt:tooltip swt:tooltip-bottom swt:text-base-content/50 swt:cursor-not-allowed"
+                        ]
+                        prop.onClick (fun _ ->
+                            if not isRestricted then
+                                setTab mode
                         )
                         prop.children [
                             if isRestricted then
                                 Html.div [
+                                    prop.id tooltipId
                                     prop.className "swt:tooltip-content"
                                     prop.text "Log in to access this tab"
                                 ]
-                            Html.a [
-                                prop.testId ("GitLabExploreTab-" + tid)
-                                prop.tabIndex 0
-                                prop.custom ("aria-disabled", if isRestricted then "true" else "false")
-                                prop.className [
-                                    "swt:tab"
-                                    if tab = mode then
-                                        "swt:tab-active"
-                                    if isRestricted then
-                                        "swt:opacity-50 swt:cursor-not-allowed"
-                                ]
-                                prop.onClick (fun _ ->
-                                    if not isRestricted then
-                                        setTab mode
-                                )
-                                prop.text label
-                            ]
+                            Html.text label
                         ]
                     ]
             ]

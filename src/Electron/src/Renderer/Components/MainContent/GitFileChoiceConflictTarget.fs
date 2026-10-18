@@ -46,7 +46,7 @@ let Main (choiceData: VersionControlFileChoicePage) =
                     ]
                     Html.p [
                         prop.className "swt:mt-2 swt:text-sm swt:text-base-content/70"
-                        prop.text "Swate can't show the differences for this file. Choose which version to keep."
+                        prop.text "ARCitISA can't show the differences for this file. Choose which version to keep."
                     ]
                     Html.div [
                         prop.className "swt:mt-5 swt:space-y-2 swt:text-sm"

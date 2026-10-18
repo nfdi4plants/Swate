@@ -3,6 +3,7 @@ module Release
 
 open SimpleExec
 open ProjectInfo
+open System
 open System.IO
 
 let npm (version: Changelog.Version) (isDryRun: bool) =
@@ -176,13 +177,113 @@ let electron () =
 
     ()
 
+/// File extensions electron-forge make produces per GitHub runner.os name.
+let private electronMakeExtensions (os: string) : string list =
+    match os with
+    | "Windows" -> [ ".exe"; ".nupkg" ]
+    | "macOS" -> [ ".zip"; ".dmg" ]
+    | "Linux" -> [ ".deb"; ".rpm" ]
+    | other -> failwithf "Unknown runner OS: %s" other
+
+let private currentRunnerOs () : string =
+    if OperatingSystem.IsWindows() then
+        "Windows"
+    elif OperatingSystem.IsMacOS() then
+        "macOS"
+    elif OperatingSystem.IsLinux() then
+        "Linux"
+    else
+        failwith "Unsupported operating system for electron binaries."
+
+let private hasExtension (ext: string) (file: string) =
+    String.Equals(Path.GetExtension file, ext, StringComparison.OrdinalIgnoreCase)
+
+let private verifyElectronMakeOutput (builtAfterUtc: DateTime) =
+
+    let makeDir = Path.Combine(ProjectPaths.electronPath, "out", "make")
+
+    if not (Directory.Exists makeDir) then
+        failwithf "electron-forge make produced no output in %s" makeDir
+
+    let os = currentRunnerOs ()
+    let expected = electronMakeExtensions os
+
+    let freshFiles =
+        Directory.GetFiles(makeDir, "*", SearchOption.AllDirectories)
+        |> Array.filter (fun file -> File.GetLastWriteTimeUtc file >= builtAfterUtc)
+
+    let missing =
+        expected
+        |> List.filter (fun ext -> not (freshFiles |> Array.exists (hasExtension ext)))
+
+    if not missing.IsEmpty then
+        let found =
+            if freshFiles.Length = 0 then
+                "none"
+            else
+                String.Join(", ", freshFiles)
+
+        failwithf
+            "electron-forge make on %s is missing fresh files with extension %s in %s. Fresh files found: %s"
+            os
+            (String.Join(", ", missing))
+            makeDir
+            found
+
+    for file in freshFiles do
+        if expected |> List.exists (fun ext -> hasExtension ext file) then
+            printGreenfn "Found electron binary: %s" file
+
 let electronBinaries (arch: string) =
+
+    let builtAfterUtc = DateTime.UtcNow.AddSeconds(-2.0)
 
     run "npm" [ "run"; "fable" ] ProjectPaths.electronPath
 
-    run "npx" [ "electron-forge"; "make"; sprintf "--arch=%s" arch ] ProjectPaths.electronPath
+    run "node" [ "scripts/forge-make.cjs"; sprintf "--arch=%s" arch ] ProjectPaths.electronPath
+
+    // forge-make.cjs turns a killed make into a failure. A make run can also exit 0 without writing
+    // every installer, so verifyElectronMakeOutput looks in out/make for each expected extension (#1421).
+    verifyElectronMakeOutput builtAfterUtc
 
     ()
+
+let verifyReleaseAssets (dir: string) =
+
+    // Must match the artifact names uploaded by the electron-web target of the release job and by
+    // the release_electron_binaries matrix in .github/workflows/release-pipeline.yml.
+    let expectedArtifacts = [
+        "release-assets-client", [ ".zip" ]
+        "release-assets-electron-Windows-x64", electronMakeExtensions "Windows"
+        "release-assets-electron-macOS-x64", electronMakeExtensions "macOS"
+        "release-assets-electron-macOS-arm64", electronMakeExtensions "macOS"
+        "release-assets-electron-Linux-x64", electronMakeExtensions "Linux"
+    ]
+
+    let problems =
+        expectedArtifacts
+        |> List.choose (fun (name, extensions) ->
+            let artifactDir = Path.Combine(dir, name)
+
+            if not (Directory.Exists artifactDir) then
+                Some(sprintf "%s: directory not found in %s" name dir)
+            else
+                let files = Directory.GetFiles(artifactDir, "*", SearchOption.AllDirectories)
+
+                let missing =
+                    extensions
+                    |> List.filter (fun ext -> not (files |> Array.exists (hasExtension ext)))
+
+                if missing.IsEmpty then
+                    None
+                else
+                    Some(sprintf "%s: no file with extension %s" name (String.Join(", ", missing)))
+        )
+
+    if not problems.IsEmpty then
+        failwithf "Release assets in %s are incomplete:\n%s" dir (String.Join("\n", problems))
+
+    printGreenfn "Verified %i release artifacts in %s" expectedArtifacts.Length dir
 
 let storybook () =
     run "npm" [ "run"; "build:storybook" ] ProjectPaths.componentsPath

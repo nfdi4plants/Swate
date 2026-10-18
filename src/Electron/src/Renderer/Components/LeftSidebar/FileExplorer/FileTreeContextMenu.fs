@@ -185,24 +185,14 @@ let fileSystemCreateContextMenuItems
     (openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit)
     (item: FileItem)
     =
-    if
-        item.IsDirectory
-        && (item.Path
-            |> Option.map PathHelpers.normalizeCanonicalRelativePath
-            |> Option.exists (fun path ->
-                String.IsNullOrWhiteSpace path
-                || ArcEntityPathRules.isGenericFileSystemParentAllowed path
-            ))
-    then
-        fileSystemCreateKinds
-        |> List.map (fun kind ->
-            ContextMenuItem.create
-                $"New {fileSystemCreateKindLabel kind}"
-                (fileSystemCreateKindIcon kind)
-                (fun () -> openFileSystemCreateModal kind item)
-        )
-    else
-        []
+    fileSystemCreateKinds
+    |> List.filter (fun kind -> canCreateFileSystemItemIn kind item)
+    |> List.map (fun kind ->
+        ContextMenuItem.create
+            $"New {fileSystemCreateKindLabel kind}"
+            (fileSystemCreateKindIcon kind)
+            (fun () -> openFileSystemCreateModal kind item)
+    )
 
 let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
     withDividers [
@@ -235,11 +225,7 @@ let private disableWhileLfsActive (lfsActivePaths: string seq) (item: FileItem) 
         menuItem
 
 let renameContextMenuItems (lfsActivePaths: string seq) (requestRenameItem: FileItem -> unit) (item: FileItem) =
-    if
-        item.Path
-        |> Option.map PathHelpers.normalizeCanonicalRelativePath
-        |> Option.exists ArcEntityPathRules.isRenamePathAllowed
-    then
+    if canRenameFileItem item then
         [
             ContextMenuItem.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
             |> disableWhileLfsActive lfsActivePaths item
@@ -248,11 +234,7 @@ let renameContextMenuItems (lfsActivePaths: string seq) (requestRenameItem: File
         []
 
 let deleteContextMenuItems (lfsActivePaths: string seq) (requestDeleteItem: FileItem -> unit) (item: FileItem) =
-    if
-        item.Path
-        |> Option.map PathHelpers.normalizeCanonicalRelativePath
-        |> Option.exists ArcEntityPathRules.isDeletePathAllowed
-    then
+    if canDeleteFileItem item then
         [
             ContextMenuItem.styled
                 "Delete"

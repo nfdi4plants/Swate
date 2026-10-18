@@ -10,6 +10,7 @@ open Swate.Components.Page.GitSidebarTypes
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.VersionControlTypes
 
 open Renderer.Context.GitWorkflow
@@ -18,6 +19,7 @@ type GitStateController = {
     state: GitState
     refresh: unit -> unit
     sidebarVisibilityChanged: bool -> unit
+    uploadRightAwayChanged: bool -> unit
     initRepository: unit -> unit
     fetch: unit -> unit
     push: unit -> unit
@@ -31,7 +33,7 @@ type GitStateController = {
     discardSelection: string[] -> unit
     confirmPendingRemoteAction: unit -> unit
     cancelPendingRemoteAction: unit -> unit
-    submitPublishRename: string -> unit
+    submitPublishRename: GitSidebarPublishSubmit -> unit
     cancelPublishRename: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
     saveDiffIndexingLimit: int -> unit
@@ -69,11 +71,14 @@ module private Helper =
             getRepositoryWebUrl = Renderer.VersionControlApiClient.getRepositoryWebUrl
             getStoragePolicySettings = Renderer.VersionControlApiClient.getStoragePolicySettings
             setStoragePolicySettings = Renderer.VersionControlApiClient.setStoragePolicySettings
+            getUploadRightAway = Renderer.VersionControlApiClient.getUploadRightAway
+            setUploadRightAway = Renderer.VersionControlApiClient.setUploadRightAway
             loadConflictPage = loadConflictPage
             updatePageState = updatePageState
             initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
             bindWorkspace = Renderer.VersionControlApiClient.bindWorkspace
             createRemoteProject = Api.ipcGitLabApi.createProject
+            loadPublishOwners = Api.ipcGitLabApi.loadPublishOwners
             renameOpenArcRoot =
                 fun newName -> promise {
                     let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
@@ -120,6 +125,7 @@ let GitStateCtx =
             state = GitState.Empty
             refresh = fun () -> ()
             sidebarVisibilityChanged = fun _ -> ()
+            uploadRightAwayChanged = fun _ -> ()
             initRepository = fun () -> ()
             fetch = fun () -> ()
             push = fun () -> ()
@@ -190,10 +196,40 @@ let GitStateCtxProvider (children: ReactElement) =
     let gitState, dispatch =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
+    // The workflow seeds the git values of a state without a session from the user defaults.
+    let userDefaults =
+        Renderer.MainSyncedState.useMainSyncedState {
+            initial = None
+            load =
+                fun () -> promise {
+                    let! defaults = Api.ipcUserDefaultsApi.getUserDefaults ()
+                    return Some defaults
+                }
+            subscribe =
+                fun update ->
+                    Renderer.IpcReceiver.subscribeProxyReceiver<IUserDefaultsRendererApi> {
+                        userDefaultsChanged = Some >> update
+                    }
+            // The built-in values stay in place. Only the settings page reports the failed load, and only
+            // once the user opens it.
+            onError = fun error -> console.warn ("Could not load the user defaults: " + error.Message)
+            dependencies = [||]
+        }
+
+    React.useEffect (
+        (fun () ->
+            userDefaults.state
+            |> Option.iter (fun defaults -> dispatch (UserDefaultsLoaded defaults.Effective))
+        ),
+        [| box userDefaults.state |]
+    )
+
     let refresh () = dispatch RefreshRequested
 
     let sidebarVisibilityChanged isVisible =
         dispatch (SidebarVisibilityChanged isVisible)
+
+    let uploadRightAwayChanged (value: bool) = dispatch (UploadRightAwayChanged value)
 
     let initRepository () = dispatch InitRepositoryRequested
 
@@ -229,8 +265,8 @@ let GitStateCtxProvider (children: ReactElement) =
     let cancelPendingRemoteAction () =
         dispatch CancelPendingRemoteActionRequested
 
-    let submitPublishRename newName =
-        dispatch (SubmitPublishRenameRequested newName)
+    let submitPublishRename (submit: GitSidebarPublishSubmit) =
+        dispatch (SubmitPublishRenameRequested submit)
 
     let cancelPublishRename () = dispatch CancelPublishRenameRequested
 
@@ -278,6 +314,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 state = gitState
                 refresh = refresh
                 sidebarVisibilityChanged = sidebarVisibilityChanged
+                uploadRightAwayChanged = uploadRightAwayChanged
                 initRepository = initRepository
                 fetch = fetch
                 push = push

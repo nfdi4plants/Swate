@@ -77,6 +77,10 @@ module private LazyComponents =
     let ProvenanceGroupingTarget () =
         Renderer.Components.MainContent.ProvenanceGroupingTarget.ProvenanceGroupingTarget()
 
+    [<ReactLazyComponent>]
+    let ProvenanceGraphTarget () =
+        Renderer.Components.MainContent.ProvenanceGraphTarget.ProvenanceGraphTarget()
+
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
@@ -135,6 +139,15 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ LazyComponents.ProvenanceGroupingTarget() ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
+                    | Some _, Some(PageState.ProvenanceGraphPage requestId) ->
+                        // The area keys the content by the request id and shows what failed when the lazy import
+                        // or the target throws. It sits in its own module, so Main imports the target only lazily.
+                        ProvenanceGraphArea.ProvenanceGraphArea
+                            requestId
+                            (React.Suspense(
+                                [ LazyComponents.ProvenanceGraphTarget() ],
+                                fallback = LazyComponents.FullPageLoadingSpinner("Loading provenance graph...")
+                            ))
                     | Some _, Some(PageState.GitDiffPage diffPage) -> GitDiffTarget.Main diffPage
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->

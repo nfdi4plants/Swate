@@ -23,7 +23,7 @@ export default defineConfig({
     },
     optimizeDeps: {
         // Avoid runtime re-optimization reloads during Vitest browser runs in CI.
-        include: ["react-dom/client"],
+        include: ["react-dom/client", "elkjs/lib/elk.bundled.js"],
     },
     build: { // changes to the build config below should be well tested. See README.md for more information.
     // README.md: local dev -> release -> npm -> background info

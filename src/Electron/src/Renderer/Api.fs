@@ -24,6 +24,9 @@ let ipcAppVersionApi =
 let ipcUiSettingsApi =
     Remoting.createIpc () |> Remoting.buildProxySender<IUiSettingsApi>
 
+let ipcUserDefaultsApi =
+    Remoting.createIpc () |> Remoting.buildProxySender<IUserDefaultsApi>
+
 let ipcTemplateApi =
     Remoting.createIpc () |> Remoting.buildProxySender<ITemplateApi>
 

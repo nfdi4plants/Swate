@@ -80,11 +80,31 @@ open Fable.Core.JsInterop
 [<Erase; Mangle(false)>]
 type Layout =
 
+    /// A square icon button for the action columns beside the sidebars. The optional indicator is a short label
+    /// in a badge on the top right corner of the button, for a feature that is new, for example.
     [<ReactComponent>]
     static member LayoutBtn
-        (iconClassName: string, tooltip: string, onClick: unit -> unit, ?tooltipClassName: string, ?isActive: bool)
-        =
+        (
+            iconClassName: string,
+            tooltip: string,
+            onClick: unit -> unit,
+            ?tooltipClassName: string,
+            ?isActive: bool,
+            ?indicator: string
+        ) =
         let isActive = defaultArg isActive false
+
+        let button =
+            Html.button [
+                prop.ariaLabel tooltip
+                prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
+                prop.children [
+                    Html.i [
+                        prop.className ("swt:size-4 swt:iconify " + iconClassName)
+                    ]
+                ]
+                prop.onClick (fun _ -> onClick ())
+            ]
 
         Html.div [
             prop.className [
@@ -98,16 +118,22 @@ type Layout =
             prop.ariaLabel tooltip
             prop.children [
                 Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
-                Html.button [
-                    prop.ariaLabel tooltip
-                    prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
-                    prop.children [
-                        Html.i [
-                            prop.className ("swt:size-4 swt:iconify " + iconClassName)
+                match indicator with
+                | Some label ->
+                    // The badge sits inside the right edge of the button, so the narrow column does not grow.
+                    Html.div [
+                        prop.className "swt:indicator"
+                        prop.children [
+                            Html.span [
+                                prop.testId "layout-btn-indicator"
+                                prop.className
+                                    "swt:indicator-item swt:badge swt:badge-primary swt:badge-xs swt:px-1 swt:[--indicator-x:0px]"
+                                prop.text label
+                            ]
+                            button
                         ]
                     ]
-                    prop.onClick (fun _ -> onClick ())
-                ]
+                | None -> button
             ]
         ]
 

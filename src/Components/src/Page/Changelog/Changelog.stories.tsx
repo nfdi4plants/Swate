@@ -31,7 +31,7 @@ export const Default: Story = {
     await expect(canvas.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Release version' }), '0');
     await expect(canvas.getByRole('heading', { name: 'Improvements', exact: true })).toBeVisible();
-    await userEvent.type(canvas.getByRole('textbox', { name: 'GitHub repository' }), 'nfdi4plants/Swate');
+    await userEvent.type(canvas.getByRole('textbox', { name: 'GitHub repository' }), 'nfdi4plants/ARCitISA');
     await expect(canvas.getByRole('checkbox', { name: 'Use GitHub releases' })).toBeEnabled();
     // Leave live fetching to manual experimentation; this story stays deterministic.
     await expect(canvas.getByRole('checkbox', { name: 'Use GitHub releases' })).not.toBeChecked();
@@ -89,7 +89,7 @@ export const SectionNavigation: Story = {
     const nav = within(await canvas.findByRole('navigation', { name: 'Release note sections' }));
     await expect(nav.getByRole('button', { name: 'Added 25' })).toBeVisible();
     const fixed = canvas.getByRole('heading', { name: 'Fixed', exact: true });
-    const scrollPane = fixed.closest('.wmde-markdown')!.parentElement!;
+    let scrollPane = fixed.closest('.wmde-markdown')!;
     await expect(scrollPane.scrollTop).toBe(0);
     await userEvent.click(nav.getByRole('button', { name: 'Fixed 1' }));
     await waitFor(() => expect(scrollPane.scrollTop).toBeGreaterThan(0));

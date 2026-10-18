@@ -136,10 +136,10 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
         | ArcFiles.Template _ -> Error(exn "Saving of template files is not supported.")
 
 let swatelogfn id fmt =
-    Printf.kprintf (fun s -> Browser.Dom.console.log ("[Swate-" + string id + "] " + s)) fmt
+    Printf.kprintf (fun s -> Browser.Dom.console.log ("[ARCitISA-" + string id + "] " + s)) fmt
 
 let swatefailfn id fmt =
-    Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
+    Printf.kprintf (fun s -> failwith ("[ARCitISA-" + string id + "] " + s)) fmt
 
 /// Serializes ARC merge operations through a single FIFO owner. Individual operation failures
 /// reject their caller's promise without terminating the queue processor.
@@ -293,7 +293,7 @@ let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string,
 }
 
 let createWindow () =
-    printfn "[Swate] Creating new window"
+    printfn "[ARCitISA] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
 
     let windowIconPath = Helper.Assets.getIcon ()

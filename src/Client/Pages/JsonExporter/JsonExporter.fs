@@ -116,7 +116,7 @@ type FileExporter =
 
             SidebarComponents.SidebarLayout.Description(
                 Html.div [
-                    Html.p "Export Swate annotation tables to official JSON."
+                    Html.p "Export ARCitISA annotation tables to official JSON."
                     Html.ul [
                         Html.li [
                             Html.b "ARCtrl"

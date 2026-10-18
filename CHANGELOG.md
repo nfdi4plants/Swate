@@ -16,6 +16,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 3.0.0 - 2026-10-16
+
+### ✨ Added
+
+- The settings page has a "Git defaults" section where you choose the git sidebar settings that every ARC opened afterwards starts with, and ARCitISA keeps them across restarts and updates. #1424 (by @caroott)
+
+### 🔄 Changed
+
+- Swate is now called ARCitISA and has a new logo, designed by @Freymaurer. #1425 (by @caroott)
+
+## 2.6.1 - 2026-10-16
+
+### 🔄 Changed
+
+- When files are marked in the git sidebar, a "Save Selected Changes" button appears next to "Save All Changes". #1392, #1423 (by @caroott)
+- Saving without uploading is now the "Upload right away" checkbox under the save buttons, checked by default. #1423 (by @caroott)
+- The git sidebar refreshes itself whenever you open it. #1423 (by @caroott)
+- The git sidebar shows file names before their folder and uses the usual arrows for ahead, behind, download and upload. #1423 (by @caroott)
+
+### 🐛 Fixed
+
+- Markdown files and the release notes follow the Swate theme instead of the system's light or dark mode. #1418, #1423 (by @caroott)
+
+## 2.6.0 - 2026-10-15
+
+### ✨ Added
+
+- The first upload of an ARC to DataHUB asks whether the repository goes to your own account or to one of your groups. The question only appears when at least one of your groups accepts new repositories. Groups where you can't create repositories are listed but disabled, with the reason next to them. #1404 (by @caroott)
+- Add search options for DOI and Europe PMC for publications. #387, #1400 (by @Freymaurer)
+- Add search options for ORCID as well as name for authors. #501, #763 (by @Freymaurer)
+- Enable the creation of a missing README.md file in the root of an ARC, and in any folder where you can create files. Once created, a README.md can't be renamed or deleted in Swate. #1396, #1406 (by @Etschbeijer)
+- Added that right-clicking the studies, assays, workflows or runs folder offers "New File". Also, files there need a file extension now, for example "notes.md", so Swate can't mistake them for a study, assay, workflow or run. #1396, #1406 (by @Etschbeijer)
+- The new "Provenance Graph" button in the left sidebar shows how samples and data flow through the studies, assays and runs of the open ARC, down to the lineage of a single sample. #1412 (by @caroott)
+
+### 🐛 Fixed
+
+- Files placed directly in the studies, assays, workflows or runs folder, such as "studies/notes.md", can be renamed and deleted like any other file. Hidden files such as ".DS_Store" in these folders can be renamed too. #1406 (by @Etschbeijer)
+- The right-click menu no longer offers Rename or Delete for files that can't be renamed or deleted there, such as a stray "isa.study.xlsx" directly in the studies folder. #1406 (by @Etschbeijer)
+
+- When DataHUB refuses a new repository because of missing permissions, Swate says so and no longer asks for a different name. #1404 (by @caroott)
+- The tabs on the "Download ARC from DataHUB" page are shown as tabs again. #1404 (by @caroott)
+- The import mode options in the template import dialog no longer look disabled. #1401 (by @Freymaurer)
+- Swate app installation sometimes showed a startup error. This has been fixed (hopefully 😶). #1398 (by @Freymaurer)
+
+## 2.5.2 - 2026-10-15
+
+### 🐛 Fixed
+
+- Adding multiple columns at once with the "Only Headers" option now works correctly. Before this fix, users were unable to save any changes done to ARC after for example "Adding a template". [#1397](https://github.com/nfdi4plants/Swate/issues/1397) (by @Freymaurer)
+
 ## 2.5.1 - 2026-10-12
 
 ### 🐛 Fixed

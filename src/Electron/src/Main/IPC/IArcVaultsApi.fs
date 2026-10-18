@@ -7,6 +7,7 @@ open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
 open Swate.Components.Shared
+open Swate.Components.Shared.ProvenanceGraph.BuildIndex
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -817,6 +818,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    loadProvenanceGraph =
+        fun () -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise { return Ok(ProvenanceGraphData.ofInvestigation vault.arc.Value) })
+            with e ->
+                return Error e
+        }
     saveArcFile =
         fun () -> promise {
             try
@@ -887,13 +898,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         event
                         (fun vault -> promise {
                             let arcPath = vault.path.Value
-                            let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
-                            let classification = ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath
 
-                            match classification with
-                            | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget _
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
-                                                                                              _) ->
+                            match! ArcFileSystemHelper.resolveDeletePathRouteAsync arcPath relativePath with
+                            | ArcFileSystemHelper.DeletePathRoute.GenericItem normalizedGenericPath ->
+                                return!
+                                    withFileTreeMutation
+                                        vault
+                                        [ normalizedGenericPath ]
+                                        (fun () -> ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath relativePath)
+                            | ArcFileSystemHelper.DeletePathRoute.ArcEntity normalizedRelativePath ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
@@ -916,15 +929,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         return Ok()
                                                 })
                                             )
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                                                                                              normalizedDataMapPath) ->
+                            | ArcFileSystemHelper.DeletePathRoute.DataMap normalizedDataMapPath ->
                                 match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
                                 | None, _ -> return Error(arcNotOpenError ())
                                 | _, None ->
                                     return
                                         Error(
                                             exn
-                                                "Swate could not determine which assay, study, run, or workflow the selected DataMap belongs to. Refresh the File Explorer and try again."
+                                                "ARCitISA could not determine which assay, study, run, or workflow the selected DataMap belongs to. Refresh the File Explorer and try again."
                                         )
                                 | Some arc, Some parentInfo ->
                                     return!
@@ -942,40 +954,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                                 return Ok()
                                         })
-                            | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
-                            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
-                                                                                                  normalizedGenericPath) ->
-                                if ArcEntityPathRules.isDeletePathAllowed normalizedGenericPath |> not then
-                                    return
-                                        Error(
-                                            exn
-                                                "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
-                                        )
-                                else
-                                    return!
-                                        withFileTreeMutation
-                                            vault
-                                            [ normalizedGenericPath ]
-                                            (fun () ->
-                                                ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
-                                                    arcPath
-                                                    normalizedGenericPath
-                                            )
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
-                                                                                              _) ->
-                                return Error(exn "Deleting the investigation file is not supported.")
-                            | ArcEntityPathRules.DeletePathClassification.ProtectedTarget _ ->
-                                return
-                                    Error(
-                                        exn
-                                            "Deleting protected files (for example .gitkeep or readme.md) is not allowed."
-                                    )
-                            | ArcEntityPathRules.DeletePathClassification.DisallowedTarget _ ->
-                                return
-                                    Error(
-                                        exn
-                                            "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
-                                    )
+                            | ArcFileSystemHelper.DeletePathRoute.Rejected message -> return Error(exn message)
                         })
             with e ->
                 return Error e
@@ -988,6 +967,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         event
                         (fun vault -> promise {
                             let arcPath = vault.path.Value
+
+                            let! isGenericRename =
+                                ArcFileSystemHelper.isGenericRenamePathAsync arcPath request.relativePath
 
                             let affectedPaths = [
                                 request.relativePath
@@ -1007,19 +989,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         return Ok()
                                 })
 
-                            match ArcEntityPathRules.classifyRenameTarget request.relativePath, vault.arc with
-                            | ArcEntityPathRules.RenamePathClassification.GenericTarget _, _ ->
+                            if isGenericRename then
                                 return!
                                     withFileTreeMutation
                                         vault
                                         affectedPaths
-                                        (fun () ->
-                                            ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
-                                        )
-                            | _, None -> return Error(arcNotOpenError ())
-                            | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget _, Some arcLocal ->
-                                return! withFileTreeMutation vault affectedPaths (renameEntity arcLocal)
-                            | _, Some arcLocal -> return! renameEntity arcLocal ()
+                                        (fun () -> ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request)
+                            else
+                                match ArcEntityPathRules.classifyRenameTarget request.relativePath, vault.arc with
+                                | _, None -> return Error(arcNotOpenError ())
+                                | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget _, Some arcLocal ->
+                                    return! withFileTreeMutation vault affectedPaths (renameEntity arcLocal)
+                                | _, Some arcLocal -> return! renameEntity arcLocal ()
                         })
             with e ->
                 return Error e

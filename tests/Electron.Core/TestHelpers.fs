@@ -53,6 +53,7 @@ let createRuntime
             ]
         Bindings = bindings
         PathCaseSensitivity = CaseInsensitive
+        SessionDefaults = UserDefaults.builtInSessionDefaults
     }
 
 let expectValue (operation: string) (result: OperationResult<'T>) =

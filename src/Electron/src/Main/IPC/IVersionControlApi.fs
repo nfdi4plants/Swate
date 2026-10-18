@@ -370,7 +370,9 @@ let private withTextDiff
 let private diffStoragePolicyOf (event: IpcMainInvokeEvent) : DiffStoragePolicy =
     match tryGetVaultAndArcPath event with
     | Ok(_, arcPath) -> VersionControlSettings.diffStoragePolicy (WorkspaceSessionHost.get().GetSettings arcPath)
-    | Error _ -> VersionControlSettings.diffStoragePolicy VersionControlSettings.defaults
+    | Error _ ->
+        let defaults = WorkspaceSessionHost.get().Runtime.SessionDefaults()
+        VersionControlSettings.diffStoragePolicy defaults.InitialSettings
 
 /// The window of the IPC call. Electron supplies it, so the renderer cannot choose it.
 let private callingWindowId (event: IpcMainInvokeEvent) : int option =
@@ -602,12 +604,24 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     // Read the values right before the close, so a change acknowledged
                     // while the bind ran is the one restored afterwards.
                     let savedSettings = host.GetSettings arcPath
+
+                    let savedUploadRightAway =
+                        match host.GetUploadRightAway arcPath with
+                        | Succeeded outcome
+                        | PartiallySucceeded(outcome, _) -> Some outcome.Value
+                        | Failed _ -> None
+
                     let! reopened = host.ReopenSession(arcPath, context)
 
                     match reopened with
-                    | Succeeded _
-                    | PartiallySucceeded _ ->
-                        if savedSettings <> VersionControlSettings.defaults then
+                    | Succeeded outcome
+                    | PartiallySucceeded(outcome, _) ->
+                        // The new session starts from the current defaults, so the checkbox value goes back first.
+                        savedUploadRightAway
+                        |> Option.iter (fun saved -> host.SetUploadRightAway(arcPath, saved) |> ignore)
+
+                        // Only settings that differ from what the fresh session started with need restoring.
+                        if savedSettings <> outcome.Value.Settings then
                             do! restoreSavedSettings savedSettings context
                     | _ -> ()
 
@@ -1052,6 +1066,21 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)
                 )
                 id
+    // The checkbox calls skip runTracked and the busy flag, because they change no workspace
+    // state. They never open a session, so a vault without one answers with a failure.
+    getUploadRightAway =
+        fun () -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) -> return Ok(Mappings.result id (WorkspaceSessionHost.get().GetUploadRightAway arcPath))
+        }
+    setUploadRightAway =
+        fun value -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                return Ok(Mappings.result id (WorkspaceSessionHost.get().SetUploadRightAway(arcPath, value)))
+        }
     // The DataHUB ruleset is checked here as well as in the renderer, because the main
     // process is the trust boundary. The main process reads the file size from the
     // workspace before checking the size rule.

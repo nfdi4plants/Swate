@@ -15,6 +15,9 @@ type HostedSession = {
     Binding: WorkspaceBinding
     Session: WorkspaceSession
     Settings: VersionControlSettings
+    /// The "Upload right away" checkbox of the git sidebar. It lives next to the settings so it
+    /// outlives a renderer reload and ends with the session. It is not a provider setting.
+    UploadRightAway: bool
 }
 
 /// A registered operation: its context for the library call and the completion
@@ -57,6 +60,9 @@ let private unmanagedFailure (workspaceRoot: string) (diagnostics: OperationFail
         AffectedPaths = [| workspaceRoot |]
 }
 
+let private sessionNotOpenFailure () =
+    OperationFailure.create NotFound VersionControlCodes.SessionUnavailable "The workspace session is not open."
+
 let private withValue (value: 'U) (outcome: OperationOutcome<'T>) : OperationOutcome<'U> = {
     Value = value
     Effect = outcome.Effect
@@ -98,24 +104,29 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     }
 
     /// Keeps a settings value only while that same session is still open. A close that
-    /// lands while the provider call runs must not be undone by its continuation.
+    /// lands while the provider call runs must not be undone by its continuation. The stored
+    /// record is the base, because the checkbox may have changed while the call ran.
     let storeSettingsIfLive (hosted: HostedSession) (settings: VersionControlSettings) =
-        if sessions.ContainsKey hosted.SessionId then
-            sessions[hosted.SessionId] <- { hosted with Settings = settings }
+        match sessions.TryGetValue hosted.SessionId with
+        | true, live -> sessions[hosted.SessionId] <- { live with Settings = settings }
+        | _ -> ()
 
     let openBinding (factory: ProviderFactory) (binding: WorkspaceBinding) (context: OperationContext) = async {
         let! opened = factory.Open binding context
 
         let initializeSettings (outcome: OperationOutcome<WorkspaceSession>) = async {
+            let sessionDefaults = runtime.SessionDefaults()
+
             let hosted = {
                 SessionId = Guid.NewGuid().ToString()
                 Binding = binding
                 Session = outcome.Value
-                Settings = VersionControlSettings.defaults
+                Settings = sessionDefaults.InitialSettings
+                UploadRightAway = sessionDefaults.InitialUploadRightAway
             }
 
-            // The app owns these values. Every session starts from the defaults.
-            // Provider repository keys only mirror them.
+            // The app owns these values. Every session starts from the user defaults, or from the
+            // built-in ones when the user has none. Provider repository keys only mirror them.
             match hosted.Session.StoragePolicy with
             | Some policy ->
                 // A provider that throws here must not lose the session it just opened,
@@ -210,7 +221,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     member _.GetSettings(workspaceRoot: string) : VersionControlSettings =
         tryFindSession workspaceRoot
         |> Option.map (fun hosted -> hosted.Settings)
-        |> Option.defaultValue VersionControlSettings.defaults
+        |> Option.defaultWith (fun () -> runtime.SessionDefaults().InitialSettings)
 
     member _.SetSettings
         (workspaceRoot: string, settings: VersionControlSettings, context: OperationContext)
@@ -220,14 +231,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             | Error(code, reason) -> return Failed(OperationFailure.create Validation code reason)
             | Ok settings ->
                 match tryFindSession workspaceRoot with
-                | None ->
-                    return
-                        Failed(
-                            OperationFailure.create
-                                NotFound
-                                VersionControlCodes.SessionUnavailable
-                                "The workspace session is not open."
-                        )
+                | None -> return Failed(sessionNotOpenFailure ())
                 | Some hosted ->
                     match hosted.Session.StoragePolicy with
                     | Some policy ->
@@ -246,6 +250,22 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                         storeSettingsIfLive hosted settings
                         return OperationResult.succeeded ()
         }
+
+    /// The checkbox value of the open session. A root without a session fails, because
+    /// the default would hide that no session holds a value.
+    member _.GetUploadRightAway(workspaceRoot: string) : OperationResult<bool> =
+        match tryFindSession workspaceRoot with
+        | Some hosted -> OperationResult.succeeded hosted.UploadRightAway
+        | None -> Failed(sessionNotOpenFailure ())
+
+    /// Stores the checkbox value in memory only. It takes no operation or lock, because the
+    /// checkbox is not a workspace change.
+    member _.SetUploadRightAway(workspaceRoot: string, value: bool) : OperationResult<unit> =
+        match tryFindSession workspaceRoot with
+        | Some hosted ->
+            sessions[hosted.SessionId] <- { hosted with UploadRightAway = value }
+            OperationResult.succeeded ()
+        | None -> Failed(sessionNotOpenFailure ())
 
     /// Returns the open session for the root, or resolves the root, adopts it when
     /// exactly one provider owns it, persists the binding and opens the session.
@@ -278,13 +298,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                                 if shouldClose then
                                     do! closeHostedSession outcome.Value |> Async.StartAsPromise
 
-                                    return
-                                        Failed(
-                                            OperationFailure.create
-                                                NotFound
-                                                VersionControlCodes.SessionUnavailable
-                                                "The workspace session is not open."
-                                        )
+                                    return Failed(sessionNotOpenFailure ())
                                 else
                                     sessions[outcome.Value.SessionId] <- outcome.Value
                                     return opened

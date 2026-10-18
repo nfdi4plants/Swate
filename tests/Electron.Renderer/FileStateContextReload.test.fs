@@ -334,6 +334,14 @@ Vitest.describe (
                     .toBe (false)
 
                 Vitest
+                    .expect(
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
+                            Some(RendererPageState.ProvenanceGraphPage "request")
+                        )
+                    )
+                    .toBe (false)
+
+                Vitest
                     .expect(FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval None)
                     .toBe (false)
         )

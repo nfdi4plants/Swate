@@ -4,11 +4,11 @@
   <Version>1.0.0</Version>
   <ProviderName>Computational Systems Biology</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Swate"/>
+  <DisplayName DefaultValue="ARCitISA"/>
   <Description DefaultValue="Utility functions to ARCify your data!"/>
   <IconUrl DefaultValue="https://localhost:3000/assets/swate_32x32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/swate_80x80.png"/>
-  <SupportUrl DefaultValue="https://github.com/nfdi4plants/Swate/issues"/>
+  <SupportUrl DefaultValue="https://github.com/nfdi4plants/ARCitISA/issues"/>
   <AppDomains>
     <AppDomain>bio.uni-kl.de</AppDomain>
   </AppDomains>
@@ -89,11 +89,11 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started annotating your data for greater good!"/>
-        <bt:String id="Swate.Label" DefaultValue="Swate"/>
+        <bt:String id="Swate.Label" DefaultValue="ARCitISA"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Swate was loaded succesfully. Go to the DATA tab and click the 'Swate' button to get started."/>
-        <bt:String id="Swate.Tooltip" DefaultValue="Open a task pane to gain full access to the Swate user functionality."/>
+        <bt:String id="GetStarted.Description" DefaultValue="ARCitISA was loaded succesfully. Go to the DATA tab and click the 'ARCitISA' button to get started."/>
+        <bt:String id="Swate.Tooltip" DefaultValue="Open a task pane to gain full access to the ARCitISA user functionality."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

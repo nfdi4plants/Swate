@@ -12,7 +12,7 @@ let withArcFileRequest
     : JS.Promise<Result<'T, exn>> =
     promise {
         match FileContentDTO.fromArcFile arcFile with
-        | None -> return Error(exn "Saving this file type is not supported in Swate yet.")
+        | None -> return Error(exn "Saving this file type is not supported in ARCitISA yet.")
         | Some request -> return! execute request
     }
 

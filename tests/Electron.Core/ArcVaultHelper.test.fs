@@ -4767,7 +4767,7 @@ Vitest.describe (
                         do! TestHelpers.removeDirectoryAsync rootPath
                         return failwith "Expected LoadArc to fail for an invalid ARC folder."
                     | Some error ->
-                        Vitest.expect(error.Message).toContain ("[Swate-0] Unable to load ARC:")
+                        Vitest.expect(error.Message).toContain ("[ARCitISA-0] Unable to load ARC:")
                         Vitest.expect(error.Message).not.toContain ("fmt.cont")
                         do! TestHelpers.removeDirectoryAsync rootPath
                 with error ->
