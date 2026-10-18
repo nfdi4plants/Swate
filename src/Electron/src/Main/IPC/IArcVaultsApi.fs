@@ -981,16 +981,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 |]
                             ]
 
-                            let renameEntity (arcLocal: ARC) () =
-                                vault.WithBusyWritingScope(fun () -> promise {
-                                    match! ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal with
-                                    | Error renameError -> return Error renameError
-                                    | Ok renamedArc ->
-                                        vault.SetArc renamedArc
-                                        vault.RefreshHasUnsavedArcChangesFlag()
-                                        return Ok()
-                                })
-
                             if isGenericRename then
                                 return!
                                     withFileTreeMutation
@@ -1000,11 +990,25 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
                                         )
                             else
-                                match ArcEntityPathRules.classifyRenameTarget request.relativePath, vault.arc with
-                                | _, None -> return Error(arcNotOpenError ())
-                                | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget _, Some arcLocal ->
-                                    return! withFileTreeMutation vault affectedPaths (renameEntity arcLocal)
-                                | _, Some arcLocal -> return! renameEntity arcLocal ()
+                                match vault.arc with
+                                | None -> return Error(arcNotOpenError ())
+                                | Some arcLocal ->
+                                    return!
+                                        withFileTreeMutation
+                                            vault
+                                            affectedPaths
+                                            (fun () ->
+                                                vault.WithBusyWritingScope(fun () -> promise {
+                                                    match!
+                                                        ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
+                                                    with
+                                                    | Error renameError -> return Error renameError
+                                                    | Ok renamedArc ->
+                                                        vault.SetArc renamedArc
+                                                        vault.RefreshHasUnsavedArcChangesFlag()
+                                                        return Ok()
+                                                })
+                                            )
                         })
             with e ->
                 return Error e
