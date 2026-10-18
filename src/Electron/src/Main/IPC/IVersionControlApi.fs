@@ -298,7 +298,8 @@ let private withMutatingSession
         mapValue
 
 /// Materializes or dematerializes one object. The file is rewritten in place and no directory moves,
-/// so the watchers stay; the loaded tree is refreshed afterwards when the request asks for it.
+/// so the watchers stay. Only the large-object state of the loaded entries can change, so that is
+/// renewed afterwards when the request asks for it.
 let private withObjectSession
     (operationName: string)
     (event: IpcMainInvokeEvent)
@@ -313,7 +314,7 @@ let private withObjectSession
             let! result = run ()
 
             if shouldRefreshObjectTree request (Ok(Mappings.result id result)) then
-                do! vault.RefreshLoadedFileTree()
+                do! vault.RenewLargeObjectState()
 
             return result
         })

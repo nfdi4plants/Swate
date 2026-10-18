@@ -351,15 +351,27 @@ module ArcVaultExtensions =
             return annotated
         }
 
+        /// Applies a renewed large-object listing to every loaded file entry.
+        member private this.ApplyRenewedLargeObjectState(arcPath: string) =
+            this.EnqueueFileTreeUpdate(fun () -> this.AnnotateLoadedEntries arcPath)
+            |> Promise.catch (fun error ->
+                swatelogfn this.window.id "Unable to renew the large-object state: %s" error.Message
+            )
+
+        /// Renews the large-object state of the loaded tree, for example after Swate materialized an object.
+        member internal this.RenewLargeObjectState() =
+            match this.path with
+            | Some arcPath ->
+                this.LargeObjectMetadata.Invalidate()
+                this.ApplyRenewedLargeObjectState arcPath
+            | None -> JS.Constructors.Promise.resolve ()
+
         /// Renews the large-object state of the loaded tree when the repository changed outside Swate,
         /// for example through git lfs pull. Called when the window gains focus.
         member internal this.RefreshLargeObjectStateIfRepositoryChanged() =
             match this.path with
             | Some arcPath when this.LargeObjectMetadata.InvalidateIfRepositoryChanged arcPath ->
-                this.EnqueueFileTreeUpdate(fun () -> this.AnnotateLoadedEntries arcPath)
-                |> Promise.catch (fun error ->
-                    swatelogfn this.window.id "Unable to renew the large-object state: %s" error.Message
-                )
+                this.ApplyRenewedLargeObjectState arcPath
             | _ -> JS.Constructors.Promise.resolve ()
 
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
@@ -459,10 +471,9 @@ module ArcVaultExtensions =
                             | _ -> None
                         )
 
-                    // A changed file can switch between pointer and content, so the shared listing is renewed.
-                    if changedFiles.Length > 0 then
-                        this.LargeObjectMetadata.Invalidate()
-
+                    // The shared listing is kept: renewing it costs seconds in a large repository and would hold
+                    // up every File Explorer read queued behind it after each save. A file that git switches
+                    // between pointer and content is caught by the focus check or the version control operation.
                     let! enrichedChangedFiles = this.WithLargeObjectMetadata(arcPath, changedFiles)
                     let mutable enrichedChangedFileIndex = 0
 
@@ -1133,12 +1144,7 @@ module ArcVaultExtensions =
 
                                     match arcFile with
                                     | ArcFiles.DataMap(Some parentInfo, _) ->
-                                        let parentPath =
-                                            DatamapParentInfo.toPath parentInfo
-                                            |> PathHelpers.tryGetParentPath
-                                            |> Option.defaultValue ""
-
-                                        do! this.RefreshFileTreeDirectory parentPath
+                                        do! this.RevealCreatedFileTreePaths [ DatamapParentInfo.toPath parentInfo ]
                                     | _ -> ()
 
                                     return Ok()
@@ -1450,14 +1456,23 @@ module ArcVaultExtensions =
                             refreshError.Message
         }
 
-        /// Refreshes a directory only when File Explorer already knows its contents.
-        /// The root is always visible and is therefore always eligible.
-        member this.RefreshFileTreeDirectoryIfLoaded(relativeDirectoryPath: string) = promise {
-            if this.IsFileTreeDirectoryLoaded relativeDirectoryPath then
-                do! this.RefreshFileTreeDirectory relativeDirectoryPath
-                return true
-            else
-                return false
+        /// Shows paths that Swate just created. A parent that is not loaded yet is loaded first; every path
+        /// is then added directly, because a partly loaded parent may not list it within its loaded entries.
+        member this.RevealCreatedFileTreePaths(relativePaths: string list) = promise {
+            let parentPaths =
+                relativePaths
+                |> List.map (fun path ->
+                    PathHelpers.normalizeCanonicalRelativePath path
+                    |> PathHelpers.tryGetParentPath
+                    |> Option.defaultValue RootDirectory
+                )
+                |> List.distinctBy PathHelpers.normalizeForComparison
+
+            for parentPath in parentPaths do
+                if not (this.IsFileTreeDirectoryLoaded parentPath) then
+                    do! this.RefreshFileTreeDirectory parentPath
+
+            do! this.ReconcileFileTreePaths relativePaths
         }
 
         member this.GetRendererFileTreeSnapshot() = promise {

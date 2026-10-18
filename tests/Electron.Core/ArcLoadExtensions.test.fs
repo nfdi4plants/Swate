@@ -3,6 +3,7 @@ module ElectronCore.ArcLoadExtensionsTests
 open ARCtrl
 open System
 open Fable.Core
+open Fable.Core.JsInterop
 open Main.ARCtrlExtensions
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
@@ -128,6 +129,33 @@ Vitest.describe (
 Vitest.describe (
     "bounded ARC loading",
     fun () ->
+        Vitest.test (
+            "a DataMap preview while the ARC is still loading shows the DataMap",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-loading-preview-"
+                    "PreviewArc"
+                    TestHelpers.addDataMapToAllEntityTypes
+                    (fun arcPath -> promise {
+                        let windowId = 7191
+                        // The vault has its path but no ARC model yet, as while a large ARC loads.
+                        let vault = TestHelpers.registerVault windowId arcPath
+
+                        try
+                            Vitest.expect(vault.arc.IsNone).toBe true
+                            let api = Main.IPC.ArcVaultsApi.api (TestHelpers.ipcEvent windowId)
+                            let! preview = api.openFile "assays/Assay With DataMap/isa.datamap.xlsx"
+
+                            match preview with
+                            | Ok dto ->
+                                Vitest.expect(dto.fileType).toEqual Swate.Electron.Shared.FileIOTypes.FileContentType.ISA_Datamap
+                            | Error error -> return raise error
+                        finally
+                            Main.ArcVault.ARC_VAULTS.Vaults.Remove windowId |> ignore
+                            TestHelpers.electronMock?reset () |> ignore
+                    })
+        )
+
         Vitest.test (
             "bounded ARC loading reconstructs every entity type",
             fun () ->

@@ -907,7 +907,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "File Explorer shares one large-object listing until a file change or invalidation renews it",
+            "File Explorer shares one large-object listing until an invalidation renews it",
             fun () -> promise {
                 let! root = createTempDirectoryAsync "swate-file-tree-objects-"
                 let workspace = join [| root; "workspace" |]
@@ -1005,26 +1005,23 @@ Vitest.describe (
 
                     Vitest.expect(listings).toBe 1
 
-                    // A watcher batch with changed files renews the listing once for the whole batch.
-                    objects <- objects |> Array.map (fun state -> { state with IsMaterialized = true })
-
+                    // A watcher batch with changed files, such as a save, reuses the listing as well.
                     let events =
                         names.[0..1]
                         |> Array.map (fun name -> Main.WatcherHelpers.buildWatcherEvent workspace "change" name)
                         |> Array.toList
 
                     do! vault.ApplyWatcherFileTreeEvents events
-                    Vitest.expect(listings).toBe 2
+                    Vitest.expect(listings).toBe 1
 
                     for name in names.[0..1] do
-                        let state = (entryAt name).largeObject |> Option.get
-                        Vitest.expect(state.IsMaterialized).toBe true
+                        Vitest.expect((entryAt name).largeObject.IsSome).toBe true
 
                     // Invalidation, for example after a version control operation, renews it on the next read.
                     objects <- [||]
                     vault.LargeObjectMetadata.Invalidate()
                     do! vault.RefreshFileTreeDirectory ""
-                    Vitest.expect(listings).toBe 3
+                    Vitest.expect(listings).toBe 2
 
                     vault.fileTree.Values
                     |> Seq.filter (fun entry ->
@@ -1035,7 +1032,7 @@ Vitest.describe (
                     // A stopped vault never reopens the version control session for metadata.
                     do! vault.StopFileWatcher()
                     let! _ = vault.WithLargeObjectMetadata(workspace, [| entryAt "ordinary.txt" |])
-                    Vitest.expect(listings).toBe 3
+                    Vitest.expect(listings).toBe 2
 
                     do! cleanup ()
                 with error ->
@@ -1099,7 +1096,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "materialization defers successful tree refreshes and refreshes after failure",
+            "materialization renews the large-object state only when asked or after a failure",
             fun () -> promise {
                 let! root = createTempDirectoryAsync "swate-vc-materialize-refresh-"
                 let workspace = join [| root; "workspace" |]
@@ -1107,9 +1104,14 @@ Vitest.describe (
                 writeText (join [| workspace; "object.txt" |]) "object\n"
 
                 let mutable materializationFails = false
+                let mutable listings = 0
 
                 let objectMaterialization: ObjectMaterializationService = {
-                    ListObjects = fun _ -> async { return OperationResult.succeeded [||] }
+                    ListObjects =
+                        fun _ -> async {
+                            listings <- listings + 1
+                            return OperationResult.succeeded [||]
+                        }
                     Materialize =
                         fun _ _ -> async {
                             if materializationFails then
@@ -1147,8 +1149,10 @@ Vitest.describe (
                 try
                     try
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 65)
-                        vault.fileTree.Clear()
+                        let! _ = vault.EnsureInitialFileTreeRootPage workspace
+                        Vitest.expect(listings).toBe 1
 
+                        // A batch renews the state once, with its last request.
                         let! succeeded =
                             api.materializeObject {
                                 OperationId = "materialize-success-no-refresh"
@@ -1157,7 +1161,7 @@ Vitest.describe (
                             }
 
                         expectDtoValue "successful materialization" succeeded |> ignore
-                        Vitest.expect(vault.fileTree.Count).toBe 0
+                        Vitest.expect(listings).toBe 1
 
                         materializationFails <- true
 
@@ -1169,7 +1173,7 @@ Vitest.describe (
                             }
 
                         expectDtoFailure "failed materialization" failed |> ignore
-                        Vitest.expect(vault.fileTree.Count).toBeGreaterThan 0
+                        Vitest.expect(listings).toBe 2
                     with error ->
                         do! cleanup ()
                         return raise error

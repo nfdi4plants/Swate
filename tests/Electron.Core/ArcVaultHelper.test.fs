@@ -1229,7 +1229,7 @@ Vitest.describe (
                         renameSync renamedSource renamedTarget
 
                         do! vault.ReconcileFileTreePaths [ renamedSourceRelativePath; "parent/renamed-entry.txt" ]
-                        let! _ = vault.RefreshFileTreeDirectoryIfLoaded "parent"
+                        do! vault.RefreshFileTreeDirectory "parent"
 
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["parent"]).toBe true
                         Vitest.expect(containsPath renamedSource).toBe false
@@ -1237,9 +1237,50 @@ Vitest.describe (
 
                         do! rmAsync renamedTarget (RmOptions())
                         do! vault.ReconcileFileTreePaths [ "parent/renamed-entry.txt" ]
-                        let! _ = vault.RefreshFileTreeDirectoryIfLoaded "parent"
+                        do! vault.RefreshFileTreeDirectory "parent"
 
                         Vitest.expect(containsPath renamedTarget).toBe false
+                        do! vault.StopFileWatcher()
+                    })
+        )
+
+        Vitest.test (
+            "revealing created paths shows them beyond the loaded page and loads an unloaded parent",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let parentPath = join [| arcPath; "parent" |]
+                        let unloadedPath = join [| arcPath; "unloaded" |]
+                        do! mkdirWatcherDirectoryAsync parentPath
+                        do! mkdirWatcherDirectoryAsync unloadedPath
+
+                        for index in 0..249 do
+                            do!
+                                writeWatcherTextFileAsync
+                                    (join [| parentPath; sprintf "entry-%03d.txt" index |])
+                                    "entry"
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadNextFileTreeDirectoryPage "parent"
+
+                        let containsPath path =
+                            vault.fileTree.Values
+                            |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path path)
+
+                        // On NTFS a listing returns names in order, so this one lies beyond the loaded page.
+                        let createdPath = join [| parentPath; "zz-created.txt" |]
+                        let createdInUnloadedPath = join [| unloadedPath; "created.txt" |]
+                        do! writeWatcherTextFileAsync createdPath "created"
+                        do! writeWatcherTextFileAsync createdInUnloadedPath "created"
+
+                        do! vault.RevealCreatedFileTreePaths [ "parent/zz-created.txt"; "unloaded/created.txt" ]
+
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["parent"]).toBe true
+                        Vitest.expect(containsPath createdPath).toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "unloaded").toBe true
+                        Vitest.expect(containsPath createdInUnloadedPath).toBe true
                         do! vault.StopFileWatcher()
                     })
         )

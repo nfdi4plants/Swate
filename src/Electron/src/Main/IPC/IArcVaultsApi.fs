@@ -72,7 +72,7 @@ let ensureNotesFolderAndRefreshFileTree (vault: ArcVault) (arcPath: string) = pr
     match! Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath with
     | Error error -> return Error error
     | Ok() ->
-        do! vault.RefreshFileTreeDirectory ""
+        do! vault.RevealCreatedFileTreePaths [ Main.Notes.NoteConstants.NotesRootFolderName ]
         return Ok()
 }
 
@@ -652,11 +652,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                                 match result with
                                                 | Ok ImportExternalFilesResult.Completed ->
-                                                    let! _ =
-                                                        vault.RefreshFileTreeDirectoryIfLoaded
-                                                            request.targetRelativePath
-
-                                                    ()
+                                                    do!
+                                                        vault.ReconcileFileTreePaths(
+                                                            importedEvents |> Array.map _.RelativePath
+                                                        )
                                                 | _ -> releaseImportEventOwnership ()
 
                                                 vault.window.setProgressBar -1.0
@@ -872,7 +871,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             let! result = ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
 
                             match result with
-                            | Ok _ -> do! vault.RefreshFileTreeDirectory request.parentPath
+                            | Ok createdPath -> do! vault.RevealCreatedFileTreePaths [ createdPath ]
                             | Error _ -> ()
 
                             return result
@@ -1089,9 +1088,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                         do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
 
-                                        match tryGetArcRelativePath arcPath directoryPath with
-                                        | Ok relativeParentPath ->
-                                            do! vault.RefreshFileTreeDirectory relativeParentPath
+                                        match tryGetArcRelativePath arcPath absolutePath with
+                                        | Ok relativePath ->
+                                            do! vault.RevealCreatedFileTreePaths [ relativePath ]
                                             return Ok()
                                         | Error pathError -> return Error pathError
                                     | FileContentType.CLI ->
@@ -1122,7 +1121,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             // The bounded root tree is available before the complete ARC model. Load only
                             // the selected workbook so previews remain interactive during initialization.
                             let normalizedPath = PathHelpers.normalizeCanonicalRelativePath relativePath
-                            let previewArc = ARC.fromFilePaths [| normalizedPath |]
+
+                            // A DataMap belongs to its study, assay, workflow or run, so that workbook is
+                            // loaded with it. Without it the DataMap has nothing to attach to.
+                            let previewPaths =
+                                match ArcEntityPathRules.tryParseCanonicalArcFileTarget normalizedPath with
+                                | Some(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile(zone, identifier)) -> [|
+                                    normalizedPath
+                                    $"{ArcEntityPathRules.zoneFolderName zone}/{identifier}/{ArcEntityPathRules.zoneEntityFileName zone}"
+                                  |]
+                                | _ -> [| normalizedPath |]
+
+                            let previewArc = ARC.fromFilePaths previewPaths
                             let contracts = previewArc.GetReadContracts()
 
                             match! fullFillContractBatchAsync arcPath contracts with
