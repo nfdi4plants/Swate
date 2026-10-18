@@ -148,7 +148,8 @@ Vitest.describe (
 
                             match preview with
                             | Ok dto ->
-                                Vitest.expect(dto.fileType).toEqual Swate.Electron.Shared.FileIOTypes.FileContentType.ISA_Datamap
+                                Vitest.expect(dto.fileType).toEqual
+                                    Swate.Electron.Shared.FileIOTypes.FileContentType.ISA_Datamap
                             | Error error -> return raise error
                         finally
                             Main.ArcVault.ARC_VAULTS.Vaults.Remove windowId |> ignore
