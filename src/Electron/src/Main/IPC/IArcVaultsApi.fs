@@ -905,7 +905,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     withFileTreeMutation
                                         vault
                                         [ normalizedGenericPath ]
-                                        (fun () -> ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath relativePath)
+                                        (fun () ->
+                                            ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath relativePath
+                                        )
                             | ArcFileSystemHelper.DeletePathRoute.ArcEntity normalizedRelativePath ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
@@ -994,7 +996,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     withFileTreeMutation
                                         vault
                                         affectedPaths
-                                        (fun () -> ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request)
+                                        (fun () ->
+                                            ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+                                        )
                             else
                                 match ArcEntityPathRules.classifyRenameTarget request.relativePath, vault.arc with
                                 | _, None -> return Error(arcNotOpenError ())
