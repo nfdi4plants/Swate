@@ -184,6 +184,67 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a completed import releases its file marks even when the watcher never reports the files",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+
+                let events =
+                    WatcherHelpers.createImportedFileWatcherEvents "C:/arc" "assays/AssayA/dataset" [|
+                        "Run1/notes.txt"
+                        "Run1/raw/results.csv"
+                    |]
+
+                Vitest.vi.useFakeTimers () |> ignore
+
+                try
+                    vault.ClaimImportedFileEvents events
+                    vault.ReleaseImportedFileEventsLater events
+                    Vitest.expect(vault.importedFileWatcherPaths.Count).toBe 2
+
+                    Vitest.vi.runAllTimers () |> ignore
+                    Vitest.expect(vault.importedFileWatcherPaths.Count).toBe 0
+                finally
+                    Vitest.vi.useRealTimers () |> ignore
+        )
+
+        Vitest.test (
+            "imported folders are added to a native watcher only",
+            fun () ->
+                let addedPaths = ResizeArray<string>()
+
+                let watcher =
+                    { new Main.Bindings.Chokidar.IWatcher with
+                        member _.close() = Promise.lift ()
+                        member _.add(path: string) = addedPaths.Add path
+                        member _.add(paths: string[]) = addedPaths.AddRange paths
+                        member _.unwatch(_: string) = Promise.lift ()
+                        member _.unwatch(_: string[]) = Promise.lift ()
+
+                        member this.on(_: Main.Bindings.Chokidar.Events, _: string -> unit) = this
+
+                        member this.on(_: Main.Bindings.Chokidar.Events, _: string -> string -> unit) = this
+
+                        member _.getWatched() = unbox null
+                    }
+
+                let watchImportedFolders usesPolling folders =
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    vault.watcher <- Some watcher
+                    vault.watcherUsesPolling <- usesPolling
+                    vault.WatchImportedFolders folders
+
+                // A polling watcher finds new folders by itself, and adding them again would swallow
+                // the events of the files that are already there.
+                watchImportedFolders true [| "C:/arc/dataset/Run1" |]
+                watchImportedFolders false [||]
+                Vitest.expect(addedPaths.Count).toBe 0
+
+                watchImportedFolders false [| "C:/arc/dataset/Run1"; "C:/arc/dataset/Run2" |]
+
+                Vitest.expect(addedPaths |> Seq.toArray).toEqual ([| "C:/arc/dataset/Run1"; "C:/arc/dataset/Run2" |])
+        )
+
+        Vitest.test (
             "active import cancellation waits for import cleanup to finish",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())

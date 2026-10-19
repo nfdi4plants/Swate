@@ -369,11 +369,14 @@ let isFileWatcherPathIgnored (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
 
+/// Decides whether the file watcher polls. Without an explicit choice it polls on Windows only,
+/// because native Windows file events can keep handles that block app-initiated folder renames.
+let resolveFileWatcherPolling (usePolling: bool option) =
+    defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+
 let createFileWatcher (path: string) (usePolling: bool option) =
 
-    // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling =
-        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+    let usePolling = resolveFileWatcherPolling usePolling
 
     let watcherOptions =
         if usePolling then

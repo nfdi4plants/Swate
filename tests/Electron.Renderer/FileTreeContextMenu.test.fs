@@ -618,6 +618,21 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "an existing folder with the legacy DataMap name can still be renamed, deleted and filled",
+            fun () ->
+                // New items may not get the name `isa_datamap`, but older ARCs must not get stuck with one.
+                let item = createFolderItem "isa_datamap" (Some "backup/isa_datamap")
+
+                let labels = [|
+                    yield! fileSystemCreateContextMenuItems (fun _ _ -> ()) item |> List.map _.Label
+                    yield! renameContextMenuItems [] ignore item |> List.map _.Label
+                    yield! deleteContextMenuItems [] ignore item |> List.map _.Label
+                |]
+
+                Vitest.expect(labels).toEqual ([| "New File"; "New Folder"; "Rename"; "Delete" |])
+        )
+
+        Vitest.test (
             "composed file context menu is grouped with open, copy, git, and ARC actions",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")

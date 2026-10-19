@@ -116,6 +116,26 @@ let private importWithoutCancellation arcPath targetRelativePath sourcePaths =
         ignore
         acceptImportedFiles
 
+/// Imports without cancellation, fails unless the import completes, and returns the planned files.
+let private importCollectingPlannedFiles arcPath targetRelativePath sourcePaths = promise {
+    let plannedFiles = ResizeArray<string>()
+
+    match!
+        ArcFileSystemHelper.importExternalFilesOnDisk
+            arcPath
+            targetRelativePath
+            sourcePaths
+            ignore
+            (fun () -> false)
+            plannedFiles.AddRange
+            ignore
+            acceptImportedFiles
+    with
+    | Error error -> return failwith error.Message
+    | Ok ImportExternalFilesResult.Cancelled -> return failwith "Expected import to complete."
+    | Ok ImportExternalFilesResult.Completed -> return plannedFiles.ToArray()
+}
+
 let private readRelativeFileAsync rootPath relativePath =
     Main.Bindings.Filesystem.readFileAsync
         (absoluteArcPath rootPath relativePath)
@@ -209,6 +229,28 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
+        Description = "a folder that contains an ARC metadata file in capitals"
+        PrepareSource = createExternalRunFolderWithAsync "raw/ISA.ASSAY.XLSX" "copied workbook"
+        TargetRelativePath = ""
+        ExpectedError = "Cannot import 'Run1/raw/ISA.ASSAY.XLSX' because 'ISA.ASSAY.XLSX' is reserved for ARC metadata."
+        AbsentRelativePath = "Run1"
+    }
+    {
+        // Unlike a nested `.gitkeep`, which is left out, a picked one follows the "New File" rules.
+        Description = "a picked .gitkeep file"
+        PrepareSource =
+            fun arcPath -> promise {
+                // ARCtrl puts a `.gitkeep` into `dataset` itself, so the import targets a folder without one.
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset/raw"
+                do! writeRelativeFileAsync (dirname arcPath) ".gitkeep" ""
+                return join [| dirname arcPath; ".gitkeep" |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset/raw"
+        ExpectedError =
+            "Cannot import '.gitkeep': Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+        AbsentRelativePath = "assays/AssayA/dataset/raw/.gitkeep"
+    }
+    {
         // Loading the ARC would rename the legacy DataMap name to `isa.datamap.xlsx`.
         Description = "a file with the legacy DataMap name"
         PrepareSource =
@@ -243,6 +285,35 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
+        // `lstat` still recognizes a link whose target is gone.
+        Description = "a folder that contains a link whose target is gone"
+        PrepareSource =
+            fun arcPath -> promise {
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                let goneTargetPath = absoluteArcPath (dirname arcPath) "external/gone"
+                do! createRelativeDirectoryAsync (dirname arcPath) "external/gone"
+                do! TestHelpers.createFolderLinkAsync goneTargetPath (join [| sourcePath; "dangling" |])
+                do! TestHelpers.removeDirectoryAsync goneTargetPath
+                return sourcePath
+            }
+        TargetRelativePath = ""
+        ExpectedError = "Cannot import 'Run1/dangling' because it is a symbolic link."
+        AbsentRelativePath = "Run1"
+    }
+    {
+        // The watcher ignores folders with this name too, so they would never be watched.
+        Description = "a folder that contains a folder with the legacy DataMap name"
+        PrepareSource =
+            fun arcPath -> promise {
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                do! createRelativeDirectoryAsync sourcePath "raw/isa_datamap"
+                return sourcePath
+            }
+        TargetRelativePath = ""
+        ExpectedError = $"Cannot import 'Run1/raw/isa_datamap': {legacyDataMapNameError}"
+        AbsentRelativePath = "Run1"
+    }
+    {
         Description = "a folder that is itself a symbolic link"
         PrepareSource =
             fun arcPath -> promise {
@@ -272,6 +343,20 @@ let private rejectedImports = [
             fun arcPath -> promise {
                 do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset/Run1"
                 return! createExternalRunFolderAsync arcPath
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = "Cannot import 'Run1' because an item with that name already exists."
+        AbsentRelativePath = "assays/AssayA/dataset/Run1/raw"
+    }
+    {
+        // The picked names are checked before the folder is scanned, so the problem inside it is not reached.
+        Description = "a folder over an existing folder before looking inside it"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset/Run1"
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                do! createRelativeDirectoryAsync sourcePath "raw/.git"
+                return sourcePath
             }
         TargetRelativePath = "assays/AssayA/dataset"
         ExpectedError = "Cannot import 'Run1' because an item with that name already exists."
@@ -430,6 +515,38 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "cancels a folder import while it is copied into the staging folder",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let mutable cancelRequested = false
+
+                    // The first progress report comes after the first entry is staged.
+                    let onProgress progress =
+                        if progress > 0.0 then
+                            cancelRequested <- true
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA/dataset"
+                            [| sourcePath |]
+                            onProgress
+                            (fun () -> cancelRequested)
+                            ignore
+                            ignore
+                            acceptImportedFiles
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Completed -> failwith "Expected import cancellation."
+                    | Ok ImportExternalFilesResult.Cancelled ->
+                        do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                        do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
             "cancels an import without leaving temporary or imported files",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
@@ -565,7 +682,7 @@ Vitest.describe (
                             ignore
                             (fun () -> false)
                             ignore
-                            (fun () -> lifecycleOrder.Add "published")
+                            (fun _ -> lifecycleOrder.Add "published")
                             (fun () -> promise {
                                 lifecycleOrder.Add "validate"
                                 return Ok()
@@ -631,6 +748,7 @@ Vitest.describe (
                     let! sourcePath = createExternalRunFolderAsync arcPath
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
                     let mutable plannedFiles = [||]
+                    let mutable publishedFolders = [||]
                     let lifecycleOrder = ResizeArray<string>()
 
                     // The import handler registers watcher ownership in onFilesPlanned, so it must run
@@ -653,7 +771,10 @@ Vitest.describe (
                             ignore
                             (fun () -> false)
                             onFilesPlanned
-                            (fun () -> lifecycleOrder.Add "published")
+                            (fun folders ->
+                                publishedFolders <- folders
+                                lifecycleOrder.Add "published"
+                            )
                             acceptImportedFiles
                     with
                     | Error error -> failwith error.Message
@@ -669,10 +790,90 @@ Vitest.describe (
 
                         Vitest.expect(plannedFiles).toEqual ([| "Run1/notes.txt"; "Run1/raw/results.csv" |])
                         Vitest.expect(lifecycleOrder |> Seq.toArray).toEqual ([| "planned"; "published" |])
+
+                        // Only the picked folder is reported, not the folders inside it.
+                        Vitest
+                            .expect(publishedFolders)
+                            .toEqual ([| absoluteArcPath arcPath "assays/AssayA/dataset/Run1" |])
+
                         Vitest.expect(notes).toBe ("run notes")
                         Vitest.expect(results).toBe ("a,b")
                         Vitest.expect(emptyFolderExists).toBe (true)
                         do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "leaves lock files, staging leftovers and the ARC's own git files out of an imported folder, but keeps README files",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let guidSuffix = String.replicate 32 "a"
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! writeRelativeFileAsync sourcePath "raw/.~$results.xlsx" "Excel lock file"
+                    do! writeRelativeFileAsync sourcePath "raw/.gitattributes" "*.csv filter=lfs"
+                    do! writeRelativeFileAsync sourcePath "empty/.gitkeep" ""
+                    do! writeRelativeFileAsync sourcePath "raw/.GITKEEP" ""
+                    // README files share the protected list with the git files, but "New File" may create them.
+                    do! writeRelativeFileAsync sourcePath "raw/README.md" "about the raw data"
+                    do! writeRelativeFileAsync sourcePath $"raw/results.csv.vcs-lfs-backup-{guidSuffix}" "backup"
+                    do! createRelativeDirectoryAsync sourcePath $".swate-import-{guidSuffix}"
+                    do! writeRelativeFileAsync sourcePath $".swate-import-{guidSuffix}/staged.txt" "staged"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! plannedFiles = importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    Vitest
+                        .expect(plannedFiles)
+                        .toEqual (
+                            [|
+                                "Run1/notes.txt"
+                                "Run1/raw/README.md"
+                                "Run1/raw/results.csv"
+                            |]
+                        )
+
+                    for skippedPath in
+                        [
+                            "raw/.~$results.xlsx"
+                            "raw/.gitattributes"
+                            "empty/.gitkeep"
+                            "raw/.GITKEEP"
+                            $"raw/results.csv.vcs-lfs-backup-{guidSuffix}"
+                            $".swate-import-{guidSuffix}"
+                        ] do
+                        do! expectRelativePathExists arcPath $"assays/AssayA/dataset/Run1/{skippedPath}" false
+
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1/empty" true
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "still imports a picked Excel lock file, unlike one inside a picked folder",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    // Picked files were imported this way before folder imports existed. The watcher does
+                    // not report such a file, so it is not registered as imported.
+                    let sourceRoot = dirname arcPath
+                    do! writeRelativeFileAsync sourceRoot ".~$data.xlsx" "Excel lock file"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! plannedFiles =
+                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
+                            absoluteArcPath sourceRoot ".~$data.xlsx"
+                        |]
+
+                    Vitest.expect(plannedFiles).toEqual ([| ".~$data.xlsx" |])
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/.~$data.xlsx" true
+
+                    Vitest
+                        .expect(
+                            Main.WatcherHelpers.createImportedFileWatcherEvents
+                                arcPath
+                                "assays/AssayA/dataset"
+                                plannedFiles
+                        )
+                        .toEqual ([||])
                 })
         )
 
@@ -686,41 +887,29 @@ Vitest.describe (
                     // Only the picked items need unique names, so both folders may contain `notes.txt`.
                     do! writeRelativeFileAsync sourceRoot "external/Run2/notes.txt" "second run notes"
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
-                    let mutable plannedFiles = [||]
 
-                    match!
-                        ArcFileSystemHelper.importExternalFilesOnDisk
-                            arcPath
-                            "assays/AssayA/dataset"
+                    let! plannedFiles =
+                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
+                            firstSourcePath
+                            absoluteArcPath sourceRoot "external/Run2"
+                        |]
+
+                    let! firstNotes = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/notes.txt"
+                    let! secondNotes = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run2/notes.txt"
+
+                    Vitest
+                        .expect(plannedFiles)
+                        .toEqual (
                             [|
-                                firstSourcePath
-                                absoluteArcPath sourceRoot "external/Run2"
+                                "Run1/notes.txt"
+                                "Run1/raw/results.csv"
+                                "Run2/notes.txt"
                             |]
-                            ignore
-                            (fun () -> false)
-                            (fun files -> plannedFiles <- files)
-                            ignore
-                            acceptImportedFiles
-                    with
-                    | Error error -> failwith error.Message
-                    | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
-                    | Ok ImportExternalFilesResult.Completed ->
-                        let! firstNotes = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/notes.txt"
-                        let! secondNotes = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run2/notes.txt"
+                        )
 
-                        Vitest
-                            .expect(plannedFiles)
-                            .toEqual (
-                                [|
-                                    "Run1/notes.txt"
-                                    "Run1/raw/results.csv"
-                                    "Run2/notes.txt"
-                                |]
-                            )
-
-                        Vitest.expect(firstNotes).toBe ("run notes")
-                        Vitest.expect(secondNotes).toBe ("second run notes")
-                        do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                    Vitest.expect(firstNotes).toBe ("run notes")
+                    Vitest.expect(secondNotes).toBe ("second run notes")
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
                 })
         )
 
@@ -731,6 +920,7 @@ Vitest.describe (
                     let sourceRoot = dirname arcPath
                     do! createRelativeDirectoryAsync sourceRoot "external/a/Run1"
                     do! writeRelativeFileAsync sourceRoot "external/a/Run1/notes.txt" "run notes"
+                    do! createRelativeDirectoryAsync sourceRoot "external/a/Run1/.git"
                     do! createRelativeDirectoryAsync sourceRoot "external/b"
                     do! writeRelativeFileAsync sourceRoot "external/b/run1" "a file named like the folder"
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
@@ -763,17 +953,23 @@ Vitest.describe (
             )
 
         Vitest.test (
-            "rolls back an imported folder when post-import validation fails",
+            "rolls back every imported folder when post-import validation fails",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
-                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    let sourceRoot = dirname arcPath
+                    let! firstSourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync sourceRoot "external/Run2/raw"
+                    do! writeRelativeFileAsync sourceRoot "external/Run2/raw/data.csv" "c,d"
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
 
                     let! result =
                         ArcFileSystemHelper.importExternalFilesOnDisk
                             arcPath
                             "assays/AssayA/dataset"
-                            [| sourcePath |]
+                            [|
+                                firstSourcePath
+                                absoluteArcPath sourceRoot "external/Run2"
+                            |]
                             ignore
                             (fun () -> false)
                             ignore
@@ -782,6 +978,7 @@ Vitest.describe (
 
                     result |> expectErrorContaining "ARC synchronization failed"
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run2" false
                     do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
                 })
         )

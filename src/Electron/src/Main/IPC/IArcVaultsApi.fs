@@ -570,26 +570,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                                     // Chokidar's awaitWriteFinish can emit these well after the import
                                                     // releases the busy flag, so ownership must outlive the write itself.
-                                                    importedEvents
-                                                    |> Seq.iter (fun event ->
-                                                        vault.importedFileWatcherPaths.Add(
-                                                            PathHelpers.normalizePath (
-                                                                event.AbsolutePath.ToLowerInvariant()
-                                                            )
-                                                        )
-                                                        |> ignore
-                                                    )
-
-                                                let releaseImportEventOwnership () =
-                                                    importedEvents
-                                                    |> Seq.iter (fun event ->
-                                                        vault.importedFileWatcherPaths.Remove(
-                                                            PathHelpers.normalizePath (
-                                                                event.AbsolutePath.ToLowerInvariant()
-                                                            )
-                                                        )
-                                                        |> ignore
-                                                    )
+                                                    vault.ClaimImportedFileEvents importedEvents
 
                                                 let! result =
                                                     ArcFileSystemHelper.importExternalFilesOnDisk
@@ -599,7 +580,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         reportImportProgress
                                                         (fun () -> abortSignal.aborted)
                                                         registerImportedFiles
-                                                        (fun () ->
+                                                        (fun publishedFolders ->
+                                                            vault.WatchImportedFolders publishedFolders
+
                                                             match vault.activeFileImport with
                                                             | Some activeImport when
                                                                 activeImport.State.requestId = request.requestId
@@ -627,8 +610,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     |> Promise.catch Error
 
                                                 match result with
-                                                | Ok ImportExternalFilesResult.Completed -> ()
-                                                | _ -> releaseImportEventOwnership ()
+                                                | Ok ImportExternalFilesResult.Completed ->
+                                                    vault.ReleaseImportedFileEventsLater(importedEvents.ToArray())
+                                                | _ -> vault.ReleaseImportedFileEvents importedEvents
 
                                                 vault.window.setProgressBar -1.0
                                                 return result

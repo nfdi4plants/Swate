@@ -273,10 +273,15 @@ module ArcFileSystemHelper =
         IsDirectory = isDirectory
     }
 
+    let private symbolicLinkImportError path =
+        exn $"Cannot import '{path}' because it is a symbolic link."
+
     /// Lists an imported source folder and everything inside it, every folder before its contents.
     /// ARC file names are rejected, because the ARC merge would read a copy such as
     /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
     /// following one could copy data from outside the picked folder or loop forever.
+    /// Leftovers the watcher ignores, such as Excel lock files, and the git files the ARC manages
+    /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
     let rec private collectExternalFolderEntries
         isCancellationRequested
         (sourceDirectory: string)
@@ -299,15 +304,31 @@ module ArcFileSystemHelper =
                     raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
                 elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
                     raise (exn $"Cannot import '{relativePath}': {legacyDataMapNameError}")
-                elif dirent.isSymbolicLink () then
-                    raise (exn $"Cannot import '{relativePath}' because it is a symbolic link.")
-                elif dirent.isDirectory () then
-                    let! folderEntries = collectExternalFolderEntries isCancellationRequested sourcePath relativePath
-                    entries.AddRange folderEntries
-                elif dirent.isFile () then
-                    entries.Add(importEntry sourcePath relativePath false)
+
+                if
+                    Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
+                    || ArcEntityPathRules.isArcManagedGitFileName dirent.name
+                then
+                    ()
                 else
-                    raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
+                    let! isLink, isDirectory, isFile =
+                        if dirent.isSymbolicLink () then
+                            lstatAsync sourcePath
+                            |> Promise.map (fun stats -> stats.isSymbolicLink (), stats.isDirectory (), stats.isFile ())
+                        else
+                            Promise.lift (false, dirent.isDirectory (), dirent.isFile ())
+
+                    if isLink then
+                        raise (symbolicLinkImportError relativePath)
+                    elif isDirectory then
+                        let! folderEntries =
+                            collectExternalFolderEntries isCancellationRequested sourcePath relativePath
+
+                        entries.AddRange folderEntries
+                    elif isFile then
+                        entries.Add(importEntry sourcePath relativePath false)
+                    else
+                        raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
 
             return entries.ToArray()
         }
@@ -321,10 +342,10 @@ module ArcFileSystemHelper =
             return PathHelpers.isSameOrDescendantPathForFsComparison realTargetDirectory realSourceDirectory
     }
 
-    /// Checks one picked file or folder and lists it, a folder with everything inside it.
+    /// Checks one picked file or folder and returns its entry, without looking inside a folder.
     /// A picked file link is followed and its content is copied. A picked folder link is rejected
     /// like a nested one.
-    let private collectSourceEntries isCancellationRequested targetRelativePath targetDirectory sourcePath = promise {
+    let private inspectPickedItemAsync targetRelativePath targetDirectory sourcePath = promise {
         let absolutePath = resolveAbsolutePath sourcePath
         let name = basename absolutePath
         let! sourceLinkStats = lstatAsync absolutePath
@@ -344,16 +365,16 @@ module ArcFileSystemHelper =
         | Ok _ -> ()
 
         if not isDirectory then
-            return [| importEntry absolutePath name false |]
+            return importEntry absolutePath name false
         elif isLink then
-            return raise (exn $"Cannot import '{name}' because it is a symbolic link.")
+            return raise (symbolicLinkImportError name)
         else
             let! isIntoItself = isImportIntoItselfAsync targetDirectory absolutePath
 
             if isIntoItself then
                 return raise (exn $"Cannot import folder '{name}' into itself.")
             else
-                return! collectExternalFolderEntries isCancellationRequested absolutePath name
+                return importEntry absolutePath name true
     }
 
     let private createExternalFileImportPlan
@@ -363,18 +384,14 @@ module ArcFileSystemHelper =
         (sourcePaths: string[])
         =
         promise {
-            let entries = ResizeArray<ExternalFileImportEntry>()
+            let pickedEntries = ResizeArray<ExternalFileImportEntry>()
 
             for sourcePath in sourcePaths do
-                let! sourceEntries =
-                    collectSourceEntries isCancellationRequested targetRelativePath targetDirectory sourcePath
-
-                entries.AddRange sourceEntries
-
-            let topLevelEntries = entries |> Seq.filter isTopLevelImportEntry |> Seq.toArray
+                let! pickedEntry = inspectPickedItemAsync targetRelativePath targetDirectory sourcePath
+                pickedEntries.Add pickedEntry
 
             let duplicateName =
-                topLevelEntries
+                pickedEntries.ToArray()
                 |> Array.groupBy (fun entry -> entry.RelativePath.ToLowerInvariant())
                 |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
 
@@ -382,7 +399,7 @@ module ArcFileSystemHelper =
             | Some(_, duplicates) -> raise (exn $"Cannot import multiple items named '{duplicates.[0].RelativePath}'.")
             | None -> ()
 
-            for entry in topLevelEntries do
+            for entry in pickedEntries do
                 let destinationPath = join [| targetDirectory; entry.RelativePath |]
 
                 match!
@@ -392,6 +409,20 @@ module ArcFileSystemHelper =
                 with
                 | Ok() -> ()
                 | Error targetError -> raise targetError
+
+            let entries = ResizeArray<ExternalFileImportEntry>()
+
+            for pickedEntry in pickedEntries do
+                if pickedEntry.IsDirectory then
+                    let! folderEntries =
+                        collectExternalFolderEntries
+                            isCancellationRequested
+                            pickedEntry.SourcePath
+                            pickedEntry.RelativePath
+
+                    entries.AddRange folderEntries
+                else
+                    entries.Add pickedEntry
 
             return {
                 TargetDirectory = targetDirectory
@@ -512,7 +543,7 @@ module ArcFileSystemHelper =
         (onProgress: float -> unit)
         (isCancellationRequested: unit -> bool)
         (onFilesPlanned: string[] -> unit)
-        (onFilesPublished: unit -> unit)
+        (onPublished: string[] -> unit)
         (validateImportedFiles: unit -> JS.Promise<Result<unit, exn>>)
         : JS.Promise<Result<ImportExternalFilesResult, exn>> =
         promise {
@@ -537,7 +568,12 @@ module ArcFileSystemHelper =
                     try
                         do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
                         do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
-                        onFilesPublished ()
+
+                        // Reports the absolute paths of the imported top-level folders.
+                        plan.Entries
+                        |> Array.filter (fun entry -> entry.IsDirectory && isTopLevelImportEntry entry)
+                        |> Array.map (importEntryPath plan.TargetDirectory)
+                        |> onPublished
 
                         match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
                         | Ok() -> ()

@@ -289,6 +289,10 @@ module ArcEntityPathRules =
     let isLegacyDataMapFileName (fileName: string) =
         PathHelpers.pathsEqual fileName legacyDataMapFileName
 
+    let isArcManagedGitFileName (fileName: string) =
+        PathHelpers.pathMatchesAny protectedDeleteTargetNames fileName
+        && not (PathHelpers.pathMatchesAny creatableProtectedFileNames fileName)
+
     /// True for a single path segment, such as `.git`, that no generic file or folder path may contain.
     let isDisallowedGenericPathSegment (segment: string) =
         PathHelpers.pathMatchesAny disallowedGenericPathSegments segment

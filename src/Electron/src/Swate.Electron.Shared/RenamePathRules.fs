@@ -52,6 +52,14 @@ let private addZoneFileNameError =
 let legacyDataMapNameError =
     $"'{ArcEntityPathRules.legacyDataMapFileName}' is the outdated DataMap name. Loading the ARC would rename it to '{ARCtrl.ArcPathHelper.DataMapFileName}'."
 
+let private validateNewItemName (targetPath: string) =
+    if ArcEntityPathRules.isLegacyDataMapFileName (PathHelpers.getFileName targetPath) then
+        Error legacyDataMapNameError
+    elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
+        Error addZoneFileNameError
+    else
+        Ok targetPath
+
 let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name: string) =
     let normalizedParentPath = normalizeRelativePath parentPath
 
@@ -77,12 +85,8 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
             then
                 Error
                     "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
-            elif ArcEntityPathRules.isLegacyDataMapFileName normalizedName then
-                Error legacyDataMapNameError
-            elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
-                Error addZoneFileNameError
             else
-                Ok targetPath
+                validateNewItemName targetPath
 
 /// `isAddZoneRootFile` marks a file directly inside an add zone (for example `studies/notes.md` or
 /// `studies/.DS_Store`). Pass `false` for every other source.
@@ -104,9 +108,5 @@ let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourceP
             if isTargetAllowed targetPath |> not then
                 Error
                     "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
-            elif ArcEntityPathRules.isLegacyDataMapFileName (PathHelpers.getFileName targetPath) then
-                Error legacyDataMapNameError
-            elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
-                Error addZoneFileNameError
             else
-                Ok targetPath
+                validateNewItemName targetPath

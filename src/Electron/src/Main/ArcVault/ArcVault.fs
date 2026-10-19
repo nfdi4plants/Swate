@@ -36,6 +36,11 @@ exception ArcCreatedButClosedException of targetWindowId: int
 /// Tests shorten this delay to cover timeout behavior without waiting 30 seconds.
 let mutable closeWaitTimeoutMilliseconds = 30000
 
+/// How long the files of a completed import stay marked as written by the import. A native watcher can
+/// miss files created in quick succession, so a mark must not wait for a watcher event that never comes.
+/// Polling reports imported files within about a second, and `awaitWriteFinish` adds two more seconds.
+let private importedFileOwnershipMilliseconds = 10000
+
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
     Fable.Core.JS.setTimeout onElapsed suppressionMs
@@ -78,6 +83,7 @@ type ArcVault(window: BrowserWindow) =
     member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
+    member val internal watcherUsesPolling: bool = false with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
@@ -555,9 +561,7 @@ module ArcVaultExtensions =
                 WatcherHelpers.queueFileWatcherEvent
                     (fun event ->
                         let isImportedPath =
-                            this.importedFileWatcherPaths.Remove(
-                                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                            )
+                            this.importedFileWatcherPaths.Remove(event.AbsolutePath.ToLowerInvariant())
 
                         not isImportedPath
                         && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
@@ -700,7 +704,9 @@ module ArcVaultExtensions =
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
+                    let usePolling = resolveFileWatcherPolling usePolling
+                    let watcher = createFileWatcher this.path.Value (Some usePolling)
+                    this.watcherUsesPolling <- usePolling
 
                     let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
@@ -735,6 +741,26 @@ module ArcVaultExtensions =
             this.watcher <- None
             this.ClearPendingFileWatcherState()
         }
+
+        member this.ClaimImportedFileEvents(events: ArcVaultFileSystemEvent seq) =
+            for event in events do
+                this.importedFileWatcherPaths.Add(event.AbsolutePath.ToLowerInvariant())
+                |> ignore
+
+        member this.ReleaseImportedFileEvents(events: ArcVaultFileSystemEvent seq) =
+            for event in events do
+                this.importedFileWatcherPaths.Remove(event.AbsolutePath.ToLowerInvariant())
+                |> ignore
+
+        member this.ReleaseImportedFileEventsLater(events: ArcVaultFileSystemEvent[]) =
+            Fable.Core.JS.setTimeout (fun () -> this.ReleaseImportedFileEvents events) importedFileOwnershipMilliseconds
+            |> ignore
+
+        member this.WatchImportedFolders(absoluteFolderPaths: string[]) =
+            match this.watcher with
+            | Some watcher when not this.watcherUsesPolling && absoluteFolderPaths.Length > 0 ->
+                watcher.add absoluteFolderPaths
+            | _ -> ()
 
         member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
