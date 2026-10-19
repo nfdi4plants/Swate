@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 🔄 Changed
+
+- Sidebar action buttons are now grouped by functionality. Added open and create ARC buttons. (by @Freymaurer)
+
 ## 3.0.0 - 2026-10-16
 
 ### ✨ Added
