@@ -51,6 +51,8 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
+/// Builds the watcher events of imported files. Files the watcher ignores, such as `.~$data.xlsx`,
+/// are left out: the watcher never reports them, so they could never be released after the import.
 let createImportedFileWatcherEvents arcPath targetRelativePath (importedRelativePaths: string[]) =
     let targetRelativePath =
         PathHelpers.normalizeCanonicalRelativePath targetRelativePath
@@ -66,6 +68,7 @@ let createImportedFileWatcherEvents arcPath targetRelativePath (importedRelative
 
         buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
     )
+    |> Array.filter (fun event -> not (ArcVaultHelper.isFileWatcherPathIgnored event.AbsolutePath))
 
 /// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
 let queueFileWatcherEvent

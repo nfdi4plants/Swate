@@ -326,6 +326,23 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "leaves files the watcher ignores out of the imported file events",
+            fun () ->
+                // The watcher never reports these files, so a registration for them would never be released.
+                let guidSuffix = String.replicate 32 "a"
+
+                let events =
+                    Main.WatcherHelpers.createImportedFileWatcherEvents "C:/arc" "assays/AssayA/dataset" [|
+                        "Run1/notes.txt"
+                        "Run1/.~$results.xlsx"
+                        $"Run1/.swate-import-{guidSuffix}/raw.txt"
+                        $"Run1/data.bin.vcs-lfs-backup-{guidSuffix}"
+                    |]
+
+                Vitest.expect(events |> Array.map _.RelativePath).toEqual ([| "assays/AssayA/dataset/Run1/notes.txt" |])
+        )
+
+        Vitest.test (
             "checks whether relative files and directories exist",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
@@ -656,6 +673,78 @@ Vitest.describe (
                         Vitest.expect(results).toBe ("a,b")
                         Vitest.expect(emptyFolderExists).toBe (true)
                         do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "imports several folders picked together, even when their contents share names",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceRoot = dirname arcPath
+                    let! firstSourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync sourceRoot "external/Run2"
+                    // Only the picked items need unique names, so both folders may contain `notes.txt`.
+                    do! writeRelativeFileAsync sourceRoot "external/Run2/notes.txt" "second run notes"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let mutable plannedFiles = [||]
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA/dataset"
+                            [|
+                                firstSourcePath
+                                absoluteArcPath sourceRoot "external/Run2"
+                            |]
+                            ignore
+                            (fun () -> false)
+                            (fun files -> plannedFiles <- files)
+                            ignore
+                            acceptImportedFiles
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
+                    | Ok ImportExternalFilesResult.Completed ->
+                        let! firstNotes = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/notes.txt"
+                        let! secondNotes = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run2/notes.txt"
+
+                        Vitest
+                            .expect(plannedFiles)
+                            .toEqual (
+                                [|
+                                    "Run1/notes.txt"
+                                    "Run1/raw/results.csv"
+                                    "Run2/notes.txt"
+                                |]
+                            )
+
+                        Vitest.expect(firstNotes).toBe ("run notes")
+                        Vitest.expect(secondNotes).toBe ("second run notes")
+                        do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "rejects picking two items with the same name, ignoring case, and writes nothing",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceRoot = dirname arcPath
+                    do! createRelativeDirectoryAsync sourceRoot "external/a/Run1"
+                    do! writeRelativeFileAsync sourceRoot "external/a/Run1/notes.txt" "run notes"
+                    do! createRelativeDirectoryAsync sourceRoot "external/b"
+                    do! writeRelativeFileAsync sourceRoot "external/b/run1" "a file named like the folder"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! result =
+                        importWithoutCancellation arcPath "assays/AssayA/dataset" [|
+                            absoluteArcPath sourceRoot "external/a/Run1"
+                            absoluteArcPath sourceRoot "external/b/run1"
+                        |]
+
+                    result |> expectErrorContaining "Cannot import multiple items named 'Run1'."
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
                 })
         )
 

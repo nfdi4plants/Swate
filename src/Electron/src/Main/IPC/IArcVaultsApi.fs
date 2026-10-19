@@ -516,7 +516,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     | Error authorizationError -> raise authorizationError
 
                 if sourceAbsolutePaths.Length = 0 then
-                    raise (exn "No files were selected for import.")
+                    raise (exn "No items were selected for import.")
 
                 return!
                     withLoadedArcVault
@@ -636,7 +636,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     )
                         })
             with e ->
-                return Error(exn $"Could not import files: {e.Message}")
+                return Error(exn $"Could not import items: {e.Message}")
         }
     cancelImportExternalFiles =
         fun requestId -> promise {
