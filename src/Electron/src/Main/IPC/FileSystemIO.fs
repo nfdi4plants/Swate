@@ -46,6 +46,13 @@ module ArcPathValidation =
 let resolveAbsolutePath (pathValue: string) =
     pathDynamic?resolve (pathValue) |> unbox<string>
 
+let tryResolveRealPathAsync (absolutePath: string) : JS.Promise<string> = promise {
+    try
+        return! realpathAsync absolutePath
+    with _ ->
+        return absolutePath
+}
+
 let tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
     let arcRoot = resolveAbsolutePath arcPath
     let absolutePath = resolveAbsolutePath requestedAbsolutePath
@@ -305,11 +312,30 @@ module ArcFileSystemHelper =
             return entries.ToArray()
         }
 
+    let private isImportIntoItselfAsync targetDirectory sourceDirectory = promise {
+        if PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory sourceDirectory then
+            return true
+        else
+            let! realTargetDirectory = tryResolveRealPathAsync targetDirectory
+            let! realSourceDirectory = tryResolveRealPathAsync sourceDirectory
+            return PathHelpers.isSameOrDescendantPathForFsComparison realTargetDirectory realSourceDirectory
+    }
+
     /// Checks one picked file or folder and lists it, a folder with everything inside it.
+    /// A picked file link is followed and its content is copied. A picked folder link is rejected
+    /// like a nested one.
     let private collectSourceEntries isCancellationRequested targetRelativePath targetDirectory sourcePath = promise {
         let absolutePath = resolveAbsolutePath sourcePath
         let name = basename absolutePath
-        let! sourceStats = statAsync absolutePath
+        let! sourceLinkStats = lstatAsync absolutePath
+        let isLink = sourceLinkStats.isSymbolicLink ()
+
+        let! sourceStats =
+            if isLink then
+                statAsync absolutePath
+            else
+                Promise.lift sourceLinkStats
+
         let isDirectory = sourceStats.isDirectory ()
 
         // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
@@ -319,10 +345,15 @@ module ArcFileSystemHelper =
 
         if not isDirectory then
             return [| importEntry absolutePath name false |]
-        elif PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory absolutePath then
-            return raise (exn $"Cannot import folder '{name}' into itself.")
+        elif isLink then
+            return raise (exn $"Cannot import '{name}' because it is a symbolic link.")
         else
-            return! collectExternalFolderEntries isCancellationRequested absolutePath name
+            let! isIntoItself = isImportIntoItselfAsync targetDirectory absolutePath
+
+            if isIntoItself then
+                return raise (exn $"Cannot import folder '{name}' into itself.")
+            else
+                return! collectExternalFolderEntries isCancellationRequested absolutePath name
     }
 
     let private createExternalFileImportPlan

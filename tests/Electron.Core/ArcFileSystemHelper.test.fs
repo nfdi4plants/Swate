@@ -243,6 +243,19 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
+        Description = "a folder that is itself a symbolic link"
+        PrepareSource =
+            fun arcPath -> promise {
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                let linkPath = join [| dirname arcPath; "external"; "LinkedRun" |]
+                do! TestHelpers.createFolderLinkAsync sourcePath linkPath
+                return linkPath
+            }
+        TargetRelativePath = ""
+        ExpectedError = "Cannot import 'LinkedRun' because it is a symbolic link."
+        AbsentRelativePath = "LinkedRun"
+    }
+    {
         Description = "a folder into itself"
         PrepareSource =
             fun arcPath -> promise {
@@ -711,6 +724,76 @@ Vitest.describe (
                         Vitest.expect(filesWerePlanned).toBe (false)
                         do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
                         do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "resolves a path through a link to its real path",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let linkedArcPath = join [| dirname arcPath; "linked-arc" |]
+                    do! TestHelpers.createFolderLinkAsync arcPath linkedArcPath
+
+                    let! realArcPath = tryResolveRealPathAsync arcPath
+                    let! resolvedLinkedArcPath = tryResolveRealPathAsync linkedArcPath
+
+                    Vitest
+                        .expect(PathHelpers.normalizePathForFsComparison resolvedLinkedArcPath)
+                        .toBe (PathHelpers.normalizePathForFsComparison realArcPath)
+                })
+        )
+
+        Vitest.test (
+            "returns a path that cannot be resolved as given",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let linkedArcPath = join [| dirname arcPath; "linked-arc" |]
+                    do! TestHelpers.createFolderLinkAsync arcPath linkedArcPath
+
+                    // Resolving a missing path fails like it does on drives that cannot resolve real paths.
+                    let missingPath = join [| linkedArcPath; "missing" |]
+                    let! resolvedPath = tryResolveRealPathAsync missingPath
+
+                    Vitest.expect(resolvedPath).toBe (missingPath)
+                })
+        )
+
+        Vitest.test (
+            "rejects importing a folder into itself when the ARC is opened through a link",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "backup/inner"
+                    let linkedArcPath = join [| dirname arcPath; "linked-arc" |]
+                    do! TestHelpers.createFolderLinkAsync arcPath linkedArcPath
+
+                    let! result =
+                        importWithoutCancellation linkedArcPath "backup/inner" [| absoluteArcPath arcPath "backup" |]
+
+                    result |> expectErrorContaining "Cannot import folder 'backup' into itself."
+                    do! expectRelativePathExists arcPath "backup/inner/backup" false
+                    do! expectNoTemporaryImportDirectory arcPath "backup/inner"
+                })
+        )
+
+        Vitest.test (
+            "imports the content of a picked file link",
+            TestOptions(skip = not (TestHelpers.canCreateFileLinks ())),
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceRoot = dirname arcPath
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    do! createRelativeDirectoryAsync sourceRoot "external"
+                    do! writeRelativeFileAsync sourceRoot "external/notes.txt" "linked notes"
+
+                    let linkPath = absoluteArcPath sourceRoot "external/linked-notes.txt"
+                    do! TestHelpers.createFileLinkAsync (absoluteArcPath sourceRoot "external/notes.txt") linkPath
+
+                    match! importWithoutCancellation arcPath "assays/AssayA/dataset" [| linkPath |] with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
+                    | Ok ImportExternalFilesResult.Completed ->
+                        let! notes = readRelativeFileAsync arcPath "assays/AssayA/dataset/linked-notes.txt"
+                        Vitest.expect(notes).toBe ("linked notes")
                 })
         )
 

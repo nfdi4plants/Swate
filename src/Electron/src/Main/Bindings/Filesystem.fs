@@ -94,6 +94,9 @@ let statAsync (path: string) : JS.Promise<Stats> = jsNative
 [<Import("lstat", "fs/promises")>]
 let lstatAsync (path: string) : JS.Promise<Stats> = jsNative
 
+[<Import("realpath", "fs/promises")>]
+let realpathAsync (path: string) : JS.Promise<string> = jsNative
+
 [<Import("readdir", "fs/promises")>]
 let readdirAsync (path: string) : JS.Promise<string[]> = jsNative
 

@@ -124,6 +124,34 @@ let removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
     return ()
 }
 
+[<Import("tmpdir", "os")>]
+let private tmpdir () : string = jsNative
+
+[<Import("mkdtempSync", "fs")>]
+let private mkdtempSync (_prefix: string) : string = jsNative
+
+[<Import("symlinkSync", "fs")>]
+let private symlinkSync (_target: string) (_linkPath: string) (_linkType: string) : unit = jsNative
+
+[<Import("rmSync", "fs")>]
+let private rmSync (_path: string) (_options: Main.Bindings.Filesystem.RmOptions) : unit = jsNative
+
+let canCreateFileLinks () =
+    let probeDirectory = mkdtempSync (join [| tmpdir (); "swate-link-probe-" |])
+
+    try
+        try
+            let targetPath = join [| probeDirectory; "target.txt" |]
+            writeText targetPath ""
+            symlinkSync targetPath (join [| probeDirectory; "link.txt" |]) "file"
+            true
+        with _ ->
+            false
+    finally
+        rmSync probeDirectory (Main.Bindings.Filesystem.RmOptions(recursive = true, force = true))
+
+let createFileLinkAsync (target: string) (linkPath: string) = symlink target linkPath "file"
+
 let pathExistsAsync (path: string) : JS.Promise<bool> = promise {
     try
         let! _ = fsPromisesDynamic?access (path) |> unbox<JS.Promise<obj>>
