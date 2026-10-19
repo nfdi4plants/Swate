@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+- Clicking a folder or its arrow in the file tree expands or collapses it. A study, assay, workflow or run folder also opens its metadata, while other folders keep the current view open. (by @Etschbeijer)
+- The right-click menu offers "Open" only for files and for folders that have metadata. (by @Etschbeijer)
+
 ## 3.0.0 - 2026-10-16
 
 ### ✨ Added
