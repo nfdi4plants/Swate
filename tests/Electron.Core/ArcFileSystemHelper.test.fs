@@ -728,6 +728,46 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "rolls back a folder import that is cancelled while its contents are published",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let mutable cancelledDuringPublishing = false
+
+                    // Only the top-level folder is registered for rollback, so the nested items that
+                    // were already published must be removed together with it.
+                    let isCancellationRequested () =
+                        if
+                            Main.Bindings.Filesystem.existsSync (
+                                absoluteArcPath arcPath "assays/AssayA/dataset/Run1/notes.txt"
+                            )
+                        then
+                            cancelledDuringPublishing <- true
+
+                        cancelledDuringPublishing
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA/dataset"
+                            [| sourcePath |]
+                            ignore
+                            isCancellationRequested
+                            ignore
+                            ignore
+                            acceptImportedFiles
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Completed -> failwith "Expected import cancellation."
+                    | Ok ImportExternalFilesResult.Cancelled ->
+                        Vitest.expect(cancelledDuringPublishing).toBe (true)
+                        do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                        do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
             "resolves a path through a link to its real path",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
