@@ -502,7 +502,7 @@ type FileTree =
             pathActionConfig = {
                 openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
-                importExternalFiles = fileStateCtx.importExternalFiles
+                importExternalPaths = fileStateCtx.importExternalPaths
                 enqueueError = errorModal.enqueue
             }
             enqueueError = errorModal.enqueue

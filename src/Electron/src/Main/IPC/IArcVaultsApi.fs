@@ -445,10 +445,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error(exn $"Could not pick directory: {e.Message}")
         }
     pickAbsolutePaths =
-        fun () -> promise {
+        fun kind -> promise {
             try
+                let pickProperty =
+                    match kind with
+                    | FileSystemItemKind.File -> Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    | FileSystemItemKind.Folder -> Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+
                 let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    pickProperty
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
 
@@ -461,7 +466,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 else
                     return Ok(Some(issue (windowIdFromIpcEvent event) result.filePaths))
             with e ->
-                return Error(exn $"Could not pick files: {e.Message}")
+                return Error(exn $"Could not pick items to import: {e.Message}")
         }
     pickExternalTextFiles =
         fun _ -> promise {
@@ -553,27 +558,31 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             (fun () -> vault.activeFileImport)
                                             (fun value -> vault.activeFileImport <- value)
                                             (fun abortSignal -> promise {
-                                                let importedEvents =
-                                                    WatcherHelpers.createImportedFileWatcherEvents
-                                                        vault.path.Value
-                                                        request.targetRelativePath
-                                                        sourceAbsolutePaths
+                                                let importedEvents = ResizeArray()
 
-                                                // Chokidar's awaitWriteFinish can emit these well after the import
-                                                // releases the busy flag, so ownership must outlive the write itself.
-                                                importedEvents
-                                                |> Array.iter (fun event ->
-                                                    vault.importedFileWatcherPaths.Add(
-                                                        PathHelpers.normalizePath (
-                                                            event.AbsolutePath.ToLowerInvariant()
-                                                        )
+                                                let registerImportedFiles importedRelativePaths =
+                                                    importedEvents.AddRange(
+                                                        WatcherHelpers.createImportedFileWatcherEvents
+                                                            vault.path.Value
+                                                            request.targetRelativePath
+                                                            importedRelativePaths
                                                     )
-                                                    |> ignore
-                                                )
+
+                                                    // Chokidar's awaitWriteFinish can emit these well after the import
+                                                    // releases the busy flag, so ownership must outlive the write itself.
+                                                    importedEvents
+                                                    |> Seq.iter (fun event ->
+                                                        vault.importedFileWatcherPaths.Add(
+                                                            PathHelpers.normalizePath (
+                                                                event.AbsolutePath.ToLowerInvariant()
+                                                            )
+                                                        )
+                                                        |> ignore
+                                                    )
 
                                                 let releaseImportEventOwnership () =
                                                     importedEvents
-                                                    |> Array.iter (fun event ->
+                                                    |> Seq.iter (fun event ->
                                                         vault.importedFileWatcherPaths.Remove(
                                                             PathHelpers.normalizePath (
                                                                 event.AbsolutePath.ToLowerInvariant()
@@ -589,6 +598,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         sourceAbsolutePaths
                                                         reportImportProgress
                                                         (fun () -> abortSignal.aborted)
+                                                        registerImportedFiles
                                                         (fun () ->
                                                             match vault.activeFileImport with
                                                             | Some activeImport when
@@ -611,7 +621,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         )
                                                         (fun () ->
                                                             vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
-                                                                importedEvents |> Array.toList
+                                                                importedEvents |> Seq.toList
                                                             )
                                                         )
                                                     |> Promise.catch Error

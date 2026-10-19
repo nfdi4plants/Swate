@@ -51,19 +51,17 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePaths =
+let createImportedFileWatcherEvents arcPath targetRelativePath (importedRelativePaths: string[]) =
     let targetRelativePath =
         PathHelpers.normalizeCanonicalRelativePath targetRelativePath
 
-    sourceAbsolutePaths
-    |> Array.map (fun sourcePath ->
-        let fileName = basename sourcePath
-
+    importedRelativePaths
+    |> Array.map (fun importedRelativePath ->
         let relativePath =
             if String.IsNullOrWhiteSpace targetRelativePath then
-                fileName
+                importedRelativePath
             else
-                $"{targetRelativePath}/{fileName}"
+                $"{targetRelativePath}/{importedRelativePath}"
             |> PathHelpers.normalizePath
 
         buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath

@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+- Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. A folder is not imported if a folder with the same name already exists there, or if it contains a ".git" folder, a symbolic link or an ARC metadata file such as "isa.assay.xlsx". (by @Etschbeijer)
+
+### 🔄 Changed
+
+- "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. (by @Etschbeijer)
+
 ## 3.0.0 - 2026-10-16
 
 ### ✨ Added

@@ -208,13 +208,19 @@ module ArcFileSystemHelper =
 
     exception private ImportCancelledException
 
-    type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
+    type private ExternalFileImportEntry = {
+        SourcePath: string
+        RelativePath: string
+        IsDirectory: bool
+    }
 
     type private ExternalFileImportPlan = {
         TargetDirectory: string
         TemporaryDirectory: string
         Entries: ExternalFileImportEntry[]
     }
+
+    let private isTopLevelImportEntry (entry: ExternalFileImportEntry) = not (entry.RelativePath.Contains "/")
 
     let createTemporaryImportDirectoryName () =
         let guid = Guid.NewGuid().ToString("N")
@@ -253,34 +259,81 @@ module ArcFileSystemHelper =
             return! ensureDirectory targetDirectory $"Cannot import because '{targetRelativePath}' is not a folder."
     }
 
-    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
-        let entries =
-            sourcePaths
-            |> Array.map (fun sourcePath ->
-                let absolutePath = resolveAbsolutePath sourcePath
+    let private importEntry sourcePath relativePath isDirectory = {
+        SourcePath = sourcePath
+        RelativePath = relativePath
+        IsDirectory = isDirectory
+    }
 
-                {
-                    SourcePath = absolutePath
-                    FileName = basename absolutePath
-                }
-            )
+    /// Lists an imported source folder and everything inside it, every folder before its contents.
+    /// ARC file names are rejected, because the ARC merge would read a copy such as
+    /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
+    /// following one could copy data from outside the picked folder or loop forever.
+    let rec private collectExternalFolderEntries (sourceDirectory: string) (relativeDirectory: string) = promise {
+        let! dirents = readdirWithTypesAsync sourceDirectory (ReaddirOptions(withFileTypes = true))
+        let entries = ResizeArray [ importEntry sourceDirectory relativeDirectory true ]
+
+        for dirent in dirents |> Array.sortBy _.name do
+            let sourcePath = join [| sourceDirectory; dirent.name |]
+            let relativePath = $"{relativeDirectory}/{dirent.name}"
+
+            if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
+                raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is not allowed inside an ARC.")
+            elif ArcEntityPathRules.isCanonicalArcFileName dirent.name then
+                raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
+            elif dirent.isSymbolicLink () then
+                raise (exn $"Cannot import '{relativePath}' because it is a symbolic link.")
+            elif dirent.isDirectory () then
+                let! folderEntries = collectExternalFolderEntries sourcePath relativePath
+                entries.AddRange folderEntries
+            elif dirent.isFile () then
+                entries.Add(importEntry sourcePath relativePath false)
+            else
+                raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
+
+        return entries.ToArray()
+    }
+
+    let private createExternalFileImportPlan targetRelativePath targetDirectory (sourcePaths: string[]) = promise {
+        let entries = ResizeArray<ExternalFileImportEntry>()
+
+        for sourcePath in sourcePaths do
+            let absolutePath = resolveAbsolutePath sourcePath
+            let name = basename absolutePath
+            let! sourceStats = statAsync absolutePath
+            let isDirectory = sourceStats.isDirectory ()
+
+            // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
+            match tryBuildGenericFileSystemChildPath (not isDirectory) targetRelativePath name with
+            | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
+            | Ok _ -> ()
+
+            if not isDirectory then
+                entries.Add(importEntry absolutePath name false)
+            elif PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory absolutePath then
+                raise (exn $"Cannot import folder '{name}' into itself.")
+            else
+                let! folderEntries = collectExternalFolderEntries absolutePath name
+                entries.AddRange folderEntries
+
+        let topLevelEntries = entries |> Seq.filter isTopLevelImportEntry |> Seq.toArray
 
         let duplicateName =
-            entries
-            |> Array.groupBy (fun entry -> entry.FileName.ToLowerInvariant())
+            topLevelEntries
+            |> Array.groupBy (fun entry -> entry.RelativePath.ToLowerInvariant())
             |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
 
         match duplicateName with
-        | Some(_, duplicates) -> raise (exn $"Cannot import multiple files named '{duplicates.[0].FileName}'.")
+        | Some(_, duplicates) -> raise (exn $"Cannot import multiple items named '{duplicates.[0].RelativePath}'.")
         | None -> ()
 
-        for entry in entries do
-            let destinationPath = join [| targetDirectory; entry.FileName |]
+        for entry in topLevelEntries do
+            let destinationPath = join [| targetDirectory; entry.RelativePath |]
 
             match!
                 ensureTargetDoesNotExist
                     destinationPath
-                    $"Cannot import '{entry.FileName}' because a file with that name already exists."
+                    $"Cannot import '{entry.RelativePath}' because an item with that name already exists."
             with
             | Ok() -> ()
             | Error targetError -> raise targetError
@@ -289,8 +342,17 @@ module ArcFileSystemHelper =
             TargetDirectory = targetDirectory
             // The watcher explicitly ignores this operation-owned directory and its contents.
             TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
-            Entries = entries
+            Entries = entries.ToArray()
         }
+    }
+
+    let private importEntryPath rootDirectory (entry: ExternalFileImportEntry) =
+        Array.append [| rootDirectory |] (entry.RelativePath.Split '/') |> join
+
+    /// Creates a folder that must not exist yet, so an import never merges into an existing folder.
+    let private mkdirExclusiveAsync absolutePath = promise {
+        let! _ = Main.Bindings.Filesystem.mkdirAsync absolutePath (MkdirOptions(recursive = false))
+        return ()
     }
 
     let private copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested = promise {
@@ -301,8 +363,13 @@ module ArcFileSystemHelper =
             if isCancellationRequested () then
                 raise ImportCancelledException
 
-            let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
-            do! copyFileAsync entry.SourcePath temporaryPath 0
+            let temporaryPath = importEntryPath plan.TemporaryDirectory entry
+
+            if entry.IsDirectory then
+                do! mkdirExclusiveAsync temporaryPath
+            else
+                do! copyFileAsync entry.SourcePath temporaryPath 0
+
             onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
     }
 
@@ -316,17 +383,21 @@ module ArcFileSystemHelper =
                 if isCancellationRequested () then
                     raise ImportCancelledException
 
-                let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
-                let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
+                let temporaryPath = importEntryPath plan.TemporaryDirectory entry
+                let destinationPath = importEntryPath plan.TargetDirectory entry
 
-                try
-                    do! linkAsync temporaryPath destinationPath
-                with _ ->
-                    // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
-                    // while preserving the no-overwrite contract if linking is unavailable or denied.
-                    do! copyFileAsync temporaryPath destinationPath copyFileExclusiveFlag
+                if entry.IsDirectory then
+                    do! mkdirExclusiveAsync destinationPath
+                else
+                    try
+                        do! linkAsync temporaryPath destinationPath
+                    with _ ->
+                        // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
+                        // while preserving the no-overwrite contract if linking is unavailable or denied.
+                        do! copyFileAsync temporaryPath destinationPath copyFileExclusiveFlag
 
-                createdTargetPaths.Add destinationPath
+                if isTopLevelImportEntry entry then
+                    createdTargetPaths.Add destinationPath
 
                 // A fallback copy cannot be interrupted. Re-check immediately afterward so a
                 // cancellation requested during the copy rolls back the registered destination.
@@ -339,7 +410,9 @@ module ArcFileSystemHelper =
 
         for createdTargetPath in createdTargetPaths |> Seq.rev do
             match!
-                removePathWithRetriesAsync (fun path -> rmAsync path (RmOptions(force = true))) createdTargetPath
+                removePathWithRetriesAsync
+                    (fun path -> rmAsync path (RmOptions(recursive = true, force = true)))
+                    createdTargetPath
             with
             | Ok() -> ()
             | Error cleanupError -> cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
@@ -383,6 +456,7 @@ module ArcFileSystemHelper =
         (sourcePaths: string[])
         (onProgress: float -> unit)
         (isCancellationRequested: unit -> bool)
+        (onFilesPlanned: string[] -> unit)
         (onFilesPublished: unit -> unit)
         (validateImportedFiles: unit -> JS.Promise<Result<unit, exn>>)
         : JS.Promise<Result<ImportExternalFilesResult, exn>> =
@@ -391,8 +465,13 @@ module ArcFileSystemHelper =
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
                 try
-                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
+                    let! plan = createExternalFileImportPlan targetRelativePath targetDirectory sourcePaths
                     let createdTargetPaths = ResizeArray<string>()
+
+                    plan.Entries
+                    |> Array.filter (fun entry -> not entry.IsDirectory)
+                    |> Array.map _.RelativePath
+                    |> onFilesPlanned
 
                     try
                         do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested

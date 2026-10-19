@@ -274,7 +274,8 @@ module ArcEntityPathRules =
         else
             None
 
-    let private isCanonicalArcFileName (fileName: string) =
+    /// True for the file names ARCtrl reads as ARC metadata, such as `isa.assay.xlsx`, wherever they are.
+    let isCanonicalArcFileName (fileName: string) =
         PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.InvestigationFileName
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.StudyFileName
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.AssayFileName
@@ -282,9 +283,9 @@ module ArcEntityPathRules =
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.RunFileName
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.DataMapFileName
 
-    let private containsDisallowedGenericPathSegment (segments: string[]) =
-        segments
-        |> Array.exists (PathHelpers.pathMatchesAny disallowedGenericPathSegments)
+    /// True for a single path segment, such as `.git`, that no generic file or folder path may contain.
+    let isDisallowedGenericPathSegment (segment: string) =
+        PathHelpers.pathMatchesAny disallowedGenericPathSegments segment
 
     /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
     let tryParseCanonicalArcFileTarget (path: string) =
@@ -374,7 +375,7 @@ module ArcEntityPathRules =
             false
         else
             segments.Length >= 1
-            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (segments |> Array.exists isDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
             && not isBlockedStructuralPath
 
@@ -545,7 +546,7 @@ module ArcEntityPathRules =
             let structuralPath = classifyStructuralArcPath segments
 
             structuralPath <> StructuralArcPath.AddZoneRoot
-            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (segments |> Array.exists isDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
 
     /// Checks whether a new generic file or folder may be created inside `relativePath`.

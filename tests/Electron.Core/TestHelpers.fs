@@ -18,6 +18,13 @@ let electronMock: obj = import "__electronMock" "electron"
 [<Emit("require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }).toString()")>]
 let execFile (_file: string) (_args: string[]) (_cwd: string) : string = jsNative
 
+[<Import("symlink", "fs/promises")>]
+let private symlink (_target: string) (_linkPath: string) (_linkType: string) : JS.Promise<unit> = jsNative
+
+/// Links `linkPath` to the folder `target`. Windows creates a junction, which needs no extra
+/// privileges. Other platforms ignore the type and create a folder symlink.
+let createFolderLinkAsync (target: string) (linkPath: string) = symlink target linkPath "junction"
+
 let writeText (filePath: string) (content: string) =
     Main.Bindings.Filesystem.writeFileSync filePath content Main.Bindings.Filesystem.TextEncoding.Utf8
 

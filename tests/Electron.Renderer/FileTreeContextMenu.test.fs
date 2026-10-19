@@ -12,7 +12,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Types
 let private createConfig () : PathActionConfig = {
     openPathInFileExplorer = fun _ -> promise { return Ok() }
     openPathWithDefaultApplication = fun _ -> promise { return Ok() }
-    importExternalFiles = fun _ -> promise { return Ok() }
+    importExternalPaths = fun _ _ -> promise { return Ok() }
     enqueueError = ignore
 }
 
@@ -105,12 +105,20 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "folder path actions import files into and reveal the folder",
+            "folder path actions import files and folders into and reveal the folder",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let menuItems = pathActionContextMenuItems (createConfig ()) item
 
-                Vitest.expect(labels menuItems).toEqual ([| "Import files"; "Open Folder Location" |])
+                Vitest
+                    .expect(labels menuItems)
+                    .toEqual (
+                        [|
+                            "Import files"
+                            "Import folders"
+                            "Open Folder Location"
+                        |]
+                    )
         )
 
         Vitest.test (
@@ -121,9 +129,9 @@ Vitest.describe (
 
                 let config = {
                     createConfig () with
-                        importExternalFiles =
-                            fun path -> promise {
-                                importedInto <- Some path
+                        importExternalPaths =
+                            fun kind path -> promise {
+                                importedInto <- Some(kind, path)
                                 return Ok()
                             }
                 }
@@ -137,8 +145,56 @@ Vitest.describe (
                 importItem.OnClick()
                 do! Promise.sleep 0
 
-                Vitest.expect(importedInto).toEqual (Some "assays/AssayA")
+                Vitest.expect(importedInto).toEqual (Some(FileSystemItemKind.File, "assays/AssayA"))
             }
+        )
+
+        Vitest.test (
+            "import folders action targets the selected folder",
+            fun () -> promise {
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable importedInto = None
+
+                let config = {
+                    createConfig () with
+                        importExternalPaths =
+                            fun kind path -> promise {
+                                importedInto <- Some(kind, path)
+                                return Ok()
+                            }
+                }
+
+                let importItem =
+                    pathActionContextMenuItems config item
+                    |> List.find (fun menuItem -> menuItem.Label = "Import folders")
+
+                importItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(importedInto).toEqual (Some(FileSystemItemKind.Folder, "assays/AssayA"))
+            }
+        )
+
+        Vitest.test (
+            "import folders is only offered where new folders may be created",
+            fun () ->
+                let labelsFor path =
+                    pathActionContextMenuItems (createConfig ()) (createFolderItem "folder" (Some path))
+                    |> labels
+
+                // Folders directly inside a collection folder are ARC entities.
+                Vitest.expect(labelsFor "assays").toEqual ([| "Import files"; "Open Folder Location" |])
+                Vitest.expect(labelsFor "studies").toEqual ([| "Import files"; "Open Folder Location" |])
+
+                Vitest
+                    .expect(labelsFor "assays/AssayA/dataset")
+                    .toEqual (
+                        [|
+                            "Import files"
+                            "Import folders"
+                            "Open Folder Location"
+                        |]
+                    )
         )
 
         Vitest.test (
@@ -204,6 +260,7 @@ Vitest.describe (
                         [|
                             "Open"
                             "Import files"
+                            "Import folders"
                             "Open Folder Location"
                             "<divider>"
                             "Copy Path"
@@ -259,6 +316,7 @@ Vitest.describe (
                     .toEqual (
                         [|
                             "Import files"
+                            "Import folders"
                             "<divider>"
                             "New File"
                             "New Folder"
@@ -282,9 +340,9 @@ Vitest.describe (
                     createContextMenuConfig () with
                         pathActionConfig = {
                             createConfig () with
-                                importExternalFiles =
-                                    fun path -> promise {
-                                        importedInto <- Some path
+                                importExternalPaths =
+                                    fun kind path -> promise {
+                                        importedInto <- Some(kind, path)
                                         return Ok()
                                     }
                         }
@@ -297,7 +355,7 @@ Vitest.describe (
                 importItem.OnClick()
                 do! Promise.sleep 0
 
-                Vitest.expect(importedInto).toEqual (Some "")
+                Vitest.expect(importedInto).toEqual (Some(FileSystemItemKind.File, ""))
             }
         )
 
