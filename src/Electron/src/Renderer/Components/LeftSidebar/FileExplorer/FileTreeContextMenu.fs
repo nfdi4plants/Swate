@@ -69,18 +69,19 @@ let private copyTextToClipboard (text: string) =
     }
     |> Promise.start
 
-let private importContextMenuItems (config: PathActionConfig) (item: FileItem) (targetRelativePath: string) = [
-    for kind, label, icon in
-        [
-            FileSystemItemKind.File, "Import files", "swt:fluent--arrow-import-24-regular swt:rotate-180"
-            FileSystemItemKind.Folder, "Import folders", "swt:fluent--folder-arrow-left-24-regular"
-        ] do
-        if canCreateFileSystemItemIn kind item then
-            ContextMenuItem.create
-                label
-                icon
-                (fun () -> runPathAction config "Import failed" (config.importExternalPaths kind) targetRelativePath)
-]
+let private importContextMenuItems (config: PathActionConfig) (item: FileItem) (targetRelativePath: string) =
+    fileSystemCreateKinds
+    |> List.filter (fun kind -> canCreateFileSystemItemIn kind item)
+    |> List.map (fun kind ->
+        let label, icon =
+            match kind with
+            | FileSystemItemKind.File -> "Import files", "swt:fluent--arrow-import-24-regular swt:rotate-180"
+            | FileSystemItemKind.Folder -> "Import folders", "swt:fluent--folder-arrow-left-24-regular"
+
+        ContextMenuItem.create label icon (fun () ->
+            runPathAction config "Import failed" (config.importExternalPaths kind) targetRelativePath
+        )
+    )
 
 let private pathActionContextMenuItemsForRelativePath
     (config: PathActionConfig)
