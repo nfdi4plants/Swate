@@ -7,6 +7,7 @@ open Main.Bindings.Path
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.RenamePathRules
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -205,6 +206,26 @@ let private rejectedImports = [
         PrepareSource = createExternalRunFolderWithAsync "raw/isa.assay.xlsx" "copied workbook"
         TargetRelativePath = ""
         ExpectedError = "Cannot import 'Run1/raw/isa.assay.xlsx' because 'isa.assay.xlsx' is reserved for ARC metadata."
+        AbsentRelativePath = "Run1"
+    }
+    {
+        // Loading the ARC would rename the legacy DataMap name to `isa.datamap.xlsx`.
+        Description = "a file with the legacy DataMap name"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                do! writeRelativeFileAsync (dirname arcPath) "isa_datamap" "copied datamap"
+                return join [| dirname arcPath; "isa_datamap" |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = $"Cannot import 'isa_datamap': {legacyDataMapNameError}"
+        AbsentRelativePath = "assays/AssayA/dataset/isa_datamap"
+    }
+    {
+        Description = "a folder that contains a file with the legacy DataMap name"
+        PrepareSource = createExternalRunFolderWithAsync "raw/isa_datamap" "copied datamap"
+        TargetRelativePath = ""
+        ExpectedError = $"Cannot import 'Run1/raw/isa_datamap': {legacyDataMapNameError}"
         AbsentRelativePath = "Run1"
     }
     {

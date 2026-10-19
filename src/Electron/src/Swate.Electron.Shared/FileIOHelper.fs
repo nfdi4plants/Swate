@@ -19,7 +19,9 @@ let pathsEqual (left: string) (right: string) =
 let isLegacyDataMapPath (path: string) =
     getNonEmptyPathParts path
     |> Array.tryLast
-    |> Option.exists (fun fileName -> String.Equals(fileName, "isa_datamap", StringComparison.OrdinalIgnoreCase))
+    |> Option.exists (fun fileName ->
+        String.Equals(fileName, ArcEntityPathRules.legacyDataMapFileName, StringComparison.OrdinalIgnoreCase)
+    )
 
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with

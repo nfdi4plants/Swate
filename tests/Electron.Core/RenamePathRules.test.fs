@@ -114,6 +114,50 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "the legacy DataMap name cannot be created or used as a rename target",
+            fun () ->
+                // Loading an ARC renames any `isa_datamap` to `isa.datamap.xlsx`.
+                [
+                    ""
+                    "assays/AssayA"
+                    "assays/AssayA/dataset"
+                    "backup/assays/AssayA"
+                ]
+                |> List.iter (fun parentPath ->
+                    [ "isa_datamap"; "ISA_DATAMAP" ]
+                    |> List.iter (fun name ->
+                        [ true; false ]
+                        |> List.iter (fun isFile ->
+                            tryBuildGenericFileSystemChildPath isFile parentPath name
+                            |> expectErrorContaining legacyDataMapNameError
+                        )
+                    )
+                )
+
+                tryBuildGenericFileSystemRenameTargetPath false "assays/AssayA/dataset/map.xlsx" "isa_datamap"
+                |> expectErrorContaining legacyDataMapNameError
+        )
+
+        Vitest.test (
+            "existing items with the legacy DataMap name can still be renamed, moved, deleted and used as parents",
+            fun () ->
+                let existingFolder = "backup/isa_datamap"
+
+                Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed false existingFolder).toBe (true)
+                Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed false existingFolder).toBe (true)
+                Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed existingFolder).toBe (true)
+                Vitest.expect(ArcEntityPathRules.isGenericFileSystemParentAllowed existingFolder).toBe (true)
+
+                match tryBuildGenericFileSystemRenameTargetPath false existingFolder "old_maps" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("backup/old_maps")
+                | Error errorMessage -> failwith errorMessage
+
+                match tryBuildGenericFileSystemChildPath true existingFolder "notes.txt" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("backup/isa_datamap/notes.txt")
+                | Error errorMessage -> failwith errorMessage
+        )
+
+        Vitest.test (
             "protected entity child folders can still be used as generic filesystem parents",
             fun () ->
                 Vitest.expect(ArcEntityPathRules.isGenericFileSystemParentAllowed "assays/AssayA/dataset").toBe (true)

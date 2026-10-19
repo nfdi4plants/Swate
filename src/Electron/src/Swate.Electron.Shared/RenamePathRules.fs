@@ -49,6 +49,9 @@ let tryBuildRenameTargetPath (sourcePath: string) (newName: string) =
 let private addZoneFileNameError =
     "Files directly inside an ARC collection folder need a file extension (for example 'notes.md'), so they cannot be mistaken for an ARC entity."
 
+let legacyDataMapNameError =
+    $"'{ArcEntityPathRules.legacyDataMapFileName}' is the outdated DataMap name. Loading the ARC would rename it to '{ARCtrl.ArcPathHelper.DataMapFileName}'."
+
 let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name: string) =
     let normalizedParentPath = normalizeRelativePath parentPath
 
@@ -74,6 +77,8 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
             then
                 Error
                     "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+            elif ArcEntityPathRules.isLegacyDataMapFileName normalizedName then
+                Error legacyDataMapNameError
             elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
                 Error addZoneFileNameError
             else
@@ -99,6 +104,8 @@ let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourceP
             if isTargetAllowed targetPath |> not then
                 Error
                     "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
+            elif ArcEntityPathRules.isLegacyDataMapFileName (PathHelpers.getFileName targetPath) then
+                Error legacyDataMapNameError
             elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
                 Error addZoneFileNameError
             else

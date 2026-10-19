@@ -282,6 +282,8 @@ module ArcFileSystemHelper =
                 raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is not allowed inside an ARC.")
             elif ArcEntityPathRules.isCanonicalArcFileName dirent.name then
                 raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
+            elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
+                raise (exn $"Cannot import '{relativePath}': {legacyDataMapNameError}")
             elif dirent.isSymbolicLink () then
                 raise (exn $"Cannot import '{relativePath}' because it is a symbolic link.")
             elif dirent.isDirectory () then
