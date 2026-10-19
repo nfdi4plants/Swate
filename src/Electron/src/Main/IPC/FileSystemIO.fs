@@ -520,8 +520,7 @@ module ArcFileSystemHelper =
                     with importError ->
                         return! externalFileImportFailureResult plan.TemporaryDirectory createdTargetPaths importError
                 with
-                | ImportCancelledException ->
-                    return Ok ImportExternalFilesResult.Cancelled
+                | ImportCancelledException -> return Ok ImportExternalFilesResult.Cancelled
                 | planError -> return Error planError
         }
 
