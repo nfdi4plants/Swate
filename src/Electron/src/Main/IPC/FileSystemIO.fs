@@ -270,35 +270,43 @@ module ArcFileSystemHelper =
     /// ARC file names are rejected, because the ARC merge would read a copy such as
     /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
     /// following one could copy data from outside the picked folder or loop forever.
-    let rec private collectExternalFolderEntries (sourceDirectory: string) (relativeDirectory: string) = promise {
-        let! dirents = readdirWithTypesAsync sourceDirectory (ReaddirOptions(withFileTypes = true))
-        let entries = ResizeArray [ importEntry sourceDirectory relativeDirectory true ]
+    let rec private collectExternalFolderEntries
+        isCancellationRequested
+        (sourceDirectory: string)
+        (relativeDirectory: string)
+        =
+        promise {
+            let! dirents = readdirWithTypesAsync sourceDirectory (ReaddirOptions(withFileTypes = true))
+            let entries = ResizeArray [ importEntry sourceDirectory relativeDirectory true ]
 
-        for dirent in dirents |> Array.sortBy _.name do
-            let sourcePath = join [| sourceDirectory; dirent.name |]
-            let relativePath = $"{relativeDirectory}/{dirent.name}"
+            for dirent in dirents |> Array.sortBy _.name do
+                if isCancellationRequested () then
+                    raise ImportCancelledException
 
-            if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
-                raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is not allowed inside an ARC.")
-            elif ArcEntityPathRules.isCanonicalArcFileName dirent.name then
-                raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
-            elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
-                raise (exn $"Cannot import '{relativePath}': {legacyDataMapNameError}")
-            elif dirent.isSymbolicLink () then
-                raise (exn $"Cannot import '{relativePath}' because it is a symbolic link.")
-            elif dirent.isDirectory () then
-                let! folderEntries = collectExternalFolderEntries sourcePath relativePath
-                entries.AddRange folderEntries
-            elif dirent.isFile () then
-                entries.Add(importEntry sourcePath relativePath false)
-            else
-                raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
+                let sourcePath = join [| sourceDirectory; dirent.name |]
+                let relativePath = $"{relativeDirectory}/{dirent.name}"
 
-        return entries.ToArray()
-    }
+                if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
+                    raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is not allowed inside an ARC.")
+                elif ArcEntityPathRules.isCanonicalArcFileName dirent.name then
+                    raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
+                elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
+                    raise (exn $"Cannot import '{relativePath}': {legacyDataMapNameError}")
+                elif dirent.isSymbolicLink () then
+                    raise (exn $"Cannot import '{relativePath}' because it is a symbolic link.")
+                elif dirent.isDirectory () then
+                    let! folderEntries = collectExternalFolderEntries isCancellationRequested sourcePath relativePath
+                    entries.AddRange folderEntries
+                elif dirent.isFile () then
+                    entries.Add(importEntry sourcePath relativePath false)
+                else
+                    raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
+
+            return entries.ToArray()
+        }
 
     /// Checks one picked file or folder and lists it, a folder with everything inside it.
-    let private collectSourceEntries targetRelativePath targetDirectory sourcePath = promise {
+    let private collectSourceEntries isCancellationRequested targetRelativePath targetDirectory sourcePath = promise {
         let absolutePath = resolveAbsolutePath sourcePath
         let name = basename absolutePath
         let! sourceStats = statAsync absolutePath
@@ -314,45 +322,53 @@ module ArcFileSystemHelper =
         elif PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory absolutePath then
             return raise (exn $"Cannot import folder '{name}' into itself.")
         else
-            return! collectExternalFolderEntries absolutePath name
+            return! collectExternalFolderEntries isCancellationRequested absolutePath name
     }
 
-    let private createExternalFileImportPlan targetRelativePath targetDirectory (sourcePaths: string[]) = promise {
-        let entries = ResizeArray<ExternalFileImportEntry>()
+    let private createExternalFileImportPlan
+        isCancellationRequested
+        targetRelativePath
+        targetDirectory
+        (sourcePaths: string[])
+        =
+        promise {
+            let entries = ResizeArray<ExternalFileImportEntry>()
 
-        for sourcePath in sourcePaths do
-            let! sourceEntries = collectSourceEntries targetRelativePath targetDirectory sourcePath
-            entries.AddRange sourceEntries
+            for sourcePath in sourcePaths do
+                let! sourceEntries =
+                    collectSourceEntries isCancellationRequested targetRelativePath targetDirectory sourcePath
 
-        let topLevelEntries = entries |> Seq.filter isTopLevelImportEntry |> Seq.toArray
+                entries.AddRange sourceEntries
 
-        let duplicateName =
-            topLevelEntries
-            |> Array.groupBy (fun entry -> entry.RelativePath.ToLowerInvariant())
-            |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
+            let topLevelEntries = entries |> Seq.filter isTopLevelImportEntry |> Seq.toArray
 
-        match duplicateName with
-        | Some(_, duplicates) -> raise (exn $"Cannot import multiple items named '{duplicates.[0].RelativePath}'.")
-        | None -> ()
+            let duplicateName =
+                topLevelEntries
+                |> Array.groupBy (fun entry -> entry.RelativePath.ToLowerInvariant())
+                |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
 
-        for entry in topLevelEntries do
-            let destinationPath = join [| targetDirectory; entry.RelativePath |]
+            match duplicateName with
+            | Some(_, duplicates) -> raise (exn $"Cannot import multiple items named '{duplicates.[0].RelativePath}'.")
+            | None -> ()
 
-            match!
-                ensureTargetDoesNotExist
-                    destinationPath
-                    $"Cannot import '{entry.RelativePath}' because an item with that name already exists."
-            with
-            | Ok() -> ()
-            | Error targetError -> raise targetError
+            for entry in topLevelEntries do
+                let destinationPath = join [| targetDirectory; entry.RelativePath |]
 
-        return {
-            TargetDirectory = targetDirectory
-            // The watcher explicitly ignores this operation-owned directory and its contents.
-            TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
-            Entries = entries.ToArray()
+                match!
+                    ensureTargetDoesNotExist
+                        destinationPath
+                        $"Cannot import '{entry.RelativePath}' because an item with that name already exists."
+                with
+                | Ok() -> ()
+                | Error targetError -> raise targetError
+
+            return {
+                TargetDirectory = targetDirectory
+                // The watcher explicitly ignores this operation-owned directory and its contents.
+                TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
+                Entries = entries.ToArray()
+            }
         }
-    }
 
     let private importEntryPath rootDirectory (entry: ExternalFileImportEntry) =
         Array.append [| rootDirectory |] (entry.RelativePath.Split '/') |> join
@@ -473,7 +489,13 @@ module ArcFileSystemHelper =
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
                 try
-                    let! plan = createExternalFileImportPlan targetRelativePath targetDirectory sourcePaths
+                    let! plan =
+                        createExternalFileImportPlan
+                            isCancellationRequested
+                            targetRelativePath
+                            targetDirectory
+                            sourcePaths
+
                     let createdTargetPaths = ResizeArray<string>()
 
                     plan.Entries
@@ -497,8 +519,10 @@ module ArcFileSystemHelper =
                         return Ok ImportExternalFilesResult.Completed
                     with importError ->
                         return! externalFileImportFailureResult plan.TemporaryDirectory createdTargetPaths importError
-                with planError ->
-                    return Error planError
+                with
+                | ImportCancelledException ->
+                    return Ok ImportExternalFilesResult.Cancelled
+                | planError -> return Error planError
         }
 
     let importExternalFilesOnDisk =

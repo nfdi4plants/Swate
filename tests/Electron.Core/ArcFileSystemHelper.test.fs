@@ -685,6 +685,36 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "cancels a folder import while the folder is still being scanned",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let mutable filesWerePlanned = false
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA/dataset"
+                            [| sourcePath |]
+                            ignore
+                            (fun () -> true)
+                            (fun _ -> filesWerePlanned <- true)
+                            ignore
+                            acceptImportedFiles
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Completed -> failwith "Expected import cancellation."
+                    | Ok ImportExternalFilesResult.Cancelled ->
+                        // The import handler registers watcher ownership when files are planned, so a scan
+                        // that stops early must not plan anything.
+                        Vitest.expect(filesWerePlanned).toBe (false)
+                        do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                        do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
             "protects structural entity child folders while allowing their contents",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
