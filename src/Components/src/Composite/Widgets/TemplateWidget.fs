@@ -19,7 +19,7 @@ type TemplateWidget =
     [<ReactComponent(true)>]
     static member TemplateWidget
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, ?onImportCompleted: unit -> unit) =
 
         let templateCacheCtx = TemplateCacheContext.useTemplateCacheCtx ()
         let templates = templateCacheCtx.Templates
@@ -97,7 +97,9 @@ type TemplateWidget =
             setShowImportDialog false
 
             if didImport then
-                widgetCtx.closeWidget WidgetType.Template
+                match onImportCompleted with
+                | Some onCompleted -> onCompleted ()
+                | None -> widgetCtx.closeWidget WidgetType.Template
 
         let selectedTemplates =
             templates
@@ -113,7 +115,8 @@ type TemplateWidget =
                 submitImport = confirmImport
             )
             Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden swt:p-2"
+                prop.className
+                    "swt:flex swt:flex-1 swt:min-h-0 swt:min-w-0 swt:flex-col swt:gap-2 swt:overflow-hidden swt:p-2"
                 prop.children [
                     TemplateBrowser.TemplateBrowser(
                         templates,
