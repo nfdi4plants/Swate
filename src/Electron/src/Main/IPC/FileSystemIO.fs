@@ -220,7 +220,8 @@ module ArcFileSystemHelper =
         Entries: ExternalFileImportEntry[]
     }
 
-    let private isTopLevelImportEntry (entry: ExternalFileImportEntry) = not (entry.RelativePath.Contains "/")
+    let private isTopLevelImportEntry (entry: ExternalFileImportEntry) =
+        PathHelpers.tryGetParentPath entry.RelativePath |> Option.isNone
 
     let createTemporaryImportDirectoryName () =
         let guid = Guid.NewGuid().ToString("N")
@@ -294,27 +295,32 @@ module ArcFileSystemHelper =
         return entries.ToArray()
     }
 
+    /// Checks one picked file or folder and lists it, a folder with everything inside it.
+    let private collectSourceEntries targetRelativePath targetDirectory sourcePath = promise {
+        let absolutePath = resolveAbsolutePath sourcePath
+        let name = basename absolutePath
+        let! sourceStats = statAsync absolutePath
+        let isDirectory = sourceStats.isDirectory ()
+
+        // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
+        match tryBuildGenericFileSystemChildPath (not isDirectory) targetRelativePath name with
+        | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
+        | Ok _ -> ()
+
+        if not isDirectory then
+            return [| importEntry absolutePath name false |]
+        elif PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory absolutePath then
+            return raise (exn $"Cannot import folder '{name}' into itself.")
+        else
+            return! collectExternalFolderEntries absolutePath name
+    }
+
     let private createExternalFileImportPlan targetRelativePath targetDirectory (sourcePaths: string[]) = promise {
         let entries = ResizeArray<ExternalFileImportEntry>()
 
         for sourcePath in sourcePaths do
-            let absolutePath = resolveAbsolutePath sourcePath
-            let name = basename absolutePath
-            let! sourceStats = statAsync absolutePath
-            let isDirectory = sourceStats.isDirectory ()
-
-            // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
-            match tryBuildGenericFileSystemChildPath (not isDirectory) targetRelativePath name with
-            | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
-            | Ok _ -> ()
-
-            if not isDirectory then
-                entries.Add(importEntry absolutePath name false)
-            elif PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory absolutePath then
-                raise (exn $"Cannot import folder '{name}' into itself.")
-            else
-                let! folderEntries = collectExternalFolderEntries absolutePath name
-                entries.AddRange folderEntries
+            let! sourceEntries = collectSourceEntries targetRelativePath targetDirectory sourcePath
+            entries.AddRange sourceEntries
 
         let topLevelEntries = entries |> Seq.filter isTopLevelImportEntry |> Seq.toArray
 
