@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sidebar action buttons are now grouped by functionality. Added open and create ARC buttons. (by @Freymaurer)
 - Empty table view now switches to a term search or template search view, instead of opening a modal. #1417 (by @Freymaurer)
 - In empty tables, the "Utilization of prior tables" feature, now allows importing inputs/outputs from all across the ARC. (by @Freymaurer)
+- Clicking a folder or its arrow in the file tree expands or collapses it. A study, assay, workflow or run folder also opens its metadata, while other folders keep the current view open. (by @Etschbeijer)
+- The right-click menu offers "Open" only for files and for folders that have metadata. (by @Etschbeijer)
 
 ## 3.0.0 - 2026-10-16
 
