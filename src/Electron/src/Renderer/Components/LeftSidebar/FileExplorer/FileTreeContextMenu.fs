@@ -78,9 +78,10 @@ let private importContextMenuItems (config: PathActionConfig) (item: FileItem) (
             | FileSystemItemKind.File -> "Import files", "swt:fluent--arrow-import-24-regular swt:rotate-180"
             | FileSystemItemKind.Folder -> "Import folders", "swt:fluent--folder-arrow-left-24-regular"
 
-        ContextMenuItem.create label icon (fun () ->
-            runPathAction config "Import failed" (config.importExternalPaths kind) targetRelativePath
-        )
+        ContextMenuItem.create
+            label
+            icon
+            (fun () -> runPathAction config "Import failed" (config.importExternalPaths kind) targetRelativePath)
     )
 
 let private pathActionContextMenuItemsForRelativePath
