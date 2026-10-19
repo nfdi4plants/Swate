@@ -14,11 +14,11 @@
     <PackageId>Swate.Components</PackageId>
     <PackageVersion>2.0.0</PackageVersion>
     <Authors>Kevin Frey</Authors>
-    <Description>Swate react components</Description>
+    <Description>ARCitISA React components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>F# fable rdm react fable-library fable-javascript</PackageTags>
-    <PackageProjectUrl>https://github.com/nfdi4plants/Swate</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nfdi4plants/Swate</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/nfdi4plants/ARCitISA</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/ARCitISA</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
@@ -314,6 +314,7 @@
     <Compile Include="Page\Changelog\Changelog.fs" />
     <Compile Include="Page\Changelog\Changelog.test.rtl.fs" />
     <Compile Include="Page\Changelog\Changelog.sample.fs" />
+    <Compile Include="Page\GitSidebar\GitDefaults.fs" />
     <Compile Include="Page\SettingsPage\SettingsPage.fs" />
     <Compile Include="Page\Metadata\FormComponents\Helpers.fs" />
     <Compile Include="Page\Metadata\FormComponents\InputSequence.fs" />

@@ -82,7 +82,19 @@ module private Helpers =
 
 type RecentARCStore() =
 
-    member val private RecentArcsState: ARCPointer[] = Helpers.load () |> Helpers.sanitize with get, set
+    // Loaded on first use: the store is created when the module loads, which is before main pins the
+    // user data folder, so reading the file here would look in the wrong folder.
+    let mutable state: ARCPointer[] option = None
+
+    member private this.RecentArcsState
+        with get () =
+            match state with
+            | Some arcs -> arcs
+            | None ->
+                let arcs = Helpers.load () |> Helpers.sanitize
+                state <- Some arcs
+                arcs
+        and set (arcs: ARCPointer[]) = state <- Some arcs
 
     member private this.SetState(newArcs: ARCPointer[]) =
         this.RecentArcsState <- Helpers.sanitize newArcs

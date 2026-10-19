@@ -45,6 +45,8 @@ type GitSidebarRunStatus =
     | Idle
     | Busy of notice: string
     | Progress of GitSidebarProgress
+    /// Busy with no banner, for a refresh the user did not start.
+    | BusyWithoutNotice
 
 type GitSidebarCreateBranchRequest = {
     BranchName: string

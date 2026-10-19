@@ -11,8 +11,8 @@
     <Description>Types for Swate.Components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>F# fable rdm react fable-library fable-javascript</PackageTags>
-    <PackageProjectUrl>https://github.com/nfdi4plants/Swate</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nfdi4plants/Swate</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/nfdi4plants/ARCitISA</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/ARCitISA</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 

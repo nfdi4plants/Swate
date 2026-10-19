@@ -69,7 +69,7 @@ let checkForUpdateWithResult () = promise {
         return Ok state
     with error ->
         // Offline startup or GitHub rate limits must never prevent the application from opening.
-        Browser.Dom.console.warn ("Could not check for Swate updates", error.Message)
+        Browser.Dom.console.warn ("Could not check for ARCitISA updates", error.Message)
         return Error error
 }
 

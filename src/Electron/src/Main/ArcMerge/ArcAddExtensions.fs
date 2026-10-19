@@ -82,7 +82,7 @@ module ArcAddExtensions =
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
         | ArcFiles.DataMap(None, _) ->
-            failwith "Swate could not determine which assay, study, run, or workflow this DataMap belongs to."
+            failwith "ARCitISA could not determine which assay, study, run, or workflow this DataMap belongs to."
         | ArcFiles.DataMap(Some parentInfo, dataMap) ->
             let workingArc = copyArcPreservingStaticHashes sourceArc
             let parentPath = DatamapParentInfo.toFolderPath parentInfo

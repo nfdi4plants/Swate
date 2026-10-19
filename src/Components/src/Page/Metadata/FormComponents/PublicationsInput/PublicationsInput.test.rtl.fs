@@ -406,7 +406,7 @@ Vitest.test (
 
         let! _ =
             RTL.screen.findByText
-                "Publication search failed: Swate could not read the response from Crossref. Please try again."
+                "Publication search failed: ARCitISA could not read the response from Crossref. Please try again."
 
         ()
     }

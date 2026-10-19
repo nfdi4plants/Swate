@@ -316,6 +316,10 @@ let private defaultDependencies: GitDependencies = {
     getRepositoryWebUrl = fun _ -> promise { return Ok(succeeded None) }
     getStoragePolicySettings = fun _ -> unexpectedPromise "getStoragePolicySettings"
     setStoragePolicySettings = fun _ -> unexpectedPromise "setStoragePolicySettings"
+    // The main process holds no stored value by default, so a refresh keeps the checkbox it has.
+    getUploadRightAway =
+        fun () -> promise { return Ok(failed NotFound VersionControlCodes.SessionUnavailable "no stored value") }
+    setUploadRightAway = fun _ -> promise { return Ok(succeeded ()) }
     loadConflictPage = fun _ _ _ -> unexpectedPromise "loadConflictPage"
     updatePageState = ignore
     initializeWorkspace = fun _ -> unexpectedPromise "initializeWorkspace"
@@ -434,6 +438,16 @@ let private runningState = {
         CurrentArcPath = Some "C:/arc"
         ArcSessionId = 1
         WorkspaceVersion = Some "v1"
+}
+
+/// Every value differs from the built-in one.
+let private changedUserDefaults = {
+    builtInUserDefaults with
+        LfsAutoTrackThresholdMb = 7
+        DownloadLargeFiles = true
+        DiffIndexingLimitMb = 2048
+        UploadRightAway = false
+        AutoCreateNotesFolder = false
 }
 
 let private noOwnerSelection: GitPublishOwnerSelection = { Owners = None; Choice = None }
@@ -1562,6 +1576,56 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Opening the sidebar of an ARC already known to have no repository leaves the page alone",
+            fun () -> promise {
+                let setPages = ResizeArray<PageState option>()
+
+                let missing =
+                    makeFailure
+                        NotFound
+                        VersionControlCodes.WorkspaceUnmanaged
+                        "The selected ARC path is not a git repository."
+                        None
+                        [||]
+
+                let refreshResult = {
+                    Session = Ok sessionInfo
+                    Status = Error missing
+                    Refs = Error missing
+                    LfsSettings = Error missing
+                    OriginRemoteRepositoryWebUrl = None
+                }
+
+                let state = {
+                    runningState with
+                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
+                }
+
+                let openedState, openCmd =
+                    update defaultDependencies setPages.Add (SidebarVisibilityChanged true) state
+
+                let! openMessages = collectMessages openCmd
+
+                let requestingState, _ =
+                    update defaultDependencies setPages.Add RefreshRequestedSilently openedState
+
+                let nextState, nextCmd =
+                    update
+                        defaultDependencies
+                        setPages.Add
+                        (SilentRefreshCompleted(requestingState.RefreshRequestId, Ok refreshResult))
+                        requestingState
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(openMessages).toEqual ([| RefreshRequestedSilently |])
+                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.MissingRepository)
+                Vitest.expect(setPages |> Seq.toArray).toEqual ([||])
+                Vitest.expect(nextMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "SelectChangeCompleted leaves the current selection untouched when an older request finishes late",
             fun () -> promise {
                 let mutable replyResult = None
@@ -1766,8 +1830,7 @@ Vitest.describe (
                 Vitest.expect(oldTimerMessages).toEqual ([||])
                 Vitest.expect(latestTimerMessages).toEqual ([| RefreshRequestedSilently |])
 
-                let hiddenState, hiddenCmd =
-                    update deps ignore ExternalChangesDetected GitState.Empty
+                let hiddenState, hiddenCmd = update deps ignore ExternalChangesDetected runningState
 
                 let! hiddenMessages = collectMessages hiddenCmd
 
@@ -1779,7 +1842,7 @@ Vitest.describe (
                 Vitest.expect(hiddenMessages).toEqual ([||])
                 Vitest.expect(hiddenState.ExternalChangesSeen).toBe (true)
                 Vitest.expect(revealedState.ExternalChangesSeen).toBe (false)
-                Vitest.expect(revealMessages).toEqual ([| RefreshRequested |])
+                Vitest.expect(revealMessages).toEqual ([| RefreshRequestedSilently |])
             }
         )
 
@@ -1815,6 +1878,226 @@ Vitest.describe (
                 Vitest.expect(hiddenState.SidebarVisible).toBe (false)
                 Vitest.expect(hideMessages).toEqual ([||])
                 Vitest.expect(dueMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "Opening the sidebar refreshes the Git state silently",
+            fun () -> promise {
+                let openedState, openCmd =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) runningState
+
+                let! openMessages = collectMessages openCmd
+
+                Vitest.expect(openedState.SidebarVisible).toBe (true)
+                Vitest.expect(openMessages).toEqual ([| RefreshRequestedSilently |])
+            }
+        )
+
+        Vitest.test (
+            "UploadRightAwayChanged starts checked, stores the new value and hands it to the main process",
+            fun () -> promise {
+                let stored = ResizeArray<bool>()
+
+                let deps = {
+                    defaultDependencies with
+                        setUploadRightAway =
+                            fun value ->
+                                stored.Add value
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let uncheckedState, uncheckedCmd =
+                    update deps ignore (UploadRightAwayChanged false) runningState
+
+                let rechecked, recheckedCmd =
+                    update deps ignore (UploadRightAwayChanged true) uncheckedState
+
+                let! uncheckedMessages = collectMessages uncheckedCmd
+                let! recheckedMessages = collectMessages recheckedCmd
+
+                Vitest.expect(GitState.Empty.UploadRightAway).toBe (true)
+                Vitest.expect(uncheckedState.UploadRightAway).toBe (false)
+                Vitest.expect(rechecked.UploadRightAway).toBe (true)
+                Vitest.expect(uncheckedMessages).toEqual ([||])
+                Vitest.expect(recheckedMessages).toEqual ([||])
+                Vitest.expect(stored.ToArray()).toEqual ([| false; true |])
+            }
+        )
+
+        Vitest.test (
+            "The first refresh of an ARC reads the stored upload right away choice and applies it",
+            fun () -> promise {
+                let reads = ResizeArray<string>()
+
+                let deps = {
+                    withRefresh cleanStatus defaultDependencies with
+                        getUploadRightAway =
+                            fun () ->
+                                reads.Add "read"
+                                promise { return Ok(succeeded false) }
+                }
+
+                let! bound, bindMessages = step deps GitState.Empty (ArcPathChanged(Some "C:/arc"))
+                let! refreshing, refreshMessages = step deps bound bindMessages[0]
+                let! refreshed, loadMessages = step deps refreshing refreshMessages[0]
+
+                Vitest.expect(refreshed.UploadRightAway).toBe (true)
+                Vitest.expect(loadMessages).toEqual ([| UploadRightAwayLoaded(bound.ArcSessionId, false) |])
+
+                let! loaded, _ = step deps refreshed loadMessages[0]
+
+                Vitest.expect(loaded.UploadRightAway).toBe (false)
+                Vitest.expect(reads.Count).toBe 1
+
+                let! refreshingAgain, againMessages = step deps loaded RefreshRequested
+                let! _, afterSecondRefresh = step deps refreshingAgain againMessages[0]
+
+                Vitest.expect(afterSecondRefresh).toEqual ([||])
+                Vitest.expect(reads.Count).toBe 1
+            }
+        )
+
+        Vitest.test (
+            "A stored upload right away choice that arrives after a local change is ignored",
+            fun () -> promise {
+                let pendingState = {
+                    runningState with
+                        UploadRightAwayLoad = UploadRightAwayLoad.Pending
+                }
+
+                let changedState, _ =
+                    update defaultDependencies ignore (UploadRightAwayChanged false) pendingState
+
+                let afterLoad, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UploadRightAwayLoaded(runningState.ArcSessionId, true))
+                        changedState
+
+                Vitest.expect(afterLoad.UploadRightAway).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "A stored upload right away choice of an earlier ARC session is ignored",
+            fun () -> promise {
+                let pendingState = {
+                    runningState with
+                        UploadRightAwayLoad = UploadRightAwayLoad.Pending
+                }
+
+                let nextArc, _ =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) pendingState
+
+                // The new ARC has its own read in flight, so only the session id tells the two apart.
+                let nextArcLoading = {
+                    nextArc with
+                        UploadRightAwayLoad = UploadRightAwayLoad.Pending
+                }
+
+                let afterLoad, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UploadRightAwayLoaded(runningState.ArcSessionId, false))
+                        nextArcLoading
+
+                Vitest.expect(nextArc.ArcSessionId).not.toBe runningState.ArcSessionId
+                Vitest.expect(afterLoad.UploadRightAway).toBe (true)
+                Vitest.expect(afterLoad.UploadRightAwayLoad).toEqual UploadRightAwayLoad.Pending
+            }
+        )
+
+        Vitest.test (
+            "Closing and reopening the sidebar keeps the upload right away choice",
+            fun () -> promise {
+                let uncheckedState, _ =
+                    update defaultDependencies ignore (UploadRightAwayChanged false) runningState
+
+                let closedState, _ =
+                    update defaultDependencies ignore (SidebarVisibilityChanged false) uncheckedState
+
+                let reopenedState, _ =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) closedState
+
+                Vitest.expect(closedState.UploadRightAway).toBe (false)
+                Vitest.expect(reopenedState.UploadRightAway).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "ArcPathChanged resets the upload right away choice to checked",
+            fun () -> promise {
+                let uncheckedState, _ =
+                    update defaultDependencies ignore (UploadRightAwayChanged false) runningState
+
+                let nextState, _ =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) uncheckedState
+
+                Vitest.expect(nextState.CurrentArcPath).toEqual (Some "C:/arc-b")
+                Vitest.expect(nextState.UploadRightAway).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "Opening the sidebar during a running refresh does not replace it",
+            fun () -> promise {
+                let refreshingState, _ =
+                    update defaultDependencies ignore RefreshRequested runningState
+
+                let openedState, openCmd =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) refreshingState
+
+                let! openMessages = collectMessages openCmd
+
+                Vitest.expect(openedState.SidebarVisible).toBe (true)
+                Vitest.expect(openedState.RefreshRequestId).toEqual (refreshingState.RefreshRequestId)
+                Vitest.expect(openMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "Opening the sidebar without an ARC keeps a running clone",
+            fun () -> promise {
+                let cloningState = {
+                    GitState.Empty with
+                        BusyOperation = Some(GitBusyOperation.CloningRepository "C:/clone")
+                        WriteRequestId = 1
+                        CurrentOperation = Some { OperationId = "clone-op" }
+                }
+
+                let openedState, openCmd =
+                    update defaultDependencies ignore (SidebarVisibilityChanged true) cloningState
+
+                let! openMessages = collectMessages openCmd
+
+                Vitest
+                    .expect(openedState)
+                    .toEqual (
+                        {
+                            cloningState with
+                                SidebarVisible = true
+                        }
+                    )
+
+                Vitest.expect(openMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "A silent refresh disables the sidebar without notice text and a normal refresh shows it",
+            fun () -> promise {
+                let silentState, _ =
+                    update defaultDependencies ignore RefreshRequestedSilently runningState
+
+                let normalState, _ = update defaultDependencies ignore RefreshRequested runningState
+
+                Vitest.expect(silentState.BusyOperation).toEqual (Some GitBusyOperation.Refreshing)
+                Vitest.expect(silentState.BusyNotice).toEqual (None)
+                Vitest.expect(currentRunStatus silentState).toEqual (Some GitSidebarRunStatus.BusyWithoutNotice)
+                Vitest.expect(normalState.BusyNotice.IsSome).toBe (true)
             }
         )
 
@@ -3002,6 +3285,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "SetCurrentProgress shows no progress during a silent refresh",
+            fun () -> promise {
+                let silentState, _ =
+                    update defaultDependencies ignore RefreshRequestedSilently runningState
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(sidebarProgress "Receiving objects" 72.)))
+                        silentState
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.CurrentProgress).toEqual (None)
+                Vitest.expect(currentRunStatus nextState).toEqual (Some GitSidebarRunStatus.BusyWithoutNotice)
+                Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "SetCurrentProgress keeps Output empty for display messages",
             fun () -> promise {
                 let current = expectedSidebarProgress "Receiving objects" 72.
@@ -3064,6 +3368,90 @@ Vitest.describe (
 
                 Vitest.expect(nextState.DownloadLargeFiles).toBe (true)
                 Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "UserDefaultsLoaded seeds the git values of a state without an ARC and a reset keeps the seed",
+            fun () -> promise {
+                let seeded, cmd =
+                    update defaultDependencies ignore (UserDefaultsLoaded changedUserDefaults) GitState.Empty
+
+                let! messages = collectMessages cmd
+                let reset, _ = update defaultDependencies ignore RefreshRequested seeded
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(seeded.UserDefaults).toEqual (changedUserDefaults)
+                Vitest.expect(seeded.LfsAutoTrackThresholdMb).toBe (7)
+                Vitest.expect(seeded.DiffIndexingLimitMb).toBe (2048)
+                Vitest.expect(seeded.UploadRightAway).toBe (false)
+                // A clone without an ARC takes this value.
+                Vitest.expect(seeded.DownloadLargeFiles).toBe (true)
+                Vitest.expect(reset.UserDefaults).toEqual (changedUserDefaults)
+                Vitest.expect(reset.DownloadLargeFiles).toBe (true)
+                Vitest.expect(reset.LfsAutoTrackThresholdMb).toBe (7)
+            }
+        )
+
+        Vitest.test (
+            "UserDefaultsLoaded leaves the values of an open ARC alone and changes the seed",
+            fun () -> promise {
+                let nextState, cmd =
+                    update defaultDependencies ignore (UserDefaultsLoaded changedUserDefaults) runningState
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.UserDefaults).toEqual (changedUserDefaults)
+                Vitest.expect(nextState.LfsAutoTrackThresholdMb).toBe (runningState.LfsAutoTrackThresholdMb)
+                Vitest.expect(nextState.DownloadLargeFiles).toBe (runningState.DownloadLargeFiles)
+                Vitest.expect(nextState.DiffIndexingLimitMb).toBe (runningState.DiffIndexingLimitMb)
+                Vitest.expect(nextState.UploadRightAway).toBe (runningState.UploadRightAway)
+            }
+        )
+
+        Vitest.test (
+            "The seed of UserDefaultsLoaded survives a change of the ARC and starts the new session",
+            fun () -> promise {
+                let seeded, _ =
+                    update defaultDependencies ignore (UserDefaultsLoaded changedUserDefaults) runningState
+
+                let opened, _ =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) seeded
+
+                let closed, _ = update defaultDependencies ignore (ArcPathChanged None) opened
+                let reset, _ = update defaultDependencies ignore ResetWorkflow opened
+
+                for state in [| opened; closed; reset |] do
+                    Vitest.expect(state.UserDefaults).toEqual (changedUserDefaults)
+                    Vitest.expect(state.LfsAutoTrackThresholdMb).toBe (7)
+                    Vitest.expect(state.DownloadLargeFiles).toBe (true)
+                    Vitest.expect(state.DiffIndexingLimitMb).toBe (2048)
+                    Vitest.expect(state.UploadRightAway).toBe (false)
+                    Vitest.expect(state.UploadRightAwayLoad).toEqual (UploadRightAwayLoad.NotStarted)
+            }
+        )
+
+        Vitest.test (
+            "A refresh result overrides the values seeded from the user defaults",
+            fun () -> promise {
+                let deps = {
+                    withRefresh cleanStatus defaultDependencies with
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 3 false)) }
+                }
+
+                let seeded, _ =
+                    update deps ignore (UserDefaultsLoaded changedUserDefaults) GitState.Empty
+
+                let! bound, bindMessages = step deps seeded (ArcPathChanged(Some "C:/arc"))
+                let! refreshing, refreshMessages = step deps bound bindMessages[0]
+                let! refreshed, _ = step deps refreshing refreshMessages[0]
+
+                Vitest.expect(bound.LfsAutoTrackThresholdMb).toBe (7)
+                Vitest.expect(bound.DownloadLargeFiles).toBe (true)
+                Vitest.expect(refreshed.LfsAutoTrackThresholdMb).toBe (3)
+                Vitest.expect(refreshed.DownloadLargeFiles).toBe (false)
+                Vitest.expect(refreshed.UserDefaults).toEqual (changedUserDefaults)
             }
         )
 
@@ -7203,7 +7591,7 @@ Vitest.describe (
                             .expect(outcome.Notice)
                             .toEqual (
                                 Some
-                                    "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                                    "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                             )
 
                         nextState, finishCmd
@@ -7216,7 +7604,7 @@ Vitest.describe (
                     .expect(nextState.WarningNotice)
                     .toEqual (
                         Some
-                            "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                            "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                     )
 
                 Vitest.expect(nextState.ActiveConflict |> Option.map _.Handle).toEqual (Some refreshedHandle)
@@ -7333,7 +7721,7 @@ Vitest.describe (
                             .expect(outcome.Notice)
                             .toEqual (
                                 Some
-                                    "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                                    "The file was resolved, but its content could not be restored from the local cache yet. ARCitISA restores it after the merge."
                             )
 
                         update deps ignore partialMessages[0] stateAfterPartialRequest
@@ -9516,6 +9904,26 @@ Vitest.describe (
         )
 )
 
+let private renderSaveSidebar (callbacks: GitSidebarCallbacks) =
+    renderToBody (
+        Swate.Components.Page.GitSidebar.Main(
+            status = {
+                CurrentBranch = Some "main"
+                TrackingBranch = Some "origin/main"
+                Ahead = 0
+                Behind = 0
+                IsClean = false
+                IsMergeInProgress = false
+            },
+            changedFiles = manyChangedFiles 3,
+            branchOptions = [| sidebarLocalBranch "main" true true |],
+            callbacks = callbacks,
+            downloadLargeFiles = true,
+            lfsAutoTrackThresholdMb = 5,
+            diffIndexingLimitMb = 1024
+        )
+    )
+
 Vitest.describe (
     "GitWorkflow component behavior",
     fun () ->
@@ -9822,7 +10230,10 @@ Vitest.describe (
                         )
                     )
 
-                Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
+                Vitest
+                    .expect(container.querySelector("[data-testid='GitSidebarChangeRow-3']").getAttribute ("title"))
+                    .toBe ("studies/s-study-01/protocol.md")
+
                 Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeStatusIcon-3']")).not.toBeNull ()
 
                 cleanup ()
@@ -10203,7 +10614,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar marks rows with Windows Explorer click semantics and shows one primary save button",
+            "GitSidebar marks rows with Windows Explorer click semantics and shows two save buttons only while rows are marked",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
@@ -10252,6 +10663,12 @@ Vitest.describe (
                 let thirdRow =
                     container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
 
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarSaveAllButton']").length).toBe (1)
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (0)
+
                 firstRow.click ()
                 do! Promise.sleep 0
 
@@ -10261,8 +10678,11 @@ Vitest.describe (
                 thirdRow.dispatchEvent shiftClick |> ignore
                 do! Promise.sleep 0
 
-                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarPrimarySaveButton']").length).toBe (1)
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarSaveAllButton']").length).toBe (1)
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
 
                 Vitest
                     .expect(container.querySelectorAll("[data-testid^='GitSidebarCommitSelectionCheckbox-']").length)
@@ -10407,10 +10827,9 @@ Vitest.describe (
                 do! Promise.sleep 0
 
                 let saveButton =
-                    container.querySelector ("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']") :?> HTMLButtonElement
 
                 Vitest.expect(saveButton.disabled).toBe (false)
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 saveButton.click ()
                 do! Promise.sleep 0
 
@@ -10494,10 +10913,9 @@ Vitest.describe (
                 do! Promise.sleep 0
 
                 let saveButton =
-                    container.querySelector ("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']") :?> HTMLButtonElement
 
                 Vitest.expect(saveButton.disabled).toBe (false)
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 saveButton.click ()
                 do! Promise.sleep 0
 
@@ -10687,7 +11105,9 @@ Vitest.describe (
                 firstRow.click ()
                 do! Promise.sleep 0
 
-                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
 
                 let ctrlClick =
                     createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
@@ -10695,7 +11115,11 @@ Vitest.describe (
                 firstRow.dispatchEvent ctrlClick |> ignore
                 do! Promise.sleep 0
 
-                Vitest.expect(container.textContent.Contains("Save All Changes")).toBe (true)
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (0)
+
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarSaveAllButton']").length).toBe (1)
 
                 let rowClass = firstRow.className
                 Vitest.expect(rowClass.Contains("swt:select-none")).toBe (true)
@@ -10778,6 +11202,248 @@ Vitest.describe (
                 let legacyCard = firstElementChild saveSection
                 Vitest.expect(legacyCard.className.Contains("swt:rounded-box")).toBe (false)
                 Vitest.expect(legacyCard.className.Contains("swt:border")).toBe (false)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar checks upload right away by default and Save All uses the primary save callback",
+            fun () -> promise {
+                let mutable primaryAllMessage: string option = None
+                let mutable commitAllCalls = 0
+
+                let! container, cleanup =
+                    renderSaveSidebar {
+                        noopCallbacks with
+                            OnPrimarySaveAll = fun message -> primaryAllMessage <- Some message
+                            OnCommitAll = fun _ -> commitAllCalls <- commitAllCalls + 1
+                    }
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                Vitest.expect(uploadCheckbox.``checked``).toBe (true)
+
+                setTextAreaValue messageInput "save everything"
+                do! Promise.sleep 0
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                saveAllButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(primaryAllMessage).toEqual (Some "save everything")
+                Vitest.expect(commitAllCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar shows the controlled upload right away value and reports changes without storing them",
+            fun () -> promise {
+                let reported = ResizeArray<bool>()
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = noopCallbacks,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024,
+                            uploadRightAway = false,
+                            onUploadRightAwayChange = reported.Add
+                        )
+                    )
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                Vitest.expect(uploadCheckbox.``checked``).toBe (false)
+
+                uploadCheckbox.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(reported |> Seq.toArray).toEqual ([| true |])
+                Vitest.expect(uploadCheckbox.``checked``).toBe (false)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar Save All with rows marked sends only the message and no paths",
+            fun () -> promise {
+                let mutable primaryAllMessage: string option = None
+                let mutable primarySelectionCalls = 0
+
+                let! container, cleanup =
+                    renderSaveSidebar {
+                        noopCallbacks with
+                            OnPrimarySaveAll = fun message -> primaryAllMessage <- Some message
+                            OnPrimarySaveSelection = fun _ -> primarySelectionCalls <- primarySelectionCalls + 1
+                    }
+
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                let row2 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                row0.click ()
+                do! Promise.sleep 0
+
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
+
+                setTextAreaValue messageInput "save all while marked"
+                do! Promise.sleep 0
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                saveAllButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(primaryAllMessage).toEqual (Some "save all while marked")
+                Vitest.expect(primarySelectionCalls).toBe (0)
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid='GitSidebarSaveSelectedButton']").length)
+                    .toBe (1)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar routes both save buttons to the local commit callbacks when upload right away is unchecked and clears the message",
+            fun () -> promise {
+                let mutable commitSelection: GitSidebarCommitSelectionRequest option = None
+                let mutable commitAllMessage: string option = None
+                let mutable primaryCalls = 0
+
+                let! container, cleanup =
+                    renderSaveSidebar {
+                        noopCallbacks with
+                            OnPrimarySaveSelection = fun _ -> primaryCalls <- primaryCalls + 1
+                            OnPrimarySaveAll = fun _ -> primaryCalls <- primaryCalls + 1
+                            OnCommitSelection = fun request -> commitSelection <- Some request
+                            OnCommitAll = fun message -> commitAllMessage <- Some message
+                    }
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                uploadCheckbox.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(uploadCheckbox.``checked``).toBe (false)
+
+                row0.click ()
+                do! Promise.sleep 0
+                setTextAreaValue messageInput "local selected"
+                do! Promise.sleep 0
+
+                let saveSelectedButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']") :?> HTMLButtonElement
+
+                saveSelectedButton.click ()
+                do! Promise.sleep 0
+
+                Vitest
+                    .expect(commitSelection |> Option.map (fun request -> request.Message, request.Paths))
+                    .toEqual (Some("local selected", [| "src/file-000.txt" |]))
+
+                Vitest.expect(messageInput.value).toBe ("")
+
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarSaveSelectedButton']")).toBeNull ()
+
+                setTextAreaValue messageInput "local all"
+                do! Promise.sleep 0
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                saveAllButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(commitAllMessage).toEqual (Some "local all")
+                Vitest.expect(messageInput.value).toBe ("")
+                Vitest.expect(primaryCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar keeps the message and upload checkbox editable during a silent refresh but disables saving",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = noopCallbacks,
+                            runStatus = GitSidebarRunStatus.BusyWithoutNotice,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
+                        )
+                    )
+
+                let saveAllButton =
+                    container.querySelector ("[data-testid='GitSidebarSaveAllButton']") :?> HTMLButtonElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                let uploadCheckbox =
+                    container.querySelector ("[data-testid='GitSidebarUploadRightAwayCheckbox']") :?> HTMLInputElement
+
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarProgressNotice']")).toBeNull ()
+                Vitest.expect(saveAllButton.disabled).toBe (true)
+                Vitest.expect(messageInput.disabled).toBe (false)
+                Vitest.expect(uploadCheckbox.disabled).toBe (false)
 
                 cleanup ()
             }

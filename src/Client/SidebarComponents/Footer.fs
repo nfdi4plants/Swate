@@ -30,7 +30,7 @@ type Footer =
                             Html.textf " – Server %s " model.PersistentStorageState.AppVersion
                         Html.a [
                             prop.className "swt:link-primary"
-                            prop.href "https://github.com/nfdi4plants/Swate/releases"
+                            prop.href "https://github.com/nfdi4plants/ARCitISA/releases"
                             prop.target.blank
                             prop.children [ Html.small "release" ]
                         ]

@@ -125,7 +125,7 @@ let private TestsSuccessful =
 
             Expect.equal
                 result.Head.MessageTxt
-                "Replaced existing Swate information! Added 0 tables!"
+                "Replaced existing ARCitISA information! Added 0 tables!"
                 $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
         }
 
@@ -143,7 +143,7 @@ let private TestsSuccessful =
 
             Expect.equal
                 result.Head.MessageTxt
-                "Replaced existing Swate information! Added 1 tables!"
+                "Replaced existing ARCitISA information! Added 1 tables!"
                 $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
         }
 
@@ -161,7 +161,7 @@ let private TestsSuccessful =
 
             Expect.equal
                 result.Head.MessageTxt
-                "Replaced existing Swate information! Added 1 tables!"
+                "Replaced existing ARCitISA information! Added 1 tables!"
                 $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
         }
 
@@ -179,7 +179,7 @@ let private TestsSuccessful =
 
             Expect.equal
                 result.Head.MessageTxt
-                "Replaced existing Swate information! Added 1 tables!"
+                "Replaced existing ARCitISA information! Added 1 tables!"
                 $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
         }
 

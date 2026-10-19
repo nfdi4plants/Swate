@@ -48,6 +48,8 @@ module.exports = {
     // dot folder in the build path (C:\Users\x\.cache, for example).
     asar: { unpack: 'text-diff-worker.cjs' },
     executableName: 'swate',
+    // Keeps the bundle id from before the rename, so macOS treats ARCitISA as the same app.
+    appBundleId: 'com.electron.swate',
     icon: platformIcon,
     extraResource: [
         "./assets"

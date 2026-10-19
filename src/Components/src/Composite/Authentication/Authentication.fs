@@ -194,7 +194,7 @@ type Authentication =
                         Html.p [
                             prop.className "swt:text-xs swt:text-base-content/60 swt:mt-1"
                             prop.text
-                                "New to access tokens? Swate can open GitLab with everything preconfigured for you. Then copy the token and paste it here!"
+                                "New to access tokens? ARCitISA can open GitLab with everything preconfigured for you. Then copy the token and paste it here!"
                         ]
                     ]
                 ]

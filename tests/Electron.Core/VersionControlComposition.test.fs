@@ -598,6 +598,7 @@ Vitest.describe (
                     Catalog = catalog ()
                     Bindings = memoryStore CaseInsensitive
                     PathCaseSensitivity = CaseInsensitive
+                    SessionDefaults = Main.UserDefaults.builtInSessionDefaults
                 }
 
                 Vitest.expect(ProviderResolver.factories runtime.Catalog |> Array.length).toBe 2

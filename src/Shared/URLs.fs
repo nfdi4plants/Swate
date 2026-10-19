@@ -40,7 +40,7 @@ module URLs =
     let SWATE_WIKI = @"https://nfdi4plants.github.io/nfdi4plants.knowledgebase/swate/"
 
     [<LiteralAttribute>]
-    let SwateRepo = @"https://github.com/nfdi4plants/Swate"
+    let SwateRepo = @"https://github.com/nfdi4plants/ARCitISA"
 
     [<LiteralAttribute>]
     let CSBTwitterUrl = @"https://twitter.com/cs_biology"

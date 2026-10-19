@@ -23,7 +23,7 @@ module ARCitect =
         | ARCitect.Init msg ->
             match msg with
             | Start() ->
-                console.log "[Swate] ARCitect.Init.Start"
+                console.log "[ARCitISA] ARCitect.Init.Start"
 
                 let cmd =
                     Cmd.OfPromise.either

@@ -22,13 +22,13 @@ body:
     id: swate-host
     attributes:
       label: Host
-      description: Where did you run Swate?
+      description: Where did you run ARCitISA?
       options:
         - Applies to All
         - Standalone
         - ARCitect
         - Excel
-        - Electron Swate App
+        - Electron ARCitISA App
       default: 0
   - type: textarea
     id: swate-host-details

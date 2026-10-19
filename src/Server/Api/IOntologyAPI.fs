@@ -88,7 +88,7 @@ module V3 =
 
     let docs =
         Fable.Remoting.OpenAPI.OpenApi.options
-        |> OpenApi.withTitle "Swate Ontology API"
+        |> OpenApi.withTitle "ARCitISA Ontology API"
         |> OpenApi.withServers [
             {
                 Url = Swate.Components.Shared.URLs.PRODUCTION_URL
@@ -103,7 +103,7 @@ module V3 =
                 Description = Some "Local development server"
             }
         ]
-        |> OpenApi.withDescription "API for searching and retrieving ontology terms and trees in Swate."
+        |> OpenApi.withDescription "API for searching and retrieving ontology terms and trees in ARCitISA."
         |> OpenApi.withVersion "3.0.0"
         |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, unit -> Async<int>> <@ fun api -> api.getTestNumber @> {
             OpenApiDefaults.endpointDocumentation with

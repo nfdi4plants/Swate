@@ -18,8 +18,8 @@ let private showMessage window title message detail messageType = promise {
 let showAbout window =
     showMessage
         window
-        "About Swate"
-        "Swate"
+        "About ARCitISA"
+        "ARCitISA"
         $"Version {Main.Settings.AppVersion.getState().CurrentVersion}"
         Enums.Dialog.ShowMessageBox.Options.Type.Info
 
@@ -30,8 +30,8 @@ let checkForUpdates window (check: unit -> JS.Promise<Result<AppVersionState, ex
     | Ok state ->
         let message =
             match state.UpdateVersion with
-            | Some version -> $"Swate {version} is available."
-            | None -> "Swate is up to date."
+            | Some version -> $"ARCitISA {version} is available."
+            | None -> "ARCitISA is up to date."
 
         do!
             showMessage

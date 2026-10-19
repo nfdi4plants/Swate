@@ -167,6 +167,9 @@ let main args =
             0
     | "postrelease" :: dir :: _ ->
 
+        // Check the assets first, so an incomplete set fails before the release is published and tagged.
+        Release.verifyReleaseAssets dir
+
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
         let latestVersion = Changelog.getLatestVersion ()
 

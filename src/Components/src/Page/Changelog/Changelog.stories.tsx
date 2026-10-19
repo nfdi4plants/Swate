@@ -31,7 +31,7 @@ export const Default: Story = {
     await expect(canvas.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Release version' }), '0');
     await expect(canvas.getByRole('heading', { name: 'Improvements', exact: true })).toBeVisible();
-    await userEvent.type(canvas.getByRole('textbox', { name: 'GitHub repository' }), 'nfdi4plants/Swate');
+    await userEvent.type(canvas.getByRole('textbox', { name: 'GitHub repository' }), 'nfdi4plants/ARCitISA');
     await expect(canvas.getByRole('checkbox', { name: 'Use GitHub releases' })).toBeEnabled();
     // Leave live fetching to manual experimentation; this story stays deterministic.
     await expect(canvas.getByRole('checkbox', { name: 'Use GitHub releases' })).not.toBeChecked();

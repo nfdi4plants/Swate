@@ -11,7 +11,7 @@ let private registerRequiredWindow (failureContext: string) =
             fun error ->
                 eprintfn "%s: %s" failureContext error.Message
 
-                dialog.showErrorBox ("Swate could not start", $"{failureContext}\n\n{error.Message}")
+                dialog.showErrorBox ("ARCitISA could not start", $"{failureContext}\n\n{error.Message}")
     )
     |> Promise.map ignore
     |> Promise.catch (fun _ -> app.quit ())
@@ -20,7 +20,7 @@ let private registerRequiredWindow (failureContext: string) =
 [<Literal>]
 let private textDiffDisposeTimeoutMilliseconds = 5000
 
-// Squirrel launches Swate for install/update/uninstall hooks; its startup helper owns
+// Squirrel launches ARCitISA for install/update/uninstall hooks; its startup helper owns
 // shortcut maintenance and exits when finished. app.quit() does not stop execution of the code below:
 // registering whenReady below can still load a window during shutdown and throw.
 // To avoid this issue, we gate the logic below fully behind the SquirrelStartup check.
@@ -29,6 +29,9 @@ if SquirrelStartup.started then
     // staying open without a window if that exit is never reported.
     app.quit ()
 else
+    // The default user data folder follows the product name. Pin it before anything reads it.
+    Main.SettingsStore.pinLegacyUserDataPath ()
+
     app
         .whenReady()
         .``then`` (fun () ->
@@ -60,6 +63,7 @@ else
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.TemplateApi.api
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.ValidationPackageApi.api
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.UiSettingsApi.api
+            Remoting.createIpc () |> Remoting.fromValue Main.IPC.UserDefaultsApi.api
             Remoting.createIpc () |> Remoting.fromValue Main.IPC.IAppVersionApi.api
 
             app.onActivate (fun _ ->

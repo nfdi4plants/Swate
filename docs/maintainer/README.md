@@ -57,7 +57,7 @@ flowchart TD
     rel-fork --> b-win & b-mac-x64 & b-mac-arm & b-linux
 
     r-web --> art-client["upload-artifact: SwateClient.zip"]
-    b-win & b-mac-x64 & b-mac-arm & b-linux --> art-bin["upload-artifact: release-assets-electron-*"]
+    b-win & b-mac-x64 & b-mac-arm & b-linux --> art-bin["upload-artifact: release-assets-electron-* (fails if nothing was built)"]
 
     r-nuget & r-npm & r-docker & art-client & r-story --> rel-join{{"join"}}
     art-bin --> bin-join{{"join"}}
@@ -67,9 +67,10 @@ flowchart TD
 
     subgraph post["post_release (ubuntu-latest)"]
         p-dl["download all release-assets-* artifacts"]
+        p-check["check that every expected artifact has its files"]
         p-upload["upload assets to draft release"]
         p-final["un-draft + mark as latest"]
-        p-dl --> p-upload --> p-final
+        p-dl --> p-check --> p-upload --> p-final
     end
 
     p-final --> done("done")
@@ -111,7 +112,7 @@ flowchart LR
     end
     subgraph electron-bin["electron-bin (per OS/arch)"]
         direction TB
-        n11["npm run fable"] --> n12["electron-forge make --arch"]
+        n11["npm run fable"] --> n12["node scripts/forge-make.cjs --arch"] --> n12b["check out/make for fresh installers"]
     end
     subgraph storybook["storybook"]
         direction TB
@@ -126,4 +127,6 @@ flowchart LR
     style storybook fill:#C8E6C9
 ```
 
-> **Note:** `electron-web` builds the prebundled web client frontend, historically used as an iframe in an external Electron app. It is unrelated to the `electron-bin` target which builds the Swate desktop application via `electron-forge make`.
+> **Note:** `electron-web` builds the prebundled web client frontend, historically used as an iframe in an external Electron app. It is unrelated to the `electron-bin` target which builds the ARCitISA desktop application via `electron-forge make`.
+
+If a desktop build is missing, its release_electron_binaries job fails. post_release then does not run, and the GitHub release stays a draft. post_release also checks the downloaded artifacts and stops before it uploads anything when one is incomplete. `Release.verifyReleaseAssets` in `build/Actions/Release.fs` lists the expected artifacts. Update that list when the `release_electron_binaries` matrix changes.

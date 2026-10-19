@@ -1,6 +1,6 @@
 {
   "name": "swate",
-  "productName": "Swate",
+  "productName": "ARCitISA",
   "version": "2.0.0-alpha.5",
   "description": "An open-source, cross-platform, and user-friendly software for managing and sharing scientific data.",
   "main": ".vite/build/main.fs.js",

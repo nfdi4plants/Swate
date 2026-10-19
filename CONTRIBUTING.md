@@ -41,9 +41,9 @@ This needs to be done once per repository download.
 
 ## Start
 
-`./build.cmd run db`, to start up Swate (+ Database network)
+`./build.cmd run db`, to start up ARCitISA (+ Database network)
 
-**Swate** runs on [https://localhost:3000](https://localhost:3000), **Swobup** on [http://localhost:8000/docs](http://localhost:8000/docs), **Database - Neo4j** can be viewed in the browser on [http://localhost:7474/browser/](http://localhost:7474/browser/).
+**ARCitISA** runs on [https://localhost:3000](https://localhost:3000), **Swobup** on [http://localhost:8000/docs](http://localhost:8000/docs), **Database - Neo4j** can be viewed in the browser on [http://localhost:7474/browser/](http://localhost:7474/browser/).
 
 > [!WARNING]
 > Should the neo4j database not correctly start up with `./build.cmd run db` delete the container (only container not the volume) and start it again. This can be easily done with the docker ui. Open the `swate_dev` network and click on the thrash bin icon next to the neo4j container.
@@ -78,7 +78,7 @@ The Electron app is still in early development and not fully integrated into the
 
 ## Contribute
 
-If you want to contribute to Swate, open an issue with the feature/bug you want to work on. This way you can ensure that your approach is in line with the project goals and you can get feedback from the maintainers.
+If you want to contribute to ARCitISA, open an issue with the feature/bug you want to work on. This way you can ensure that your approach is in line with the project goals and you can get feedback from the maintainers.
 
 Afterwards you can fork the repository and start working on your feature/bug. When you are done, describe your changes in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and open a pull request.
 

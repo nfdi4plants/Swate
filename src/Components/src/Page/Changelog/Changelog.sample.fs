@@ -82,11 +82,11 @@ type internal ChangelogSample =
                         ]
                         Html.button [
                             prop.className "swt:btn swt:btn-primary"
-                            prop.text "Try Swate Repository"
+                            prop.text "Try ARCitISA Repository"
                             prop.onClick (fun _ ->
-                                Browser.Dom.console.log ("Trying Swate Repository")
+                                Browser.Dom.console.log ("Trying ARCitISA Repository")
                                 setUseGitHub true
-                                setRepository "nfdi4plants/Swate"
+                                setRepository "nfdi4plants/ARCitISA"
                             )
                         ]
                         Html.label [

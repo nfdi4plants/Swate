@@ -86,6 +86,9 @@ jobs:
     needs: verify_release
     if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
+    # The npm and NuGet trusted publishing policies still name the old Swate repo. Until they are
+    # updated, a failed npm or NuGet publish must not stop the GitHub release.
+    continue-on-error: ${{ matrix.target == 'nuget' || matrix.target == 'npm' }}
     strategy:
       fail-fast: false
       matrix:
@@ -137,6 +140,7 @@ jobs:
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
         run: dotnet run --project ./build/Build.fsproj -- release ${{ matrix.target }} --ci --user=${{ github.actor }}
 
+      # Release.verifyReleaseAssets in build/Actions/Release.fs expects this artifact.
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.target == 'electron-web' }}
         with:
@@ -159,6 +163,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Release.verifyReleaseAssets in build/Actions/Release.fs lists the artifact of every entry
+        # here. Update that list when this matrix changes.
         include:
           - os: windows-latest
             arch: x64
@@ -207,11 +213,17 @@ jobs:
         run: npm i
 
       - name: Build Electron binaries
+        env:
+          # The macOS runners have 7 GB of RAM, so Node picks a smaller default heap there than on
+          # the 16 GB Linux and Windows runners, and the 2.6.0 build ran out of memory (#1421).
+          # 4096 is the limit Node already uses on the 16 GB runners, so only the macOS jobs change.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: dotnet run --project ./build/Build.fsproj -- release electron-bin --ci --arch=${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-assets-electron-${{ runner.os }}-${{ matrix.arch }}
+          if-no-files-found: error
           path: |
             src/Electron/out/make/**/*.exe
             src/Electron/out/make/**/*.nupkg

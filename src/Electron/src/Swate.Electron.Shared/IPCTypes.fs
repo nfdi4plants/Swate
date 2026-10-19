@@ -25,7 +25,7 @@ module IPCTypesHelper =
 open IPCTypesHelper
 
 [<Literal>]
-let swateReleaseRepository = "nfdi4plants/Swate"
+let swateReleaseRepository = "nfdi4plants/ARCitISA"
 
 type AppVersionState = {
     CurrentVersion: string
@@ -45,6 +45,32 @@ type IUiSettingsApi = {
     /// Persists a finite positive scale globally and applies it to all windows. 1.0 = 100%.
     setUiScale: float -> JS.Promise<Result<unit, exn>>
     getUiScale: unit -> JS.Promise<float>
+}
+
+/// The values a user can set as defaults for every newly opened ARC session.
+type UserDefaultValuesDto = {
+    /// Whole MiB from 1 to 100. Files at or above it use large-object storage automatically.
+    LfsAutoTrackThresholdMb: int
+    DownloadLargeFiles: bool
+    /// Whole MiB from 1 to 1048576.
+    DiffIndexingLimitMb: int
+    UploadRightAway: bool
+    AutoCreateNotesFolder: bool
+}
+
+/// The values new sessions start from, next to the values Swate ships with.
+type UserDefaultsDto = {
+    Effective: UserDefaultValuesDto
+    BuiltIn: UserDefaultValuesDto
+}
+
+/// Two Way Bridge: Renderer <-> Main
+type IUserDefaultsApi = {
+    getUserDefaults: unit -> JS.Promise<UserDefaultsDto>
+    /// Validates every field, stores the values that differ from the built-in ones and tells all windows.
+    /// An Error leaves the stored values as they were. It names the refused field for an invalid value.
+    /// A newer-schema file or a failed write gets a message without a field.
+    setUserDefaults: UserDefaultValuesDto -> JS.Promise<Result<UserDefaultsDto, string>>
 }
 
 [<RequireQualifiedAccess>]
@@ -149,6 +175,11 @@ type IVersionControlApi = {
     getStoragePolicySettings:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, exn>>
     setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    /// The "Upload right away" checkbox the open session of the calling window holds in memory.
+    /// Fails when no session is open. The call is not a tracked operation and takes no lock.
+    getUploadRightAway: unit -> JS.Promise<Result<OperationResultDto<bool>, exn>>
+    /// Stores the checkbox value in the open session. Fails when no session is open.
+    setUploadRightAway: bool -> JS.Promise<Result<OperationResultDto<unit>, exn>>
     setPathStoragePolicy: PathStoragePolicyRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
     pruneStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     deduplicateStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
@@ -237,6 +268,10 @@ module MainToRendererIpc =
     type IReleaseNotesRendererApi = { showReleaseNotes: string -> unit }
 
     type IUiSettingsRendererApi = { uiScaleChanged: float -> unit }
+
+    type IUserDefaultsRendererApi = {
+        userDefaultsChanged: UserDefaultsDto -> unit
+    }
 
 // TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer

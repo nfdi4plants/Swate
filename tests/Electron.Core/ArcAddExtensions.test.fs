@@ -332,7 +332,7 @@ Vitest.describe (
                         | Error error ->
                             Vitest
                                 .expect(error.Message)
-                                .toBe ("Swate is still saving another change. Please wait a moment and try again.")
+                                .toBe ("ARCitISA is still saving another change. Please wait a moment and try again.")
 
                         match! firstAdd with
                         | Error error -> failwith error.Message

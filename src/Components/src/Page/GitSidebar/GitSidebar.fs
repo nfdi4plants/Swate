@@ -6,7 +6,6 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
-open Swate.Components.Primitive.Popover
 open Swate.Components.Primitive.BaseModal
 
 open Swate.Components.Page.GitSidebarTypes
@@ -91,6 +90,15 @@ module private GitSidebarInternal =
             ToneClassName = "swt:text-error"
           }
 
+    /// Splits a repository-relative path into the file name and its parent directory. A trailing slash stays with the name.
+    let splitPath (path: string) : string * string option =
+        match path.TrimEnd('/').LastIndexOf '/' with
+        | index when index > 0 -> path.Substring(index + 1), Some(path.Substring(0, index))
+        | _ -> path, None
+
+    let commitCountLabel (count: int) =
+        if count = 1 then "1 commit" else $"{count} commits"
+
     let branchKindLabel (kind: GitSidebarBranchKind) =
         match kind with
         | GitSidebarBranchKind.Local -> "Local"
@@ -142,14 +150,6 @@ module private GitSidebarInternal =
         match owner.NamespaceId with
         | Some id -> string id
         | None -> "personal"
-
-    /// The range of the background indexing limit in MB, the same as the main process allows. A value
-    /// below 64 is the memory budget of a diff held in memory.
-    [<Literal>]
-    let MinDiffIndexingLimitMb = 1
-
-    [<Literal>]
-    let MaxDiffIndexingLimitMb = 1048576
 
     let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
         match
@@ -204,8 +204,6 @@ type private AdvancedActionsProps = {
     RemoteActionsWarning: string option
     SubmitDownloadLargeFiles: bool -> unit
     SubmitUpdateFromOnline: unit -> unit
-    HasMarkedFiles: bool
-    CanRunPrimarySave: bool
     IsAdvancedActionsOpen: bool
     ToggleAdvancedActions: unit -> unit
     SubmitFetch: unit -> unit
@@ -228,8 +226,10 @@ type private CommitSectionProps = {
     MarkedCount: int
     HasMarkedFiles: bool
     CanRunPrimarySave: bool
-    SubmitPrimarySave: unit -> unit
-    SubmitLocalCommit: unit -> unit
+    UploadRightAway: bool
+    SetUploadRightAway: bool -> unit
+    SubmitSaveSelected: unit -> unit
+    SubmitSaveAll: unit -> unit
 }
 
 type private ChangedFilesListProps = {
@@ -433,7 +433,8 @@ type GitSidebar =
                         ]
                     ]
                 ]
-            | GitSidebarRunStatus.Idle -> Html.none
+            | GitSidebarRunStatus.Idle
+            | GitSidebarRunStatus.BusyWithoutNotice -> Html.none
 
             match errorNotice with
             | Some message ->
@@ -633,15 +634,18 @@ type GitSidebar =
                                     Html.span [
                                         prop.testId "GitSidebarTitle"
                                         prop.className "swt:truncate swt:text-sm swt:font-semibold"
+                                        prop.title "Source Control"
                                         prop.text "Source Control"
                                     ]
+                                    let branchName =
+                                        match props.Status.CurrentBranch with
+                                        | Some branch -> branch
+                                        | None -> "Detached HEAD"
+
                                     Html.span [
                                         prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
-                                        prop.text (
-                                            match props.Status.CurrentBranch with
-                                            | Some branch -> branch
-                                            | None -> "Detached HEAD"
-                                        )
+                                        prop.title branchName
+                                        prop.text branchName
                                     ]
                                 ]
                             ]
@@ -706,15 +710,49 @@ type GitSidebar =
                                         ]
 
                                     if props.Status.Ahead > 0 then
+                                        let label =
+                                            $"{GitSidebarInternal.commitCountLabel props.Status.Ahead} ahead of remote"
+
                                         Html.span [
-                                            prop.className "swt:badge swt:badge-outline swt:badge-sm"
-                                            prop.text $"Ahead {props.Status.Ahead}"
+                                            prop.testId "GitSidebarAheadBadge"
+                                            prop.className "swt:badge swt:badge-outline swt:badge-sm swt:gap-0.5"
+                                            prop.title label
+                                            prop.children [
+                                                Html.span [
+                                                    prop.ariaHidden true
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--arrow-up-20-regular swt:size-3 swt:shrink-0"
+                                                ]
+                                                Html.span [
+                                                    prop.testId "GitSidebarAheadCount"
+                                                    prop.ariaHidden true
+                                                    prop.text props.Status.Ahead
+                                                ]
+                                                Html.span [ prop.className "swt:sr-only"; prop.text label ]
+                                            ]
                                         ]
 
                                     if props.Status.Behind > 0 then
+                                        let label =
+                                            $"{GitSidebarInternal.commitCountLabel props.Status.Behind} behind remote"
+
                                         Html.span [
-                                            prop.className "swt:badge swt:badge-outline swt:badge-sm"
-                                            prop.text $"Behind {props.Status.Behind}"
+                                            prop.testId "GitSidebarBehindBadge"
+                                            prop.className "swt:badge swt:badge-outline swt:badge-sm swt:gap-0.5"
+                                            prop.title label
+                                            prop.children [
+                                                Html.span [
+                                                    prop.ariaHidden true
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--arrow-down-20-regular swt:size-3 swt:shrink-0"
+                                                ]
+                                                Html.span [
+                                                    prop.testId "GitSidebarBehindCount"
+                                                    prop.ariaHidden true
+                                                    prop.text props.Status.Behind
+                                                ]
+                                                Html.span [ prop.className "swt:sr-only"; prop.text label ]
+                                            ]
                                         ]
                                 ]
                             ]
@@ -727,7 +765,7 @@ type GitSidebar =
                                     prop.children [
                                         Html.span [
                                             prop.className
-                                                "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
+                                                "swt:iconify swt:fluent--cloud-24-regular swt:size-4 swt:shrink-0"
                                         ]
                                         Html.span [
                                             prop.className "swt:min-w-0 swt:wrap-anywhere"
@@ -803,8 +841,8 @@ type GitSidebar =
                                     prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
                                     prop.type'.number
                                     prop.custom ("step", "1")
-                                    prop.custom ("min", "1")
-                                    prop.custom ("max", "100")
+                                    prop.custom ("min", string GitSettingRanges.MinLfsAutoTrackThresholdMb)
+                                    prop.custom ("max", string GitSettingRanges.MaxLfsAutoTrackThresholdMb)
                                     prop.disabled props.IsBusy
                                     prop.value props.LfsThresholdInput
                                     prop.onChange props.SetLfsThresholdInput
@@ -876,8 +914,8 @@ type GitSidebar =
                                     prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
                                     prop.type'.number
                                     prop.custom ("step", "1")
-                                    prop.custom ("min", string GitSidebarInternal.MinDiffIndexingLimitMb)
-                                    prop.custom ("max", string GitSidebarInternal.MaxDiffIndexingLimitMb)
+                                    prop.custom ("min", string GitSettingRanges.MinDiffIndexingLimitMb)
+                                    prop.custom ("max", string GitSettingRanges.MaxDiffIndexingLimitMb)
                                     prop.disabled props.IsBusy
                                     prop.value props.DiffIndexingLimitInput
                                     prop.onChange props.SetDiffIndexingLimitInput
@@ -916,7 +954,7 @@ type GitSidebar =
                 prop.children [
                     GitSidebar.ActionButton(
                         "Download Changes",
-                        "swt:fluent--arrow-down-24-regular",
+                        "swt:fluent--arrow-download-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarPullButton",
@@ -925,7 +963,7 @@ type GitSidebar =
                     )
                     GitSidebar.ActionButton(
                         "Upload Changes",
-                        "swt:fluent--arrow-up-24-regular",
+                        "swt:fluent--arrow-upload-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitPush,
                         testId = "GitSidebarPushButton",
@@ -989,7 +1027,7 @@ type GitSidebar =
                             prop.children [
                                 GitSidebar.ActionButton(
                                     "Check for Changes",
-                                    "swt:fluent--arrow-download-24-regular",
+                                    "swt:fluent--arrow-sync-24-regular",
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitFetch,
                                     testId = "GitSidebarFetchButton",
@@ -1050,56 +1088,34 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private SaveOptionsHelpPopover() =
-        Popover.Popover(
-            debug = "GitSidebarSaveOptionsHelp",
-            children =
-                React.Fragment [
-                    Popover.Trigger(
-                        Html.span "?",
-                        className =
-                            "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-6 swt:w-6 swt:px-0 swt:text-xs swt:font-bold",
-                        props = [ prop.testId "GitSidebarSaveOptionsHelpButton" ]
-                    )
-                    Popover.Content(
-                        children =
-                            Html.div [
-                                prop.className "swt:flex swt:max-w-72 swt:flex-col swt:gap-2 swt:text-sm"
-                                prop.children [
-                                    Popover.Heading(Html.text "Save options")
-                                    Html.p [
-                                        prop.text
-                                            "Save changes commits locally, then updates and uploads online when the repository can sync safely."
-                                    ]
-                                    Html.p [
-                                        prop.text
-                                            "Add and commit changes only writes the local Git commit. Online sync stays pending until you update or upload later."
-                                    ]
-                                ]
-                            ]
-                    )
+    static member private CommitSaveButton
+        (testId: string, label: string, iconClassName: string, isFilled: bool, isDisabled: bool, onClick: unit -> unit)
+        =
+        Html.button [
+            prop.testId testId
+            prop.className [
+                "swt:btn swt:btn-sm swt:btn-success swt:min-w-0 swt:flex-1 swt:basis-0 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case"
+                "swt:@max-3xs/gitSidebar:gap-0 swt:@max-3xs/gitSidebar:px-0"
+                if not isFilled then
+                    "swt:btn-outline"
+            ]
+            prop.disabled isDisabled
+            prop.ariaLabel label
+            prop.title label
+            prop.onClick (fun _ -> onClick ())
+            prop.children [
+                Html.span [
+                    prop.className [ "swt:iconify"; iconClassName; "swt:size-4 swt:shrink-0" ]
                 ]
-        )
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate swt:@max-3xs/gitSidebar:sr-only"
+                    prop.text label
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member private CommitSection(props: CommitSectionProps) =
-        let isSaveMenuOpen, setSaveMenuOpen = React.useState false
-        let saveMenuRef = React.useElementRef ()
-
-        React.useListener.onClickAway (saveMenuRef, fun _ -> setSaveMenuOpen false)
-
-        let primarySaveLabel =
-            if props.HasMarkedFiles then
-                "Save Selected Changes"
-            else
-                "Save All Changes"
-
-        let localCommitLabel =
-            if props.HasMarkedFiles then
-                "Add and commit selected Changes"
-            else
-                "Add and commit all Changes"
-
         React.Fragment [
             GitSidebar.SectionHeader("Save", None)
 
@@ -1156,84 +1172,46 @@ type GitSidebar =
                         ]
                     ]
                     Html.div [
-                        prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
+                        prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:gap-2"
                         prop.children [
-                            Html.div [
-                                prop.ref saveMenuRef
-                                prop.className "swt:relative swt:inline-flex swt:min-w-0 swt:flex-1"
-                                prop.children [
-                                    Html.div [
-                                        prop.className "swt:join swt:flex swt:min-w-0 swt:flex-1"
-                                        prop.children [
-                                            Html.button [
-                                                prop.testId "GitSidebarPrimarySaveButton"
-                                                prop.className
-                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:flex-1 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
-                                                prop.disabled (not props.CanRunPrimarySave)
-                                                prop.title primarySaveLabel
-                                                prop.onClick (fun _ -> props.SubmitPrimarySave())
-                                                prop.children [
-                                                    Html.span [
-                                                        prop.className
-                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4 swt:shrink-0"
-                                                    ]
-                                                    Html.span [
-                                                        prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
-                                                        prop.text primarySaveLabel
-                                                    ]
-                                                ]
-                                            ]
-                                            Html.button [
-                                                prop.testId "GitSidebarSaveOptionsButton"
-                                                prop.className
-                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:shrink-0 swt:px-2"
-                                                prop.disabled (not props.CanRunPrimarySave)
-                                                prop.title "Save options"
-                                                prop.onClick (fun _ -> setSaveMenuOpen (not isSaveMenuOpen))
-                                                prop.children [
-                                                    Html.span [
-                                                        prop.className
-                                                            "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4 swt:shrink-0"
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                                    if isSaveMenuOpen then
-                                        Html.ul [
-                                            prop.testId "GitSidebarSaveOptionsMenu"
-                                            prop.tabIndex 0
-                                            prop.className
-                                                "swt:menu swt:absolute swt:left-0 swt:top-full swt:z-99 swt:mt-1 swt:w-full swt:min-w-0 swt:rounded-box swt:bg-base-200 swt:p-2 swt:shadow-sm"
-                                            prop.onClick (fun _ -> setSaveMenuOpen false)
-                                            prop.children [
-                                                Html.li [
-                                                    prop.children [
-                                                        Html.button [
-                                                            prop.testId "GitSidebarLocalCommitButton"
-                                                            prop.className
-                                                                "swt:items-start swt:gap-2 swt:whitespace-normal swt:text-left"
-                                                            prop.onClick (fun _ -> props.SubmitLocalCommit())
-                                                            prop.children [
-                                                                Html.span [
-                                                                    prop.className
-                                                                        "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
-                                                                ]
-                                                                Html.span [
-                                                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
-                                                                    prop.text localCommitLabel
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                ]
+                            // Save All keeps the left edge and the filled style. Clicking a row marks it,
+                            // so the outlined Save Selected reads as the second choice.
+                            GitSidebar.CommitSaveButton(
+                                "GitSidebarSaveAllButton",
+                                "Save All Changes",
+                                "swt:fluent--checkmark-circle-24-regular",
+                                true,
+                                not props.CanRunPrimarySave,
+                                props.SubmitSaveAll
+                            )
+
+                            if props.HasMarkedFiles then
+                                GitSidebar.CommitSaveButton(
+                                    "GitSidebarSaveSelectedButton",
+                                    "Save Selected Changes",
+                                    "swt:fluent--document-checkmark-24-regular",
+                                    false,
+                                    not props.CanRunPrimarySave,
+                                    props.SubmitSaveSelected
+                                )
+                        ]
+                    ]
+                    Html.label [
+                        prop.className "swt:mt-2 swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-xs"
+                        prop.title
+                            "When unchecked, changes are saved on this computer only and not uploaded to the online repository."
+                        prop.children [
+                            Html.input [
+                                prop.testId "GitSidebarUploadRightAwayCheckbox"
+                                prop.className "swt:checkbox swt:checkbox-xs swt:shrink-0"
+                                prop.type'.checkbox
+                                prop.disabled (not props.CanEditCommit)
+                                prop.isChecked props.UploadRightAway
+                                prop.onChange props.SetUploadRightAway
                             ]
-                            Html.div [
-                                prop.className "swt:shrink-0"
-                                prop.children [ GitSidebar.SaveOptionsHelpPopover() ]
+                            Html.span [
+                                prop.className "swt:min-w-0 swt:truncate"
+                                prop.text "Upload right away"
                             ]
                         ]
                     ]
@@ -1264,6 +1242,7 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
+        let fileName, directory = GitSidebarInternal.splitPath change.Path
 
         let activateRow ctrlKey shiftKey =
             props.UpdateMarkedSelection change ctrlKey shiftKey
@@ -1279,6 +1258,7 @@ type GitSidebar =
                     prop.custom ("data-index", props.Index)
                     prop.role "button"
                     prop.tabIndex 0
+                    prop.title change.Path
                     prop.className [
                         "swt:group swt:flex swt:min-h-6 swt:w-full swt:min-w-0 swt:items-center swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:text-left swt:transition-colors swt:select-none swt:@max-xs:gap-1.5"
                         "swt:cursor-pointer"
@@ -1304,16 +1284,37 @@ type GitSidebar =
                                 Html.div [
                                     prop.className "swt:min-w-0"
                                     prop.children [
+                                        // One truncating line: the ellipsis cuts the directory first and the file name only when it does not fit alone.
                                         Html.span [
                                             prop.className
-                                                "swt:block swt:min-w-0 swt:truncate swt:text-sm swt:font-medium swt:@max-xs:text-xs"
-                                            prop.text change.Path
+                                                "swt:block swt:min-w-0 swt:truncate swt:text-sm swt:@max-xs:text-xs"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.testId $"GitSidebarChangeName-{props.Index}"
+                                                    prop.text fileName
+                                                ]
+                                                match directory with
+                                                | Some directory ->
+                                                    // The space keeps assistive tech from reading name and directory as one word.
+                                                    React.Fragment [
+                                                        Html.text " "
+                                                        Html.span [
+                                                            prop.testId $"GitSidebarChangeDirectory-{props.Index}"
+                                                            prop.className
+                                                                "swt:ml-1 swt:text-xs swt:text-base-content/60"
+                                                            prop.text directory
+                                                        ]
+                                                    ]
+                                                | None -> Html.none
+                                            ]
                                         ]
                                         match change.OriginalPath with
                                         | Some originalPath ->
                                             Html.div [
+                                                prop.testId $"GitSidebarChangeRenamedFrom-{props.Index}"
                                                 prop.className
                                                     "swt:mt-0.5 swt:truncate swt:text-xs swt:text-base-content/60"
+                                                prop.title originalPath
                                                 prop.text $"Renamed from {originalPath}"
                                             ]
                                         | None -> Html.none
@@ -1438,7 +1439,7 @@ type GitSidebar =
                 prop.ariaLabel "Changed files"
                 prop.ref scrollContainerRef
                 prop.className
-                    "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:px-2 swt:pb-2 swt:@max-xs:px-1"
+                    "swt:min-h-26 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:px-2 swt:pb-2 swt:@max-xs:px-1"
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
@@ -1855,7 +1856,9 @@ type GitSidebar =
             ?canCancelOperation: bool,
             ?onOpenRemoteRepository: unit -> unit,
             ?onSubmitPublishRename: GitSidebarPublishSubmit -> unit,
-            ?onCancelPublishRename: unit -> unit
+            ?onCancelPublishRename: unit -> unit,
+            ?uploadRightAway: bool,
+            ?onUploadRightAwayChange: bool -> unit
         ) =
 
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
@@ -1896,6 +1899,15 @@ type GitSidebar =
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
         let isMissingMessageModalOpen, setMissingMessageModalOpen = React.useState false
+        let localUploadRightAway, setLocalUploadRightAway = React.useState true
+        let isUploadRightAwayControlled = uploadRightAway.IsSome
+        let uploadRightAway = defaultArg uploadRightAway localUploadRightAway
+
+        let setUploadRightAway (value: bool) =
+            if not isUploadRightAwayControlled then
+                setLocalUploadRightAway value
+
+            onUploadRightAwayChange |> Option.iter (fun notify -> notify value)
 
         let publishRenameInput, setPublishRenameInput =
             React.useState (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
@@ -1946,7 +1958,17 @@ type GitSidebar =
             match runStatus with
             | GitSidebarRunStatus.Idle -> false
             | GitSidebarRunStatus.Busy _
+            | GitSidebarRunStatus.BusyWithoutNotice
             | GitSidebarRunStatus.Progress _ -> true
+
+        // A silent refresh disables the actions but leaves the commit message and the upload
+        // checkbox editable, so typing is not interrupted when the sidebar opens.
+        let isBusyWithVisibleOperation =
+            match runStatus with
+            | GitSidebarRunStatus.Busy _
+            | GitSidebarRunStatus.Progress _ -> true
+            | GitSidebarRunStatus.Idle
+            | GitSidebarRunStatus.BusyWithoutNotice -> false
 
         let visibleError = errorNotice |> Option.orElse localError
 
@@ -2079,43 +2101,32 @@ type GitSidebar =
             setMarkedPaths (fun _ -> nextMarkedPaths)
             setSelectionAnchorPath (fun _ -> Some change.Path)
 
-        let submitPrimarySave () =
+        let submitSave (selectedOnly: bool) =
             let normalizedCommitMessage = commitMessage.Trim()
-            let hasMarkedFiles = (Set.count markedPaths) > 0
 
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
                 setMissingMessageModalOpen true
-            elif hasMarkedFiles then
-                setLocalError None
-
-                onPrimarySaveSelection {
-                    Message = normalizedCommitMessage
-                    Paths = markedPaths |> Set.toArray |> Array.sort
-                }
-
-                setCommitMessage ""
-                setMarkedPaths (fun _ -> Set.empty)
             else
                 setLocalError None
-                onPrimarySaveAll normalizedCommitMessage
+
+                if selectedOnly then
+                    let request = {
+                        Message = normalizedCommitMessage
+                        Paths = markedPaths |> Set.toArray |> Array.sort
+                    }
+
+                    if uploadRightAway then
+                        onPrimarySaveSelection request
+                    else
+                        onCommitSelection request
+
+                    setMarkedPaths (fun _ -> Set.empty)
+                elif uploadRightAway then
+                    onPrimarySaveAll normalizedCommitMessage
+                else
+                    onCommitAll normalizedCommitMessage
+
                 setCommitMessage ""
-
-        let submitLocalCommit () =
-            let normalizedCommitMessage = commitMessage.Trim()
-            let hasMarkedFiles = (Set.count markedPaths) > 0
-
-            if String.IsNullOrWhiteSpace normalizedCommitMessage then
-                setMissingMessageModalOpen true
-            elif hasMarkedFiles then
-                setLocalError None
-
-                onCommitSelection {
-                    Message = normalizedCommitMessage
-                    Paths = markedPaths |> Set.toArray |> Array.sort
-                }
-            else
-                setLocalError None
-                onCommitAll normalizedCommitMessage
 
         let submitDiscardSelection (paths: string[]) =
             let normalizedPaths =
@@ -2140,10 +2151,14 @@ type GitSidebar =
 
             if not success then
                 setLocalError (Some "Git LFS threshold must be a whole number.")
-            elif parsedThresholdMb < 1 then
-                setLocalError (Some "Git LFS threshold must be at least 1 MB.")
-            elif parsedThresholdMb > 100 then
-                setLocalError (Some "Git LFS threshold must not exceed 100 MB.")
+            elif parsedThresholdMb < GitSettingRanges.MinLfsAutoTrackThresholdMb then
+                setLocalError (
+                    Some $"Git LFS threshold must be at least {GitSettingRanges.MinLfsAutoTrackThresholdMb} MB."
+                )
+            elif parsedThresholdMb > GitSettingRanges.MaxLfsAutoTrackThresholdMb then
+                setLocalError (
+                    Some $"Git LFS threshold must not exceed {GitSettingRanges.MaxLfsAutoTrackThresholdMb} MB."
+                )
             else
                 setLocalError None
                 onSaveLfsAutoTrackThreshold parsedThresholdMb
@@ -2154,13 +2169,13 @@ type GitSidebar =
 
             if not success then
                 setLocalError (Some "Background indexing limit must be a whole number.")
-            elif parsedLimitMb < GitSidebarInternal.MinDiffIndexingLimitMb then
+            elif parsedLimitMb < GitSettingRanges.MinDiffIndexingLimitMb then
                 setLocalError (
-                    Some $"Background indexing limit must be at least {GitSidebarInternal.MinDiffIndexingLimitMb} MB."
+                    Some $"Background indexing limit must be at least {GitSettingRanges.MinDiffIndexingLimitMb} MB."
                 )
-            elif parsedLimitMb > GitSidebarInternal.MaxDiffIndexingLimitMb then
+            elif parsedLimitMb > GitSettingRanges.MaxDiffIndexingLimitMb then
                 setLocalError (
-                    Some $"Background indexing limit must not exceed {GitSidebarInternal.MaxDiffIndexingLimitMb} MB."
+                    Some $"Background indexing limit must not exceed {GitSettingRanges.MaxDiffIndexingLimitMb} MB."
                 )
             else
                 setLocalError None
@@ -2221,10 +2236,13 @@ type GitSidebar =
             callbacks.OnDedupLfsStorage()
 
         let hasConflicts = GitSidebarInternal.hasConflicts status changedFiles
-        let canEditCommit = not status.IsClean && not hasConflicts && not isBusy
+
+        let canEditCommit =
+            not status.IsClean && not hasConflicts && not isBusyWithVisibleOperation
+
         let markedCount = Set.count markedPaths
         let hasMarkedFiles = markedCount > 0
-        let canRunPrimarySave = canEditCommit
+        let canRunPrimarySave = canEditCommit && not isBusy
 
         let normalizedLfsThresholdInput = lfsThresholdInput.Trim()
 
@@ -2268,7 +2286,7 @@ type GitSidebar =
         Html.div [
             prop.testId "GitSidebar"
             prop.className
-                "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:bg-base-100"
+                "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:overflow-y-auto swt:bg-base-100"
             prop.children [
                 GitSidebar.BranchHeader(branchHeaderProps)
 
@@ -2298,8 +2316,6 @@ type GitSidebar =
                             fun () ->
                                 setLocalError None
                                 onUpdateFromOnline ()
-                        HasMarkedFiles = hasMarkedFiles
-                        CanRunPrimarySave = canRunPrimarySave
                         IsAdvancedActionsOpen = isAdvancedActionsOpen
                         ToggleAdvancedActions =
                             fun () ->
@@ -2349,8 +2365,10 @@ type GitSidebar =
                         MarkedCount = markedCount
                         HasMarkedFiles = hasMarkedFiles
                         CanRunPrimarySave = canRunPrimarySave
-                        SubmitPrimarySave = submitPrimarySave
-                        SubmitLocalCommit = submitLocalCommit
+                        UploadRightAway = uploadRightAway
+                        SetUploadRightAway = setUploadRightAway
+                        SubmitSaveSelected = fun () -> submitSave true
+                        SubmitSaveAll = fun () -> submitSave false
                     }
                 )
 
