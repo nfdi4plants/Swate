@@ -128,6 +128,9 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ PDFViewer.DisplayPDF.Main(content) ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading pdf...")
                         )
+                    | Some _, Some(PageState.PNGImage content) -> ImageViewer.Main("image/png", content)
+                    | Some _, Some(PageState.JPGImage content) -> ImageViewer.Main("image/jpeg", content)
+                    | Some _, Some(PageState.SVGImage content) -> ImageViewer.Main("image/svg+xml", content)
                     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
                     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()
                     | Some _, Some(PageState.ErrorPage errMsg) -> ErrorViewTarget errMsg

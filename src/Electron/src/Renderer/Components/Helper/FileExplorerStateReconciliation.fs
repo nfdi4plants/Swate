@@ -21,6 +21,9 @@ let private resetsWhenSelectionIsRemoved =
     | PageState.ArcFilePage _
     | PageState.MarkdownPage _
     | PageState.PDFPage _
+    | PageState.PNGImage _
+    | PageState.JPGImage _
+    | PageState.SVGImage _
     | PageState.TextPage _
     | PageState.UnknownPage
     | PageState.ErrorPage _ -> true
@@ -59,6 +62,9 @@ let private reloadsWhenSelectedFileChanges =
     function
     | PageState.MarkdownPage _
     | PageState.PDFPage _
+    | PageState.PNGImage _
+    | PageState.JPGImage _
+    | PageState.SVGImage _
     | PageState.TextPage _
     | PageState.UnknownPage
     | PageState.ErrorPage _ -> true

@@ -1002,10 +1002,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
 
                                 let! content =
-                                    if fileType = FileContentType.PDF then
-                                        Main.Bindings.Filesystem.readFileBase64Async path
-                                    else
-                                        ARCtrl.FileSystemHelper.readFileTextAsync path
+                                    match fileType with
+                                    | FileContentType.PDF -> Main.Bindings.Filesystem.readFileBase64Async path
+                                    | FileContentType.PNGImage -> Main.Bindings.Filesystem.readFileBase64Async path
+                                    | FileContentType.JPGImage -> Main.Bindings.Filesystem.readFileBase64Async path
+                                    | FileContentType.SVGImage -> Main.Bindings.Filesystem.readFileBase64Async path
+                                    | _ -> ARCtrl.FileSystemHelper.readFileTextAsync path
 
                                 let dto = FileContentDTO.create fileType content relativePath
 
