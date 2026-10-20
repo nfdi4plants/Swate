@@ -322,8 +322,10 @@
     <Compile Include="Page\Metadata\FormComponents\PersonsInput\Lookup.fs" />
     <Compile Include="Page\Metadata\FormComponents\PersonsInput\Lookup.test.fs" />
     <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonSearchDialog.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonImportDialog.fs" />
     <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonsInput.fs" />
     <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonsInput.test.rtl.fs" />
+    <Compile Include="Page\Metadata\FormComponents\PersonsInput\PersonImportDialog.test.rtl.fs" />
     <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Types.fs" />
     <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Lookup.fs" />
     <Compile Include="Page\Metadata\FormComponents\PublicationsInput\Lookup.test.fs" />
@@ -339,6 +341,7 @@
     <Compile Include="Page\Metadata\DataMapMetadata.fs" />
     <Compile Include="Page\Metadata\InvestigationMetadata.fs" />
     <Compile Include="Page\Metadata\ArcFileMetadata.fs" />
+    <Compile Include="Page\Metadata\ArcFileMetadata.test.rtl.fs" />
     <Compile Include="Page\Landing\Types.fs" />
     <Compile Include="Page\Landing\State.fs" />
     <Compile Include="Page\Landing\Validation.fs" />
@@ -382,13 +385,15 @@
     <Compile Include="Page\ValidationPackageBrowser\ValidationPackageBrowser.sample.fs" />
     <Compile Include="Page\ArcFileEditor\Types.fs" />
     <Compile Include="Page\ArcFileEditor\Helper.fs" />
+    <Compile Include="Page\ArcFileEditor\EmptyTableView\Types.fs" />
     <Compile Include="Page\ArcFileEditor\EmptyTableView\Helper.fs" />
-    <Compile Include="Page\ArcFileEditor\EmptyTableView\Modals.fs" />
     <Compile Include="Page\ArcFileEditor\EmptyTableView\Main.fs" />
     <Compile Include="Page\ArcFileEditor\Widgets.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileFooterTabs.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileEditor.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileEditor.test.rtl.fs" />
+    <Compile Include="Page\ArcFileEditor\EmptyTableView\Main.sample.fs" />
+    <Compile Include="Page\ArcFileEditor\EmptyTableView\Main.test.rtl.fs" />
 
     <Compile Include="Style.fs" />
   </ItemGroup>
