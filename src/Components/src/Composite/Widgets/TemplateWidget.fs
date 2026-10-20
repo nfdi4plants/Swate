@@ -41,8 +41,6 @@ type TemplateWidget =
             | Some _ -> None
             | None -> Some "Select a table first to import templates."
 
-        let canAppend = tryGetActiveTableIndex arcFile |> Option.isSome
-
         let syncSelectedTemplateIds (loadedTemplates: Template[]) =
             TemplateActions.syncSelectedTemplateIds loadedTemplates setSelectedTemplateIds
 
@@ -53,66 +51,56 @@ type TemplateWidget =
         let toggleTemplateSelection (templateId: System.Guid) =
             setSelectedTemplateIds (fun current -> TemplateActions.toggleTemplateSelection templateId current)
 
-        let importTemplates (payload: TemplateTypes.ImportModalConfirmPayload) =
-            match canAppend with
-            | false -> false
-            | true ->
-                if payload.SelectedTemplatesForImport.Length > 0 then
-                    let importTables =
-                        ResizeArray(
-                            payload.SelectedTemplatesForImport
-                            |> Seq.map (fun (template, _) -> template.Table)
-                        )
-
-                    let selectedTemplateIndexById =
-                        TemplateActions.selectedTemplateIndexById payload.SelectedTemplatesForImport
-
-                    let deselectedColumns =
-                        TemplateActions.deselectedColumnsForImport
-                            payload.DeselectedTemplateColumns
-                            selectedTemplateIndexById
-
-                    let importConfig =
-                        TemplateActions.buildSelectiveImportConfig
-                            payload.ImportType
-                            (TemplateActions.importTablesConfig payload.SelectedTemplatesForImport)
-                            deselectedColumns
-
-                    let nextArcFileState =
-                        Helper.updateTables importTables importConfig (tryGetActiveTableIndex arcFile) (Some arcFile)
-
-                    let nextArcFile = ArcFiles.refreshRef nextArcFileState
-                    setArcFile nextArcFile
-                    setSelectedTemplateIds (fun _ -> Set.empty<System.Guid>)
-                    true
-                else
-                    false
+        let importError, setImportError = React.useState (None: string option)
 
         let openImportDialog () =
             if not showImportDialog then
+                setImportError None
                 setShowImportDialog true
 
         let confirmImport (payload: TemplateTypes.ImportModalConfirmPayload) =
-            let didImport = importTemplates payload
-            setShowImportDialog false
+            match tryGetActiveTableIndex arcFile with
+            | Some tableIndex when payload.SelectedTemplatesForImport.Length > 0 ->
+                let importResult =
+                    try
+                        Ok(TemplateActions.importIntoCopy arcFile (Some tableIndex) payload)
+                    with error ->
+                        Error error.Message
+
+                match importResult with
+                | Error message -> setImportError (Some message)
+                | Ok nextArcFile ->
+                    setArcFile nextArcFile
+                    setSelectedTemplateIds (fun _ -> Set.empty<System.Guid>)
+                    setShowImportDialog false
+                    widgetCtx.closeWidget WidgetType.Template
+            | _ -> setShowImportDialog false
 
             if didImport then
                 match onImportCompleted with
                 | Some onCompleted -> onCompleted ()
                 | None -> widgetCtx.closeWidget WidgetType.Template
+        let existingTableNames = arcFile.Tables() |> Seq.map _.Name |> Array.ofSeq
 
         let selectedTemplates =
-            templates
-            |> Array.filter (fun template -> selectedTemplateIds.Contains template.Id)
+            React.useMemo (
+                (fun () ->
+                    templates
+                    |> Array.filter (fun template -> selectedTemplateIds.Contains template.Id)
+                ),
+                [| box templates; box selectedTemplateIds |]
+            )
 
         React.Fragment [
             TemplateImportModal.TemplateImportModal(
                 isOpen = showImportDialog,
                 importType = importType,
                 selectedTemplates = selectedTemplates,
+                existingTableNames = existingTableNames,
                 setIsOpen = setShowImportDialog,
                 setImportType = setImportType,
-                submitImport = confirmImport
+                submitImport = confirmImport,
+                ?importError = importError
             )
             Html.div [
                 prop.className

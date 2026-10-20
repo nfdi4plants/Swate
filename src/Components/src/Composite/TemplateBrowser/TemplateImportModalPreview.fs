@@ -31,6 +31,48 @@ type TemplateImportModalPreview =
             ]
         ]
 
+    [<ReactComponent>]
+    static member private NewTableNameField
+        (newTableName: Swate.Components.Shared.ARCtrlHelper.NewTableName, setName: string -> unit)
+        =
+        let message (colorClass: string) (iconClass: string) (text: string) =
+            Html.span [
+                prop.className [
+                    "swt:flex swt:items-center swt:gap-1 swt:text-xs"
+                    colorClass
+                ]
+                prop.children [
+                    Html.i [ prop.className [ "swt:iconify"; iconClass ] ]
+                    Html.span text
+                ]
+            ]
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-1"
+            prop.children [
+                Html.label [
+                    prop.className "swt:flex swt:flex-col swt:gap-1"
+                    prop.children [
+                        Html.span [ prop.className "swt:text-xs"; prop.text "New table name" ]
+                        Html.input [
+                            prop.type'.text
+                            prop.className [
+                                "swt:input swt:input-xs swt:w-full"
+                                if newTableName.Error.IsSome then
+                                    "swt:input-error"
+                            ]
+                            prop.value newTableName.Name
+                            prop.onChange setName
+                        ]
+                    ]
+                ]
+                match newTableName.Error, newTableName.Notice with
+                | Some error, _ -> message "swt:text-error" "swt:fluent--warning-12-filled" error
+                | None, Some notice -> message "swt:text-info" "swt:fluent--info-12-regular" notice
+                | None, None -> Html.none
+            ]
+        ]
+
     [<ReactComponent(true)>]
     static member TemplateImportModalPreview(templates: Template[], callbacks: TemplateTypes.TemplatePreviewCallbacks) =
         if templates.Length = 0 then
@@ -94,6 +136,13 @@ type TemplateImportModalPreview =
                                         )
                                     ]
                                 ]
+                                match callbacks.GetNewTableName template.Id with
+                                | Some newTableName ->
+                                    TemplateImportModalPreview.NewTableNameField(
+                                        newTableName,
+                                        callbacks.SetNewTableName template.Id
+                                    )
+                                | None -> Html.none
                                 Html.details [
                                     prop.className "swt:border swt:border-base-300 swt:rounded-box swt:px-2 swt:py-1"
                                     prop.children [
