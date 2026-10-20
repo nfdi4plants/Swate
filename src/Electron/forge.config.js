@@ -68,7 +68,22 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      // On Linux the zip holds the unpacked app for distributions that cannot install the deb or rpm (#1433).
+      platforms: ['darwin', 'linux'],
+    },
+    {
+      name: '@reforged/maker-appimage',
+      platforms: ['linux'],
+      config: {
+        options: {
+          icon: 'assets/icons/png/512x512.png',
+          categories: ['Science'],
+          // The maker downloads the runtime from the moving "continuous" tag by default. A tagged
+          // release keeps the runtime fixed. The AppImage is built for Linux x64 only (see
+          // electronTarget in build/Actions/Release.fs).
+          runtime: 'https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-deb',
