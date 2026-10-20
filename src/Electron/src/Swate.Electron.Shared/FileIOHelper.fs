@@ -23,6 +23,12 @@ let isLegacyDataMapPath (path: string) =
         String.Equals(fileName, ArcEntityPathRules.legacyDataMapFileName, StringComparison.OrdinalIgnoreCase)
     )
 
+let isOfficeLockFilePath (path: string) =
+    Text.RegularExpressions.Regex.IsMatch(
+        PathHelpers.normalizeSeparators path,
+        """(^|/)(\.?~\$[^/]*\.[^/]+|\.~lock\.[^/]+#)$"""
+    )
+
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with
     | [| candidateRoot |] -> pathsEqual rootFolderName candidateRoot

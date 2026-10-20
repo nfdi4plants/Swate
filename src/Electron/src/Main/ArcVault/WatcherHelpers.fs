@@ -51,7 +51,7 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-/// Builds the watcher events of imported files. Files the watcher ignores, such as `.~$data.xlsx`,
+/// Builds the watcher events of imported files. Files the watcher ignores, such as `~$data.xlsx`,
 /// are left out: the watcher never reports them, so they could never be released after the import.
 let createImportedFileWatcherEvents arcPath targetRelativePath (importedRelativePaths: string[]) =
     let targetRelativePath =

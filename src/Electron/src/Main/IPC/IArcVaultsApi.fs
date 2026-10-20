@@ -609,10 +609,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         )
                                                     |> Promise.catch Error
 
-                                                match result with
-                                                | Ok ImportExternalFilesResult.Completed ->
-                                                    vault.ReleaseImportedFileEventsLater(importedEvents.ToArray())
-                                                | _ -> vault.ReleaseImportedFileEvents importedEvents
+                                                vault.ReleaseImportedFileEventsAfterImport(
+                                                    result,
+                                                    importedEvents.ToArray()
+                                                )
 
                                                 vault.window.setProgressBar -1.0
                                                 return result

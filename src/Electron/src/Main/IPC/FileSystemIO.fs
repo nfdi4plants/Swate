@@ -276,10 +276,40 @@ module ArcFileSystemHelper =
     let private symbolicLinkImportError path =
         exn $"Cannot import '{path}' because it is a symbolic link."
 
+    /// The first line of a Git LFS pointer file. `hawser` is the name Git LFS had before its release.
+    let private gitLfsPointerVersionLines = [
+        "version https://git-lfs.github.com/spec/v1"
+        "version https://hawser.github.com/spec/v1"
+    ]
+
+    let private isGitLfsPointerFileAsync (absolutePath: string) = promise {
+        let! stats = statAsync absolutePath
+
+        if stats.size >= 1024.0 then
+            return false
+        else
+            let! content = readFileAsync absolutePath TextEncoding.Utf8
+
+            return
+                gitLfsPointerVersionLines
+                |> List.exists (fun versionLine -> content.StartsWith(versionLine, StringComparison.Ordinal))
+    }
+
+    let private rejectGitLfsPointerFileAsync (absolutePath: string) (importedPath: string) = promise {
+        let! isPointer = isGitLfsPointerFileAsync absolutePath
+
+        if isPointer then
+            raise (
+                exn
+                    $"Cannot import '{importedPath}' because it is only a Git LFS pointer, not the file's content. Download the file in its ARC first."
+            )
+    }
+
     /// Lists an imported source folder and everything inside it, every folder before its contents.
     /// ARC file names are rejected, because the ARC merge would read a copy such as
     /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
-    /// following one could copy data from outside the picked folder or loop forever.
+    /// following one could copy data from outside the picked folder or loop forever. Git LFS pointer
+    /// files are rejected, because they only stand in for data that was never downloaded.
     /// Leftovers the watcher ignores, such as Excel lock files, and the git files the ARC manages
     /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
     let rec private collectExternalFolderEntries
@@ -326,6 +356,7 @@ module ArcFileSystemHelper =
 
                         entries.AddRange folderEntries
                     elif isFile then
+                        do! rejectGitLfsPointerFileAsync sourcePath relativePath
                         entries.Add(importEntry sourcePath relativePath false)
                     else
                         raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
@@ -365,6 +396,7 @@ module ArcFileSystemHelper =
         | Ok _ -> ()
 
         if not isDirectory then
+            do! rejectGitLfsPointerFileAsync absolutePath name
             return importEntry absolutePath name false
         elif isLink then
             return raise (symbolicLinkImportError name)

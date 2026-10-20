@@ -752,9 +752,19 @@ module ArcVaultExtensions =
                 this.importedFileWatcherPaths.Remove(event.AbsolutePath.ToLowerInvariant())
                 |> ignore
 
-        member this.ReleaseImportedFileEventsLater(events: ArcVaultFileSystemEvent[]) =
-            Fable.Core.JS.setTimeout (fun () -> this.ReleaseImportedFileEvents events) importedFileOwnershipMilliseconds
-            |> ignore
+        /// Ends the marks of an import. A completed import keeps them until the watcher reports the files,
+        /// or for a fixed time at the latest. A cancelled or failed import was rolled back, so the watcher
+        /// has nothing of it left to report.
+        member this.ReleaseImportedFileEventsAfterImport
+            (result: Result<ImportExternalFilesResult, exn>, events: ArcVaultFileSystemEvent[])
+            =
+            match result with
+            | Ok ImportExternalFilesResult.Completed ->
+                Fable.Core.JS.setTimeout
+                    (fun () -> this.ReleaseImportedFileEvents events)
+                    importedFileOwnershipMilliseconds
+                |> ignore
+            | _ -> this.ReleaseImportedFileEvents events
 
         member this.WatchImportedFolders(absoluteFolderPaths: string[]) =
             match this.watcher with

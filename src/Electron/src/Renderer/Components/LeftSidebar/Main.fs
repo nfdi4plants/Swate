@@ -45,7 +45,7 @@ let private FileImportStatusNotice () =
                                 elif activeImport.phase = FileImportPhase.Finalizing then
                                     "Finalizing import..."
                                 else
-                                    "Importing files..."
+                                    "Importing..."
                         )
                         if
                             not fileStateCtx.isCancellingFileImport

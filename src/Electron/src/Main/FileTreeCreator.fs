@@ -20,10 +20,9 @@ let private shouldIgnoreDirName (name: string) = name = ".git"
 
 let private shouldIgnorePath (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    isOfficeLockFilePath normalizedPath
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
     || isLegacyDataMapPath normalizedPath
 

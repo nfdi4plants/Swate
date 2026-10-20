@@ -352,4 +352,30 @@ Vitest.describe (
                     })
             }
         )
+
+        Vitest.test (
+            "lock files of open Office and LibreOffice documents are hidden",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        for name in
+                            [
+                                "Book1.xlsx"
+                                "~$Book1.xlsx"
+                                ".~$Book2.xlsx"
+                                ".~lock.Book1.xlsx#"
+                            ] do
+                            do! writeUtf8FileAsync (join [| context.RepoPath; name |]) "content"
+
+                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
+                        let names = entries |> Array.map _.name
+
+                        Vitest.expect(names).toContain ("Book1.xlsx")
+                        Vitest.expect(names).not.toContain ("~$Book1.xlsx")
+                        Vitest.expect(names).not.toContain (".~$Book2.xlsx")
+                        Vitest.expect(names).not.toContain (".~lock.Book1.xlsx#")
+                    })
+            }
+        )
 )

@@ -18,13 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added
 
-- Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. A folder is not imported if a folder with the same name already exists there, or if it contains a ".git" folder, a symbolic link or an ARC metadata file such as "isa.assay.xlsx". (by @Etschbeijer)
+- Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. A folder is not imported if a folder with the same name already exists there, if the folder itself is a symbolic link, or if it contains a ".git" folder, a symbolic link, an ARC metadata file such as "isa.assay.xlsx", an item named "isa_datamap" or a Git LFS pointer file, which stands in for a large file that was not downloaded. Lock files of open Office documents, such as "~$Book1.xlsx", and ".gitkeep" and ".gitattributes" files inside the folder are left out. (by @Etschbeijer)
 
 ### 🔄 Changed
 
-- "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. (by @Etschbeijer)
+- "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. Git LFS pointer files can't be imported either: download the file in its ARC first. (by @Etschbeijer)
 - Clicking a folder or its arrow in the file tree expands or collapses it. A study, assay, workflow or run folder also opens its metadata, while other folders keep the current view open. (by @Etschbeijer)
 - The right-click menu offers "Open" only for files and for folders that have metadata. (by @Etschbeijer)
+- New files and folders and renamed items can't be named "isa_datamap" anymore. It is the outdated name of DataMap files, and opening the ARC would turn such a file into "isa.datamap.xlsx". Existing items with that name can still be renamed, moved and deleted. (by @Etschbeijer)
+
+### 🐛 Fixed
+
+- Lock files of open Office documents, such as "~$Book1.xlsx", no longer appear in the file tree. (by @Etschbeijer)
 
 ## 3.0.0 - 2026-10-16
 
