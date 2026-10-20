@@ -59,6 +59,7 @@ type TemplateWidget =
                 setShowImportDialog true
 
         let confirmImport (payload: TemplateTypes.ImportModalConfirmPayload) =
+
             match tryGetActiveTableIndex arcFile with
             | Some tableIndex when payload.SelectedTemplatesForImport.Length > 0 ->
                 let importResult =
@@ -73,13 +74,11 @@ type TemplateWidget =
                     setArcFile nextArcFile
                     setSelectedTemplateIds (fun _ -> Set.empty<System.Guid>)
                     setShowImportDialog false
-                    widgetCtx.closeWidget WidgetType.Template
-            | _ -> setShowImportDialog false
 
-            if didImport then
-                match onImportCompleted with
-                | Some onCompleted -> onCompleted ()
-                | None -> widgetCtx.closeWidget WidgetType.Template
+                    match onImportCompleted with
+                    | Some onCompleted -> onCompleted ()
+                    | None -> widgetCtx.closeWidget WidgetType.Template
+            | _ -> setShowImportDialog false
 
         let existingTableNames = arcFile.Tables() |> Seq.map _.Name |> Array.ofSeq
 
