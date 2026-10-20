@@ -1279,8 +1279,7 @@ Vitest.describe (
                         do! writeWatcherTextFileAsync createdPath "created"
                         do! writeWatcherTextFileAsync createdInUnloadedPath "created"
 
-                        do!
-                            vault.RevealCreatedFileTreePaths [ "parent/zz-created.txt"; "unloaded/nested/created.txt" ]
+                        do! vault.RevealCreatedFileTreePaths [ "parent/zz-created.txt"; "unloaded/nested/created.txt" ]
 
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["parent"]).toBe true
                         Vitest.expect(containsPath createdPath).toBe true
