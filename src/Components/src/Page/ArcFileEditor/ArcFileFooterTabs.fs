@@ -151,36 +151,68 @@ type ArcFileFooterTabs =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private EditTableNameTab
-        (currentName: string, onNameChange: string -> unit, closeEdit: unit -> unit, isActive: bool)
-        =
+        (
+            currentName: string,
+            otherTableNames: string[],
+            onNameChange: string -> unit,
+            closeEdit: unit -> unit,
+            isActive: bool
+        ) =
         let localInput, setLocalInput = React.useState currentName
 
-        let submit =
-            fun (newName: string) ->
-                let trimmed = newName.Trim()
+        let error =
+            if localInput.Trim() = currentName then
+                None
+            else
+                tryTableNameError otherTableNames localInput
 
-                match System.String.IsNullOrWhiteSpace trimmed || trimmed = currentName with
-                | true -> ()
-                | _ -> onNameChange trimmed
+        let submit () =
+            let trimmed = localInput.Trim()
+
+            if error.IsNone && trimmed <> currentName then
+                onNameChange trimmed
 
         ArcFileFooterTabs.BaseTab(
-            Html.input [
-                prop.autoFocus true
-                prop.className "swt:input swt:input-ghost swt:input-xs swt:w-full swt:max-w-xs"
-                prop.value localInput
-                prop.onChange (fun (e: string) -> setLocalInput e)
-                prop.onKeyDown (fun (e: Browser.Types.KeyboardEvent) ->
-                    match e.code with
-                    | kbdEventCode.enter ->
-                        e.preventDefault ()
-                        submit localInput
-                    | kbdEventCode.escape ->
-                        e.preventDefault ()
-                        setLocalInput currentName
-                        closeEdit ()
-                    | _ -> ()
-                )
-                prop.onBlur (fun _ -> closeEdit ())
+            Html.div [
+                prop.className "swt:flex swt:items-center swt:gap-2"
+                prop.children [
+                    Html.input [
+                        prop.autoFocus true
+                        prop.className [
+                            "swt:input swt:input-ghost swt:input-xs swt:w-full swt:max-w-xs"
+                            if error.IsSome then
+                                "swt:input-error"
+                        ]
+                        prop.value localInput
+                        prop.onChange (fun (e: string) -> setLocalInput e)
+                        prop.onKeyDown (fun (e: Browser.Types.KeyboardEvent) ->
+                            match e.code with
+                            | kbdEventCode.enter ->
+                                e.preventDefault ()
+                                submit ()
+                            | kbdEventCode.escape ->
+                                e.preventDefault ()
+                                setLocalInput currentName
+                                closeEdit ()
+                            | _ -> ()
+                        )
+                        prop.onBlur (fun _ -> closeEdit ())
+                    ]
+                    match error with
+                    | Some message ->
+                        Html.span [
+                            prop.role.alert
+                            prop.className
+                                "swt:flex swt:items-center swt:gap-1 swt:text-xs swt:text-error swt:whitespace-nowrap"
+                            prop.children [
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--warning-12-filled"
+                                ]
+                                Html.span message
+                            ]
+                        ]
+                    | None -> Html.none
+                ]
             ],
             ignore,
             isActive = isActive
@@ -431,23 +463,18 @@ type ArcFileFooterTabs =
                 |]
             )
 
+        let otherTableNames (tableIndex: int) =
+            arcFile.ArcTables().TableNames
+            |> Seq.indexed
+            |> Seq.filter (fun (index, _) -> index <> tableIndex)
+            |> Seq.map snd
+            |> Array.ofSeq
+
         let renameTable =
             React.useCallback (
                 (fun (tableIndex: int) (newName: string) ->
-
-                    let currentTables = arcFile.ArcTables()
-
-                    match
-                        System.String.IsNullOrWhiteSpace newName
-                        || newName = currentTables.[tableIndex].Name
-                        || (currentTables
-                            |> Seq.mapi (fun index table -> index, table.Name)
-                            |> Seq.exists (fun (index, tableName) -> index <> tableIndex && tableName = newName))
-                    with
-                    | true -> ()
-                    | false ->
-                        updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().RenameTableAt(tableIndex, newName))
-                        closeEditorMode ()
+                    updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().RenameTableAt(tableIndex, newName))
+                    closeEditorMode ()
                 ),
                 [|
                     box arcFile
@@ -500,6 +527,7 @@ type ArcFileFooterTabs =
                                             | true ->
                                                 ArcFileFooterTabs.EditTableNameTab(
                                                     tableModel.tableName,
+                                                    otherTableNames tableModel.index,
                                                     renameTable tableModel.index,
                                                     closeEditorMode,
                                                     isActive = tableModel.isActive

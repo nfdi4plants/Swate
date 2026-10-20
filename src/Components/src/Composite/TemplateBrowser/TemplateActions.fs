@@ -1,6 +1,7 @@
 module Swate.Components.Composite.Template.TemplateActions
 
 open ARCtrl
+open Swate.Components.Shared
 open Swate.Components.Composite.Template.Types
 
 /// Syncs the selected template IDs with the currently loaded templates, removing any IDs that no longer exist in the loaded templates.
@@ -94,43 +95,71 @@ let selectedTemplatesForImport
         | nextAction -> Some(template, nextAction)
     )
 
-let selectedTemplateIndexById (selectedTemplatesForImport: (Template * TemplateImportAction)[]) =
-    selectedTemplatesForImport
-    |> Array.mapi (fun tableIndex (template, _) -> template.Id, tableIndex)
+let newTableNames
+    (existingTableNames: string seq)
+    (selectedTemplatesForImport: (Template * TemplateImportAction)[])
+    (enteredNames: Map<System.Guid, string>)
+    =
+    let newTableTemplates =
+        selectedTemplatesForImport
+        |> Array.choose (fun (template, action) ->
+            if action = TemplateImportAction.ImportAsNewTable then
+                Some template
+            else
+                None
+        )
+
+    newTableTemplates
+    |> Array.map (fun template -> template.Table.Name, enteredNames.TryFind template.Id)
+    |> resolveNewTableNames existingTableNames
+    |> Array.zip newTableTemplates
+    |> Array.map (fun (template, newTableName) -> template.Id, newTableName)
     |> Map.ofArray
 
-let deselectedColumnsForImport
-    (deselectedTemplateColumns: Set<System.Guid * int>)
-    (selectedTemplateIndexById: Map<System.Guid, int>)
-    =
-    deselectedTemplateColumns
-    |> Seq.choose (fun (templateId, columnIndex) ->
-        selectedTemplateIndexById
-        |> Map.tryFind templateId
-        |> Option.map (fun tableIndex -> tableIndex, columnIndex)
-    )
-    |> Set.ofSeq
+let importIntoCopy (arcFile: ArcFiles) (activeTableIndex: int option) (payload: ImportModalConfirmPayload) =
+    let selected = payload.SelectedTemplatesForImport
 
-let importTablesConfig (selectedTemplatesForImport: (Template * TemplateImportAction)[]) =
-    selectedTemplatesForImport
-    |> Array.mapi (fun tableIndex (_, action) ->
-        ({
-            Index = tableIndex
-            FullImport = (action = TemplateImportAction.ImportAsNewTable)
-        }
-        : ImportTable)
-    )
-    |> Array.toList
+    let tableIndexById =
+        selected
+        |> Array.mapi (fun tableIndex (template, _) -> template.Id, tableIndex)
+        |> Map.ofArray
 
-let buildSelectiveImportConfig
-    (importType: TableJoinOptions)
-    (importTablesConfig: ImportTable list)
-    (deselectedColumns: Set<int * int>)
-    =
-    {
+    let importConfig = {
         SelectiveImportConfig.init () with
-            ImportType = importType
-            ImportMetadata = false
-            ImportTables = importTablesConfig
-            DeselectedColumns = deselectedColumns
+            ImportType = payload.ImportType
+            ImportTables =
+                selected
+                |> Array.mapi (fun tableIndex (template, action) ->
+                    let fullImport = action = TemplateImportAction.ImportAsNewTable
+
+                    ({
+                        Index = tableIndex
+                        FullImport = fullImport
+                        Name =
+                            if fullImport then
+                                payload.NewTableNames.TryFind template.Id |> Option.map _.Trim()
+                            else
+                                None
+                    }
+                    : ImportTable)
+                )
+                |> Array.toList
+            DeselectedColumns =
+                payload.DeselectedTemplateColumns
+                |> Seq.choose (fun (templateId, columnIndex) ->
+                    tableIndexById.TryFind templateId
+                    |> Option.map (fun tableIndex -> tableIndex, columnIndex)
+                )
+                |> Set.ofSeq
     }
+
+    let nextArcFile = ArcFiles.refreshRef arcFile
+
+    Helper.updateTables
+        (selected |> Array.map (fun (template, _) -> template.Table) |> ResizeArray)
+        importConfig
+        activeTableIndex
+        (Some nextArcFile)
+    |> ignore
+
+    nextArcFile
