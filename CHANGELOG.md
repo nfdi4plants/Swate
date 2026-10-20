@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 - Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. A folder is not imported if a folder with the same name already exists there, if the folder itself is a symbolic link, or if it contains a ".git" folder, a symbolic link, an ARC metadata file such as "isa.assay.xlsx", an item named "isa_datamap" or a Git LFS pointer file, which stands in for a large file that was not downloaded. Lock files of open Office documents, such as "~$Book1.xlsx", and ".gitkeep" and ".gitattributes" files inside the folder are left out. (by @Etschbeijer)
+- Linux releases include an Arch Linux package (`.pkg.tar.zst`), an `.AppImage` and a `.zip` of the unpacked app, for distributions that cannot install the `.deb` or `.rpm`. The `.deb`, `.rpm` and `.zip` packages are now also provided for `arm64`. #1433 (by @caroott)
 
 ### 🔄 Changed
 
