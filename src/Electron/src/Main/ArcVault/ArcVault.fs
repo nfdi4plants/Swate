@@ -1456,21 +1456,25 @@ module ArcVaultExtensions =
                             refreshError.Message
         }
 
-        /// Shows paths that Swate just created. A parent that is not loaded yet is loaded first; every path
-        /// is then added directly, because a partly loaded parent may not list it within its loaded entries.
+        /// Shows paths that Swate just created. Every ancestor that is not loaded yet is loaded first, from
+        /// the top down: File Explorer expands the folders on the path to a selected new item, and a folder
+        /// shown without its listing would hide its other children. Every path is then added directly,
+        /// because a partly loaded parent may not list it within its loaded entries.
         member this.RevealCreatedFileTreePaths(relativePaths: string list) = promise {
-            let parentPaths =
-                relativePaths
-                |> List.map (fun path ->
-                    PathHelpers.normalizeCanonicalRelativePath path
-                    |> PathHelpers.tryGetParentPath
-                    |> Option.defaultValue RootDirectory
-                )
-                |> List.distinctBy PathHelpers.normalizeForComparison
+            let rec ancestorsOf (path: string) =
+                match PathHelpers.tryGetParentPath path with
+                | Some parentPath -> ancestorsOf parentPath @ [ parentPath ]
+                | None -> []
 
-            for parentPath in parentPaths do
-                if not (this.IsFileTreeDirectoryLoaded parentPath) then
-                    do! this.RefreshFileTreeDirectory parentPath
+            let ancestorPaths =
+                relativePaths
+                |> List.collect (PathHelpers.normalizeCanonicalRelativePath >> ancestorsOf)
+                |> List.distinctBy PathHelpers.normalizeForComparison
+                |> List.sortBy getPathDepth
+
+            for ancestorPath in ancestorPaths do
+                if not (this.IsFileTreeDirectoryLoaded ancestorPath) then
+                    do! this.RefreshFileTreeDirectory ancestorPath
 
             do! this.ReconcileFileTreePaths relativePaths
         }

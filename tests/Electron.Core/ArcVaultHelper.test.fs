@@ -1245,7 +1245,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "revealing created paths shows them beyond the loaded page and loads an unloaded parent",
+            "revealing created paths shows them beyond the loaded page and loads every unloaded ancestor",
             fun () ->
                 withTempArc
                     ignore
@@ -1271,15 +1271,24 @@ Vitest.describe (
 
                         // On NTFS a listing returns names in order, so this one lies beyond the loaded page.
                         let createdPath = join [| parentPath; "zz-created.txt" |]
-                        let createdInUnloadedPath = join [| unloadedPath; "created.txt" |]
+                        // A new note sits in new folders below a folder that may never have been expanded.
+                        let siblingPath = join [| unloadedPath; "sibling.txt" |]
+                        let createdInUnloadedPath = join [| unloadedPath; "nested"; "created.txt" |]
+                        do! writeWatcherTextFileAsync siblingPath "sibling"
+                        do! mkdirWatcherDirectoryAsync (join [| unloadedPath; "nested" |])
                         do! writeWatcherTextFileAsync createdPath "created"
                         do! writeWatcherTextFileAsync createdInUnloadedPath "created"
 
-                        do! vault.RevealCreatedFileTreePaths [ "parent/zz-created.txt"; "unloaded/created.txt" ]
+                        do!
+                            vault.RevealCreatedFileTreePaths [ "parent/zz-created.txt"; "unloaded/nested/created.txt" ]
 
                         Vitest.expect(vault.fileTreeDirectoryHasMore.["parent"]).toBe true
                         Vitest.expect(containsPath createdPath).toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "unloaded").toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "unloaded/nested").toBe true
+                        // The ancestor shows all of its children, not only the path to the new item.
+                        Vitest.expect(containsPath siblingPath).toBe true
+                        Vitest.expect(vault.fileTreeDirectoryHasMore.["unloaded"]).toBe false
                         Vitest.expect(containsPath createdInUnloadedPath).toBe true
                         do! vault.StopFileWatcher()
                     })
