@@ -402,6 +402,12 @@ module ArcFileSystemHelper =
         | Ok _ -> ()
 
         if not isDirectory then
+            if isOfficeLockFilePath name then
+                raise (
+                    exn
+                        $"Cannot import '{name}' because it is the lock file of a document that is open in Office or LibreOffice."
+                )
+
             do! rejectGitLfsPointerFileAsync absolutePath name
             return importEntry absolutePath name false
         elif isLink then

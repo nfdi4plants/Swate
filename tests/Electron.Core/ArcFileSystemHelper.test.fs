@@ -257,6 +257,32 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
+        // The file tree hides lock files, so an imported one would never show up.
+        Description = "a picked Excel lock file"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                do! writeRelativeFileAsync (dirname arcPath) "~$data.xlsx" "Excel lock file"
+                return join [| dirname arcPath; "~$data.xlsx" |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError =
+            "Cannot import '~$data.xlsx' because it is the lock file of a document that is open in Office or LibreOffice."
+        AbsentRelativePath = "assays/AssayA/dataset/~$data.xlsx"
+    }
+    {
+        Description = "a picked LibreOffice lock file"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                do! writeRelativeFileAsync (dirname arcPath) ".~lock.data.xlsx#" "LibreOffice lock file"
+                return join [| dirname arcPath; ".~lock.data.xlsx#" |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = "Cannot import '.~lock.data.xlsx#' because it is the lock file of a document"
+        AbsentRelativePath = "assays/AssayA/dataset/.~lock.data.xlsx#"
+    }
+    {
         Description = "a picked Git LFS pointer file"
         PrepareSource =
             fun arcPath -> promise {
@@ -914,35 +940,6 @@ Vitest.describe (
 
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1/empty" true
                     do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
-                })
-        )
-
-        Vitest.test (
-            "still imports a picked Excel lock file, unlike one inside a picked folder",
-            fun () ->
-                withAssayArc (fun arcPath -> promise {
-                    // Picked files were imported this way before folder imports existed. The watcher does
-                    // not report such a file, so it is not registered as imported.
-                    let sourceRoot = dirname arcPath
-                    do! writeRelativeFileAsync sourceRoot "~$data.xlsx" "Excel lock file"
-                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
-
-                    let! plannedFiles =
-                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
-                            absoluteArcPath sourceRoot "~$data.xlsx"
-                        |]
-
-                    Vitest.expect(plannedFiles).toEqual ([| "~$data.xlsx" |])
-                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/~$data.xlsx" true
-
-                    Vitest
-                        .expect(
-                            Main.WatcherHelpers.createImportedFileWatcherEvents
-                                arcPath
-                                "assays/AssayA/dataset"
-                                plannedFiles
-                        )
-                        .toEqual ([||])
                 })
         )
 
