@@ -64,7 +64,13 @@ let private importTemplate importType fullImport deselected source target =
     let config = {
         SelectiveImportConfig.init () with
             ImportType = importType
-            ImportTables = [ { Index = 0; FullImport = fullImport } ]
+            ImportTables = [
+                {
+                    Index = 0
+                    FullImport = fullImport
+                    Name = None
+                }
+            ]
             DeselectedColumns = deselected
     }
 
