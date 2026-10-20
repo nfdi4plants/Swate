@@ -282,10 +282,16 @@ module ArcFileSystemHelper =
         "version https://hawser.github.com/spec/v1"
     ]
 
+    let private minimumGitLfsPointerBytes =
+        (gitLfsPointerVersionLines |> List.map String.length |> List.min)
+        + "\noid sha256:".Length
+        + 64
+        + "\nsize 0\n".Length
+
     let private isGitLfsPointerFileAsync (absolutePath: string) = promise {
         let! stats = statAsync absolutePath
 
-        if stats.size >= 1024.0 then
+        if stats.size < float minimumGitLfsPointerBytes || stats.size >= 1024.0 then
             return false
         else
             let! content = readFileAsync absolutePath TextEncoding.Utf8

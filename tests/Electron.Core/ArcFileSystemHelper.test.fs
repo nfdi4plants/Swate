@@ -244,6 +244,19 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
+        // The shortest possible pointer: the old version line, an `oid` and a one-digit `size`.
+        Description = "a folder that contains the shortest possible Git LFS pointer file"
+        PrepareSource =
+            createExternalRunFolderWithAsync
+                "raw/empty.bin"
+                ("version https://hawser.github.com/spec/v1\noid sha256:"
+                 + String.replicate 64 "a"
+                 + "\nsize 0\n")
+        TargetRelativePath = ""
+        ExpectedError = "Cannot import 'Run1/raw/empty.bin' because it is only a Git LFS pointer"
+        AbsentRelativePath = "Run1"
+    }
+    {
         Description = "a picked Git LFS pointer file"
         PrepareSource =
             fun arcPath -> promise {
@@ -1015,6 +1028,12 @@ Vitest.describe (
                             sourcePath
                             "raw/pointer-like.txt"
                             (gitLfsPointerContent + String.replicate 1024 "x")
+                    // Too short to hold an `oid` and a `size`, so it can't be a pointer.
+                    do!
+                        writeRelativeFileAsync
+                            sourcePath
+                            "raw/version-only.txt"
+                            "version https://git-lfs.github.com/spec/v1\n"
 
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
 
@@ -1022,6 +1041,7 @@ Vitest.describe (
 
                     Vitest.expect(plannedFiles).toContain ("Run1/raw/lfs-notes.md")
                     Vitest.expect(plannedFiles).toContain ("Run1/raw/pointer-like.txt")
+                    Vitest.expect(plannedFiles).toContain ("Run1/raw/version-only.txt")
                 })
         )
 
