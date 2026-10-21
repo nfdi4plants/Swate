@@ -16,14 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 3.1.0 - 2026-10-21
+
 ### ✨ Added
 
 - Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. A folder is not imported if a folder with the same name already exists there, if the folder itself is a symbolic link, or if it contains a ".git" folder, a symbolic link, an ARC metadata file such as "isa.assay.xlsx", an item named "isa_datamap" or a Git LFS pointer file, which stands in for a large file that was not downloaded. Lock files of open Office documents, such as "~$Book1.xlsx", and ".gitkeep" and ".gitattributes" files inside the folder are left out. (by @Etschbeijer)
+- Add "Import Person" functionality to all metadata sections. #1367 (by @Freymaurer)
 - Linux releases include an Arch Linux package (`.pkg.tar.zst`), an `.AppImage` and a `.zip` of the unpacked app, for distributions that cannot install the `.deb` or `.rpm`. The `.deb`, `.rpm` and `.zip` packages are now also provided for `arm64`. #1433 (by @caroott)
 
 ### 🔄 Changed
 
 - "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. Lock files of open Office documents, such as "~$Book1.xlsx", and Git LFS pointer files can't be imported either. For a pointer file, download the file in its ARC first. (by @Etschbeijer)
+- Sidebar action buttons are now grouped by functionality. Added open and create ARC buttons. (by @Freymaurer)
+- Empty table view now switches to a term search or template search view, instead of opening a modal. #1417 (by @Freymaurer)
+- In empty tables, the "Utilization of prior tables" feature, now allows importing inputs/outputs from all across the ARC. (by @Freymaurer)
 - Clicking a folder or its arrow in the file tree expands or collapses it. A study, assay, workflow or run folder also opens its metadata, while other folders keep the current view open. (by @Etschbeijer)
 - The right-click menu offers "Open" only for files and for folders that have metadata. (by @Etschbeijer)
 - New files and folders and renamed items can't be named "isa_datamap" anymore. It is the outdated name of DataMap files, and opening the ARC would turn such a file into "isa.datamap.xlsx". Existing items with that name can still be renamed, moved and deleted. (by @Etschbeijer)

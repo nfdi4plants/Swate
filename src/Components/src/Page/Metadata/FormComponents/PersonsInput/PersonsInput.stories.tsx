@@ -3,15 +3,17 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { PersonsInput } from './PersonsInput.fs.ts';
 import { Person } from '../../../../fable_modules/ARCtrl.Core.3.0.0-beta.12/Person.fs.ts';
+import { OntologyAnnotation } from '../../../../fable_modules/ARCtrl.Core.3.0.0-beta.12/OntologyAnnotation.fs.ts';
+import { Comment$ as Comment } from '../../../../fable_modules/ARCtrl.Core.3.0.0-beta.12/Comment.fs.ts';
 
 const orcid = '0000-0002-1825-0097';
 const fullName = 'Jane Smith';
 
-function PersonEditor() {
+function PersonEditor({ onImportPersons }: { onImportPersons?: () => Promise<Person[]> }) {
   const [persons, setPersons] = useState(() => [new Person()]);
   return (
     <div className="swt:max-w-3xl swt:mx-auto swt:p-4">
-      <PersonsInput persons={persons} setter={(next: Person[]) => setPersons([...next])} label="Persons" />
+      <PersonsInput persons={persons} setter={(next: Person[]) => setPersons([...next])} label="Persons" onImportPersons={onImportPersons} />
     </div>
   );
 }
@@ -90,6 +92,92 @@ async function confirmPerson(canvasElement: HTMLElement, mode: 'ORCID' | 'Name',
 }
 
 export const ManualEntry: Story = {};
+
+const loadPersons = async () => {
+  const ada = new Person();
+  ada.FirstName = 'Ada';
+  ada.LastName = 'Lovelace';
+  ada.Affiliation = 'Research Institute';
+  const grace = new Person();
+  grace.FirstName = 'Grace';
+  grace.LastName = 'Hopper';
+  return [ada, grace];
+};
+
+export const ImportPersons: Story = {
+  args: { onImportPersons: loadPersons },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Import Persons' }));
+    const portal = within(canvasElement.ownerDocument.body);
+    const dialog = within(await portal.findByRole('dialog', { name: 'Import persons' }));
+    await expect(dialog.getByRole('button', { name: 'Import selected' })).toBeDisabled();
+    await userEvent.click(await dialog.findByRole('checkbox', { name: 'Import Ada Lovelace' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Import selected' }));
+    await waitFor(() => expect(portal.queryByRole('dialog')).not.toBeInTheDocument());
+    await expect(canvas.getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('heading', { name: 'Grace Hopper' })).not.toBeInTheDocument();
+  },
+};
+
+export const EmptyImport: Story = {
+  args: { onImportPersons: async () => [] },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Import Persons' }));
+    const dialog = within(await within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'Import persons' }));
+    await expect(await dialog.findByText('No persons available to import.')).toBeInTheDocument();
+  },
+};
+
+export const ImportPersonDetails: Story = {
+  args: {
+    onImportPersons: async () => {
+      const [ada] = await loadPersons();
+      ada.MidInitials = 'A';
+      ada.ORCID = orcid;
+      ada.EMail = 'ada@example.org';
+      ada.Phone = '+44 123';
+      ada.Fax = '+44 456';
+      ada.Address = '12 Example Street\nLondon';
+      ada.Roles = [new OntologyAnnotation('Investigator', 'CREDIT', 'CREDIT:0000001', [new Comment('Role note', 'Primary role')])];
+      ada.Comments = [new Comment('Contribution', 'Study design')];
+      return [ada];
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Import Persons' }));
+    const portal = within(canvasElement.ownerDocument.body);
+    const dialog = within(await portal.findByRole('dialog', { name: 'Import persons' }));
+    const moreInfo = await dialog.findByTitle('More info about Ada A Lovelace');
+    await userEvent.click(moreInfo);
+    const details = within(await portal.findByRole('dialog', { name: 'Person details' }));
+    for (const label of ['First name', 'Last name', 'Mid initials', 'ORCID', 'Address', 'Affiliation', 'Email', 'Phone', 'Fax', 'Roles']) {
+      await expect(details.getByText(label, { exact: true })).toBeInTheDocument();
+    }
+    for (const value of ['Ada', 'Lovelace', 'A', orcid, 'Research Institute', 'ada@example.org', '+44 123', '+44 456', 'Investigator']) {
+      await expect(details.getByText(value, { exact: true })).toBeInTheDocument();
+    }
+    await expect(details.getByText('CREDIT:0000001')).toBeInTheDocument();
+    await expect(details.getByText('Primary role')).toBeInTheDocument();
+    await expect(details.getByText('Study design')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(portal.queryByRole('dialog', { name: 'Person details' })).not.toBeInTheDocument());
+    await expect(portal.getByRole('dialog', { name: 'Import persons' })).toBeInTheDocument();
+    await expect(dialog.getByRole('checkbox', { name: 'Import Ada A Lovelace' })).not.toBeChecked();
+    await expect(dialog.getByRole('button', { name: 'Import selected' })).toBeDisabled();
+    await userEvent.click(moreInfo);
+  },
+};
+
+export const ImportError: Story = {
+  args: { onImportPersons: async () => { throw new Error('Could not load persons from the source.'); } },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Import Persons' }));
+    const dialog = within(await within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'Import persons' }));
+    await expect(await dialog.findByRole('alert')).toHaveTextContent('Could not load persons from the source.');
+    await expect(dialog.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  },
+};
 
 export const OrcidIdLookup: Story = {
   play: async ({ canvasElement }) => confirmPerson(canvasElement, 'ORCID', orcid),
