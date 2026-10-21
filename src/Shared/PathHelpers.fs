@@ -289,6 +289,10 @@ module ArcEntityPathRules =
     let isLegacyDataMapFileName (fileName: string) =
         PathHelpers.pathsEqual fileName legacyDataMapFileName
 
+    /// Rename and delete refuse items with these names, files and folders alike.
+    let isProtectedName (name: string) =
+        PathHelpers.pathMatchesAny protectedDeleteTargetNames name
+
     let isArcManagedGitFileName (fileName: string) =
         PathHelpers.pathMatchesAny protectedDeleteTargetNames fileName
         && not (PathHelpers.pathMatchesAny creatableProtectedFileNames fileName)

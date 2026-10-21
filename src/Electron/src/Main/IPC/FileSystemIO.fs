@@ -300,6 +300,25 @@ module ArcFileSystemHelper =
             )
     }
 
+    let private disallowedSegmentImportError (displayPath: string) (name: string) =
+        exn $"Cannot import '{displayPath}' because '{name}' is not allowed inside an ARC."
+
+    let private protectedFolderImportError (displayPath: string) (name: string) =
+        exn
+            $"Cannot import '{displayPath}' because ARCitISA protects the name '{name}', so the folder could not be renamed or deleted afterwards."
+
+    /// True for a name the import leaves out of a folder and rejects when it is picked: names the watcher
+    /// ignores and the git files the ARC manages itself. Lock file names and git file names only mark files
+    /// as leftovers. A folder named like a lock file is imported, although the watcher does not report
+    /// changes inside it.
+    let private isLeftOutOfImport (isDirectory: bool) (relativePath: string) (name: string) =
+        if isDirectory then
+            Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
+            && not (isOfficeLockFilePath name)
+        else
+            Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
+            || ArcEntityPathRules.isArcManagedGitFileName name
+
     /// Lists an imported source folder and everything inside it, every folder before its contents.
     /// ARC file names are rejected, because the ARC merge would read a copy such as
     /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
@@ -307,9 +326,10 @@ module ArcFileSystemHelper =
     /// files are rejected, because they only stand in for data that was never downloaded.
     /// Leftover files the watcher ignores, such as Excel lock files, and the git files the ARC manages
     /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
-    /// Lock file names and the ARC's git file names only mark files as leftovers. A folder with such a
-    /// name is imported like any other folder, although the watcher does not report changes inside a
-    /// folder named like a lock file. Staging folders from an earlier import are left out.
+    /// See `isLeftOutOfImport` for which names are left out.
+    /// A folder named like a protected file, such as `.gitkeep` or `README.md`, is rejected, because
+    /// Swate could never rename or delete it afterwards.
+    /// Names inside one folder that differ only by case are rejected, because they collide on Windows and macOS.
     /// Every nested name passes the same name check as a picked item, so a name with a backslash, which
     /// Linux and macOS allow, cannot become a phantom folder in the ARC.
     let rec private collectExternalFolderEntries
@@ -320,6 +340,7 @@ module ArcFileSystemHelper =
         promise {
             let! dirents = readdirWithTypesAsync sourceDirectory (ReaddirOptions(withFileTypes = true))
             let entries = ResizeArray [ importEntry sourceDirectory relativeDirectory true ]
+            let seenNames = System.Collections.Generic.HashSet<string>()
 
             for dirent in dirents |> Array.sortBy _.name do
                 if isCancellationRequested () then
@@ -333,7 +354,7 @@ module ArcFileSystemHelper =
                 | Ok _ -> ()
 
                 if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
-                    raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is not allowed inside an ARC.")
+                    raise (disallowedSegmentImportError relativePath dirent.name)
                 elif ArcEntityPathRules.isCanonicalArcFileName dirent.name then
                     raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
                 elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
@@ -346,17 +367,17 @@ module ArcFileSystemHelper =
                     else
                         Promise.lift (false, dirent.isDirectory (), dirent.isFile ())
 
-                let isLeftOut =
-                    if isDirectory then
-                        Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
-                        && not (isOfficeLockFilePath dirent.name)
-                    else
-                        Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
-                        || ArcEntityPathRules.isArcManagedGitFileName dirent.name
+                if isDirectory && ArcEntityPathRules.isProtectedName dirent.name then
+                    raise (protectedFolderImportError relativePath dirent.name)
 
-                if isLeftOut then
+                if isLeftOutOfImport isDirectory relativePath dirent.name then
                     ()
-                else if isLink then
+                elif not (seenNames.Add(dirent.name.ToLowerInvariant())) then
+                    raise (
+                        exn
+                            $"Cannot import '{relativePath}' because its folder already contains an item with the same name, ignoring case."
+                    )
+                elif isLink then
                     raise (symbolicLinkImportError relativePath)
                 elif isDirectory then
                     let! folderEntries = collectExternalFolderEntries isCancellationRequested sourcePath relativePath
@@ -397,18 +418,35 @@ module ArcFileSystemHelper =
 
         let isDirectory = sourceStats.isDirectory ()
 
+        if ArcEntityPathRules.isDisallowedGenericPathSegment name then
+            raise (disallowedSegmentImportError name name)
+
+        if ArcEntityPathRules.isLegacyDataMapFileName name then
+            raise (exn $"Cannot import '{name}': {legacyDataMapNameError}")
+
+        if isDirectory && ArcEntityPathRules.isProtectedName name then
+            raise (protectedFolderImportError name name)
+
+        if isLeftOutOfImport isDirectory name name then
+            if not isDirectory && isOfficeLockFilePath name then
+                raise (
+                    exn
+                        $"Cannot import '{name}' because it is the lock file of a document that is open in Office or LibreOffice."
+                )
+            elif not isDirectory && ArcEntityPathRules.isArcManagedGitFileName name then
+                raise (exn $"Cannot import '{name}' because the ARC manages its own '{name}' file.")
+            else
+                raise (
+                    exn
+                        $"Cannot import '{name}' because ARCitISA reserves names like this for its own files, so the item would not be tracked."
+                )
+
         // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
         match tryBuildGenericFileSystemChildPath (not isDirectory) targetRelativePath name with
         | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
         | Ok _ -> ()
 
         if not isDirectory then
-            if isOfficeLockFilePath name then
-                raise (
-                    exn
-                        $"Cannot import '{name}' because it is the lock file of a document that is open in Office or LibreOffice."
-                )
-
             do! rejectGitLfsPointerFileAsync absolutePath name
             return importEntry absolutePath name false
         elif isLink then

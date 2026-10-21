@@ -287,6 +287,34 @@ let private rejectedImports = [
         AbsentRelativePath = "assays/AssayA/dataset/.~lock.data.xlsx#"
     }
     {
+        // The watcher ignores everything inside a staging folder, so its content would never show up.
+        Description = "a picked staging folder from an earlier import"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                let folderName = ".swate-import-" + String.replicate 32 "a"
+                do! createRelativeDirectoryAsync (dirname arcPath) folderName
+                do! writeRelativeFileAsync (dirname arcPath) $"{folderName}/data.csv" "a,b"
+                return join [| dirname arcPath; folderName |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = "reserves names like this"
+        AbsentRelativePath = "assays/AssayA/dataset/.swate-import-" + String.replicate 32 "a"
+    }
+    {
+        Description = "a picked Git LFS backup file"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                let fileName = "data.bin.vcs-lfs-backup-" + String.replicate 32 "a"
+                do! writeRelativeFileAsync (dirname arcPath) fileName "backup"
+                return join [| dirname arcPath; fileName |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = "reserves names like this"
+        AbsentRelativePath = "assays/AssayA/dataset/data.bin.vcs-lfs-backup-" + String.replicate 32 "a"
+    }
+    {
         Description = "a picked Git LFS pointer file"
         PrepareSource =
             fun arcPath -> promise {
@@ -306,7 +334,7 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
-        // Unlike a nested `.gitkeep`, which is left out, a picked one follows the "New File" rules.
+        // A nested `.gitkeep` is left out. A picked one is rejected, because the user chose it explicitly.
         Description = "a picked .gitkeep file"
         PrepareSource =
             fun arcPath -> promise {
@@ -316,9 +344,59 @@ let private rejectedImports = [
                 return join [| dirname arcPath; ".gitkeep" |]
             }
         TargetRelativePath = "assays/AssayA/dataset/raw"
-        ExpectedError =
-            "Cannot import '.gitkeep': Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+        ExpectedError = "Cannot import '.gitkeep' because the ARC manages its own '.gitkeep' file."
         AbsentRelativePath = "assays/AssayA/dataset/raw/.gitkeep"
+    }
+    {
+        Description = "a picked .gitkeep folder"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset/raw"
+                do! createRelativeDirectoryAsync (dirname arcPath) ".gitkeep"
+                do! writeRelativeFileAsync (dirname arcPath) ".gitkeep/inner.txt" "inner"
+                return join [| dirname arcPath; ".gitkeep" |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset/raw"
+        ExpectedError = "protects the name"
+        AbsentRelativePath = "assays/AssayA/dataset/raw/.gitkeep"
+    }
+    {
+        Description = "a folder that contains a nested .gitkeep folder"
+        PrepareSource =
+            fun arcPath -> promise {
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                do! createRelativeDirectoryAsync sourcePath "raw/.gitkeep"
+                return sourcePath
+            }
+        TargetRelativePath = ""
+        ExpectedError = "protects the name"
+        AbsentRelativePath = "Run1"
+    }
+    {
+        Description = "a folder that contains a nested README.md folder"
+        PrepareSource =
+            fun arcPath -> promise {
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                do! createRelativeDirectoryAsync sourcePath "raw/README.md"
+                return sourcePath
+            }
+        TargetRelativePath = ""
+        ExpectedError = "protects the name"
+        AbsentRelativePath = "Run1"
+    }
+    {
+        Description = "a picked Git LFS backup folder"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                let folderName = "x.vcs-lfs-backup-" + String.replicate 32 "a"
+                do! createRelativeDirectoryAsync (dirname arcPath) folderName
+                do! writeRelativeFileAsync (dirname arcPath) $"{folderName}/data.csv" "a,b"
+                return join [| dirname arcPath; folderName |]
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = "reserves names like this"
+        AbsentRelativePath = "assays/AssayA/dataset/x.vcs-lfs-backup-" + String.replicate 32 "a"
     }
     {
         // Loading the ARC would rename the legacy DataMap name to `isa.datamap.xlsx`.
@@ -990,14 +1068,12 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "imports folders named like lock files or ARC git files with their contents",
+            "imports folders named like lock files with their contents",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let! sourcePath = createExternalRunFolderAsync arcPath
                     do! createRelativeDirectoryAsync sourcePath "~$archive.old"
-                    do! createRelativeDirectoryAsync sourcePath ".gitkeep"
                     do! writeRelativeFileAsync sourcePath "~$archive.old/data.csv" "a,b"
-                    do! writeRelativeFileAsync sourcePath ".gitkeep/inner.txt" "inner"
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
 
                     let! plannedFiles = importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [| sourcePath |]
@@ -1005,13 +1081,36 @@ Vitest.describe (
                     let! lockFolderContent =
                         readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/~$archive.old/data.csv"
 
-                    let! gitFolderContent =
-                        readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/.gitkeep/inner.txt"
-
                     Vitest.expect(plannedFiles |> Array.contains "Run1/~$archive.old/data.csv").toBe (true)
-                    Vitest.expect(plannedFiles |> Array.contains "Run1/.gitkeep/inner.txt").toBe (true)
                     Vitest.expect(lockFolderContent).toBe ("a,b")
-                    Vitest.expect(gitFolderContent).toBe ("inner")
+                })
+        )
+
+        Vitest.test (
+            "imports a picked folder named like a lock file",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    do! createRelativeDirectoryAsync (dirname arcPath) "~$archive.old"
+                    do! writeRelativeFileAsync (dirname arcPath) "~$archive.old/data.csv" "a,b"
+
+                    do! createRelativeDirectoryAsync (dirname arcPath) ".~lock.data.xlsx#"
+                    do! writeRelativeFileAsync (dirname arcPath) ".~lock.data.xlsx#/inner.csv" "c,d"
+
+                    do!
+                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
+                            join [| dirname arcPath; "~$archive.old" |]
+                            join [| dirname arcPath; ".~lock.data.xlsx#" |]
+                        |]
+                        |> Promise.map ignore
+
+                    let! content = readRelativeFileAsync arcPath "assays/AssayA/dataset/~$archive.old/data.csv"
+
+                    let! libreOfficeContent =
+                        readRelativeFileAsync arcPath "assays/AssayA/dataset/.~lock.data.xlsx#/inner.csv"
+
+                    Vitest.expect(content).toBe ("a,b")
+                    Vitest.expect(libreOfficeContent).toBe ("c,d")
                 })
         )
 
@@ -1187,9 +1286,8 @@ Vitest.describe (
 
         Vitest.test (
             "rejects a nested name with a backslash and writes nothing",
-            fun (context: TestContext) ->
-                context.skip (nodePlatform () = "win32", "Windows does not allow a backslash in a file name")
-
+            TestOptions(skip = (nodePlatform () = "win32")),
+            fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let! sourcePath = createExternalRunFolderAsync arcPath
 
@@ -1202,6 +1300,23 @@ Vitest.describe (
 
                     result |> expectErrorContaining "must not contain path separators"
                     result |> expectErrorContaining "Run1/raw/a\\b.csv"
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "rejects nested names that differ only by case and writes nothing",
+            TestOptions(skip = (nodePlatform () <> "linux")),
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! writeRelativeFileAsync sourcePath "raw/A.csv" "upper"
+                    do! writeRelativeFileAsync sourcePath "raw/a.csv" "lower"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let! result = importWithoutCancellation arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    result |> expectErrorContaining "same name, ignoring case"
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
                     do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
                 })
