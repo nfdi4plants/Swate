@@ -1224,6 +1224,109 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "reports the first Git LFS pointer in scan order when a folder contains several",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! writeRelativeFileAsync sourcePath "raw/b.bin" gitLfsPointerContent
+                    do! writeRelativeFileAsync sourcePath "raw/a.bin" gitLfsPointerContent
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! result = importWithoutCancellation arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    result
+                    |> expectErrorContaining "Cannot import 'Run1/raw/a.bin' because it is only a Git LFS pointer"
+
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "keeps the result order when mappings resolve at once or in reverse order",
+            fun () -> promise {
+                let! immediate =
+                    ArcFileSystemHelper.mapWithConcurrencyAsync 16 (fun () -> false) (fun i -> Promise.lift (i * 2)) [|
+                        0..99
+                    |]
+
+                Vitest.expect(immediate).toEqual ([| 0..2..198 |])
+
+                let! reversed =
+                    ArcFileSystemHelper.mapWithConcurrencyAsync
+                        4
+                        (fun () -> false)
+                        (fun i -> promise {
+                            do! Promise.sleep (20 - i)
+                            return i
+                        })
+                        [| 0..19 |]
+
+                Vitest.expect(reversed).toEqual ([| 0..19 |])
+            }
+        )
+
+        Vitest.test (
+            "stops starting new items once cancellation is requested",
+            fun () -> promise {
+                let mutable started = 0
+
+                let! outcome =
+                    ArcFileSystemHelper.mapWithConcurrencyAsync
+                        4
+                        (fun () -> started > 0)
+                        (fun i -> promise {
+                            started <- started + 1
+                            do! Promise.sleep 5
+                            return i
+                        })
+                        [| 0..99 |]
+                    |> Promise.map Ok
+                    |> Promise.catch Error
+
+                match outcome with
+                | Error(ArcFileSystemHelper.ImportCancelledException) -> ()
+                | _ -> failwith "Expected the mapping to be cancelled."
+
+                Vitest.expect(started <= 4).toBe true
+            }
+        )
+
+        Vitest.test (
+            "stops starting new items after a mapping fails",
+            fun () -> promise {
+                let mutable started = 0
+
+                let! outcome =
+                    ArcFileSystemHelper.mapWithConcurrencyAsync
+                        4
+                        (fun () -> false)
+                        (fun i -> promise {
+                            started <- started + 1
+
+                            if i = 0 then
+                                do! Promise.sleep 5
+                                return failwith "mapping failed"
+                            else
+                                do! Promise.sleep 30
+                                return i
+                        })
+                        [| 0..99 |]
+                    |> Promise.map Ok
+                    |> Promise.catch Error
+
+                match outcome with
+                | Error error -> Vitest.expect(error.Message).toBe "mapping failed"
+                | Ok _ -> failwith "Expected the mapping to fail."
+
+                // The other workers finish their running items after the failure. Without the stop they would
+                // then start further items, so the count is read only after those items are done.
+                do! Promise.sleep 60
+                Vitest.expect(started).toBe 4
+            }
+        )
+
+        Vitest.test (
             "imports several folders picked together, even when their contents share names",
             fun () ->
                 withAssayArc (fun arcPath -> promise {

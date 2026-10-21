@@ -215,7 +215,7 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
 
-    exception private ImportCancelledException
+    exception internal ImportCancelledException
 
     type private ExternalFileImportEntry = {
         SourcePath: string
@@ -290,15 +290,66 @@ module ArcFileSystemHelper =
             return (TextDiffLfsPointer.tryParseStrict bytes).IsSome
     }
 
+    let private gitLfsPointerImportError (importedPath: string) =
+        exn
+            $"Cannot import '{importedPath}' because it is only a Git LFS pointer, not the file's content. Download the file in its ARC first."
+
     let private rejectGitLfsPointerFileAsync (absolutePath: string) (importedPath: string) = promise {
         let! isPointer = isGitLfsPointerFileAsync absolutePath
 
         if isPointer then
-            raise (
-                exn
-                    $"Cannot import '{importedPath}' because it is only a Git LFS pointer, not the file's content. Download the file in its ARC first."
-            )
+            raise (gitLfsPointerImportError importedPath)
     }
+
+    /// Each small file is opened and read, so an unbounded pass over a large folder could run out of file handles.
+    let private gitLfsPointerCheckConcurrency = 16
+
+    /// Maps items with at most `limit` mappings in flight and keeps the result order.
+    /// It raises ImportCancelledException once `isCancellationRequested` is true, and after one mapping
+    /// fails the others start no new items.
+    let internal mapWithConcurrencyAsync
+        (limit: int)
+        (isCancellationRequested: unit -> bool)
+        (mapping: 'T -> JS.Promise<'U>)
+        (items: 'T[])
+        : JS.Promise<'U[]> =
+        let results: 'U[] = Array.zeroCreate items.Length
+        let nextIndex = ref 0
+        let stopped = ref false
+
+        // The checks and the index claim run in one synchronous step, so no worker claims an index past the end
+        // after another worker took the last one.
+        let rec worker () : JS.Promise<unit> =
+            if stopped.Value then
+                Promise.lift ()
+            elif isCancellationRequested () then
+                stopped.Value <- true
+                Promise.reject ImportCancelledException
+            else
+                let index = nextIndex.Value
+
+                if index >= items.Length then
+                    Promise.lift ()
+                else
+                    nextIndex.Value <- index + 1
+
+                    mapping items.[index]
+                    |> Promise.bind (fun result ->
+                        results.[index] <- result
+                        worker ()
+                    )
+                    |> Promise.catchBind (fun error ->
+                        stopped.Value <- true
+                        Promise.reject error
+                    )
+
+        if items.Length = 0 then
+            Promise.lift results
+        else
+            Promise.all [|
+                for _ in 1 .. max 1 (min limit items.Length) -> worker ()
+            |]
+            |> Promise.map (fun _ -> results)
 
     let private disallowedSegmentImportError (displayPath: string) (name: string) =
         exn $"Cannot import '{displayPath}' because '{name}' is not allowed inside an ARC."
@@ -322,8 +373,8 @@ module ArcFileSystemHelper =
     /// Lists an imported source folder and everything inside it, every folder before its contents.
     /// ARC file names are rejected, because the ARC merge would read a copy such as
     /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
-    /// following one could copy data from outside the picked folder or loop forever. Git LFS pointer
-    /// files are rejected, because they only stand in for data that was never downloaded.
+    /// following one could copy data from outside the picked folder or loop forever. `createExternalFileImportPlan`
+    /// rejects Git LFS pointer files after this walk, because they only stand in for data that was never downloaded.
     /// Leftover files the watcher ignores, such as Excel lock files, and the git files the ARC manages
     /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
     /// See `isLeftOutOfImport` for which names are left out.
@@ -384,7 +435,6 @@ module ArcFileSystemHelper =
 
                     entries.AddRange folderEntries
                 elif isFile then
-                    do! rejectGitLfsPointerFileAsync sourcePath relativePath
                     entries.Add(importEntry sourcePath relativePath false)
                 else
                     raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
@@ -506,6 +556,22 @@ module ArcFileSystemHelper =
                     entries.AddRange folderEntries
                 else
                     entries.Add pickedEntry
+
+            let nestedFiles =
+                entries
+                |> Seq.filter (fun entry -> not entry.IsDirectory && not (isTopLevelImportEntry entry))
+                |> Seq.toArray
+
+            let! pointerFlags =
+                nestedFiles
+                |> mapWithConcurrencyAsync
+                    gitLfsPointerCheckConcurrency
+                    isCancellationRequested
+                    (fun entry -> isGitLfsPointerFileAsync entry.SourcePath)
+
+            match Array.tryFindIndex id pointerFlags with
+            | Some index -> raise (gitLfsPointerImportError nestedFiles.[index].RelativePath)
+            | None -> ()
 
             return {
                 TargetDirectory = targetDirectory
