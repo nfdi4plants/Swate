@@ -279,7 +279,7 @@ module ArcFileSystemHelper =
         exn $"Cannot import '{path}' because it is a symbolic link."
 
     /// Uses the strict pointer parser, so only the exact layout git-lfs writes counts as a pointer.
-    /// A text file that only starts like a pointer is imported as a file.
+    /// A text file that merely starts like a pointer passes this check and is imported with its content.
     let private isGitLfsPointerFileAsync (absolutePath: string) = promise {
         let! stats = statAsync absolutePath
 
@@ -301,7 +301,7 @@ module ArcFileSystemHelper =
             raise (gitLfsPointerImportError importedPath)
     }
 
-    /// Each small file is opened and read, so an unbounded pass over a large folder could run out of file handles.
+    /// The check opens and reads each small file, so an unbounded pass over a large folder could run out of file handles.
     let private gitLfsPointerCheckConcurrency = 16
 
     /// Maps items with at most `limit` mappings in flight and keeps the result order.
@@ -351,6 +351,9 @@ module ArcFileSystemHelper =
             |]
             |> Promise.map (fun _ -> results)
 
+    let private whitespaceNameImportError (path: string) =
+        exn $"Cannot import '{path}' because its name starts or ends with a space."
+
     let private disallowedSegmentImportError (displayPath: string) (name: string) =
         exn $"Cannot import '{displayPath}' because '{name}' is not allowed inside an ARC."
 
@@ -358,31 +361,30 @@ module ArcFileSystemHelper =
         exn
             $"Cannot import '{displayPath}' because ARCitISA protects the name '{name}', so the folder could not be renamed or deleted afterwards."
 
-    /// True for a name the import leaves out of a folder and rejects when it is picked: names the watcher
-    /// ignores and the git files the ARC manages itself. Lock file names and git file names only mark files
-    /// as leftovers. A folder named like a lock file is imported, although the watcher does not report
-    /// changes inside it.
+    /// Decides whether the import leaves a name out. The import leaves out staging folders
+    /// (`.swate-import-<32 hex>`) and the files that the watcher ignores or the ARC manages itself, such as
+    /// Excel lock files and `.gitkeep`. A staging folder is a leftover copy from an earlier import, so it never
+    /// belongs to the imported data. A folder with any other name is user data and is imported, even one named
+    /// like a lock file or a Git LFS backup. The picked-item check rejects a name that this rule leaves out.
     let private isLeftOutOfImport (isDirectory: bool) (relativePath: string) (name: string) =
         if isDirectory then
-            Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
-            && not (isOfficeLockFilePath name)
+            isTemporaryImportPath name
         else
             Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
             || ArcEntityPathRules.isArcManagedGitFileName name
 
     /// Lists an imported source folder and everything inside it, every folder before its contents.
-    /// ARC file names are rejected, because the ARC merge would read a copy such as
-    /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
+    /// The walk rejects ARC file names, because the ARC merge would read a copy such as
+    /// `backup/assays/A/isa.assay.xlsx` as the real assay A. It rejects symbolic links, because
     /// following one could copy data from outside the picked folder or loop forever. `createExternalFileImportPlan`
     /// rejects Git LFS pointer files after this walk, because they only stand in for data that was never downloaded.
-    /// Leftover files the watcher ignores, such as Excel lock files, and the git files the ARC manages
-    /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
-    /// See `isLeftOutOfImport` for which names are left out.
-    /// A folder named like a protected file, such as `.gitkeep` or `README.md`, is rejected, because
-    /// Swate could never rename or delete it afterwards.
-    /// Names inside one folder that differ only by case are rejected, because they collide on Windows and macOS.
+    /// The walk skips the names `isLeftOutOfImport` selects and does not report them as errors.
+    /// It rejects a folder named like a protected file, such as `.gitkeep` or `README.md`, because
+    /// ARCitISA could never rename or delete it afterwards.
+    /// It also rejects names inside one folder that differ only by case, because they collide on Windows and macOS.
     /// Every nested name passes the same name check as a picked item, so a name with a backslash, which
-    /// Linux and macOS allow, cannot become a phantom folder in the ARC.
+    /// Linux and macOS allow, cannot become a phantom folder in the ARC. A name with leading or trailing
+    /// white space fails too, because ARCitISA trims paths when it renames or deletes.
     let rec private collectExternalFolderEntries
         isCancellationRequested
         (sourceDirectory: string)
@@ -402,6 +404,7 @@ module ArcFileSystemHelper =
 
                 match validateRenameName dirent.name with
                 | Error validationError -> raise (exn $"Cannot import '{relativePath}': {validationError}")
+                | Ok trimmed when trimmed <> dirent.name -> raise (whitespaceNameImportError relativePath)
                 | Ok _ -> ()
 
                 if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
@@ -468,6 +471,11 @@ module ArcFileSystemHelper =
 
         let isDirectory = sourceStats.isDirectory ()
 
+        match validateRenameName name with
+        | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
+        | Ok trimmed when trimmed <> name -> raise (whitespaceNameImportError name)
+        | Ok _ -> ()
+
         if ArcEntityPathRules.isDisallowedGenericPathSegment name then
             raise (disallowedSegmentImportError name name)
 
@@ -488,7 +496,7 @@ module ArcFileSystemHelper =
             else
                 raise (
                     exn
-                        $"Cannot import '{name}' because ARCitISA reserves names like this for its own files, so the item would not be tracked."
+                        $"Cannot import '{name}' because ARCitISA reserves names like this for its own files, so ARCitISA would not see changes to it."
                 )
 
         // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.

@@ -378,4 +378,49 @@ Vitest.describe (
                     })
             }
         )
+
+        Vitest.test (
+            "hides .git folders in any case and shows import staging folders",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let stagingName = ".swate-import-0123456789abcdef0123456789ABCDEF"
+
+                        for folder, file in
+                            [
+                                stagingName, "staged.txt"
+                                "data/.GIT", "config"
+                                "data", "a.txt"
+                                "~$archive.old", "b.txt"
+                            ] do
+                            let folderPath = join [| context.RepoPath; folder |]
+
+                            do!
+                                Main.Bindings.Filesystem.mkdirAsync
+                                    folderPath
+                                    (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+                                |> Promise.map ignore
+
+                            do! writeUtf8FileAsync (join [| folderPath; file |]) "content"
+
+                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
+                        let names = entries |> Array.map _.name
+
+                        for name in
+                            [
+                                "data"
+                                "a.txt"
+                                "~$archive.old"
+                                "b.txt"
+                                stagingName
+                                "staged.txt"
+                            ] do
+                            Vitest.expect(names).toContain (name)
+
+                        for name in [ ".GIT"; "config" ] do
+                            Vitest.expect(names).not.toContain (name)
+                    })
+            }
+        )
 )

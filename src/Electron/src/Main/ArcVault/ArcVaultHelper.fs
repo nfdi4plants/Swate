@@ -357,16 +357,13 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
+/// Chokidar applies this to files and folders, so a folder named like a lock file is not watched.
 let isFileWatcherPathIgnored (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
-    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
-    isOfficeLockFilePath normalizedPath
-    || isGitMetadataPath normalizedPath
-    || isLegacyDataMapPath normalizedPath
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
+    isGitMetadataPath normalizedPath
+    || isTemporaryImportPath normalizedPath
+    || isHiddenArcFilePath normalizedPath
 
 /// Decides whether the file watcher polls. Without an explicit choice it polls on Windows only,
 /// because native Windows file events can keep handles that block app-initiated folder renames.

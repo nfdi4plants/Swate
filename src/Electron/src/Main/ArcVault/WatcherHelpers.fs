@@ -53,7 +53,9 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
 
 /// Builds the watcher events of an import's planned folders and files. The polling watcher reports
 /// each new folder as addDir, and an unclaimed addDir would start a second ARC merge after the import.
-/// The watcher never reports paths it ignores, such as `~$data.xlsx`, so this function builds no claim for them.
+/// It builds no claim for planned paths the watcher ignores, such as a folder named like a lock file or an LFS
+/// backup. It still builds claims for the files inside such a folder. The watcher never reports those, so the
+/// lease timer frees them.
 let createImportedWatcherEvents arcPath targetRelativePath (plannedPaths: PlannedImportPaths) =
     let targetRelativePath =
         PathHelpers.normalizeCanonicalRelativePath targetRelativePath

@@ -385,20 +385,6 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
-        Description = "a picked Git LFS backup folder"
-        PrepareSource =
-            fun arcPath -> promise {
-                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
-                let folderName = "x.vcs-lfs-backup-" + String.replicate 32 "a"
-                do! createRelativeDirectoryAsync (dirname arcPath) folderName
-                do! writeRelativeFileAsync (dirname arcPath) $"{folderName}/data.csv" "a,b"
-                return join [| dirname arcPath; folderName |]
-            }
-        TargetRelativePath = "assays/AssayA/dataset"
-        ExpectedError = "reserves names like this"
-        AbsentRelativePath = "assays/AssayA/dataset/x.vcs-lfs-backup-" + String.replicate 32 "a"
-    }
-    {
         // Loading the ARC would rename the legacy DataMap name to `isa.datamap.xlsx`.
         Description = "a file with the legacy DataMap name"
         PrepareSource =
@@ -1074,6 +1060,9 @@ Vitest.describe (
                     let! sourcePath = createExternalRunFolderAsync arcPath
                     do! createRelativeDirectoryAsync sourcePath "~$archive.old"
                     do! writeRelativeFileAsync sourcePath "~$archive.old/data.csv" "a,b"
+                    let backupFolder = "raw/y.vcs-lfs-backup-" + String.replicate 32 "a"
+                    do! createRelativeDirectoryAsync sourcePath backupFolder
+                    do! writeRelativeFileAsync sourcePath $"{backupFolder}/data.csv" "c,d"
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
 
                     let! plannedFiles = importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [| sourcePath |]
@@ -1081,8 +1070,12 @@ Vitest.describe (
                     let! lockFolderContent =
                         readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/~$archive.old/data.csv"
 
+                    let! backupFolderContent =
+                        readRelativeFileAsync arcPath $"assays/AssayA/dataset/Run1/{backupFolder}/data.csv"
+
                     Vitest.expect(plannedFiles |> Array.contains "Run1/~$archive.old/data.csv").toBe (true)
                     Vitest.expect(lockFolderContent).toBe ("a,b")
+                    Vitest.expect(backupFolderContent).toBe ("c,d")
                 })
         )
 
@@ -1097,10 +1090,15 @@ Vitest.describe (
                     do! createRelativeDirectoryAsync (dirname arcPath) ".~lock.data.xlsx#"
                     do! writeRelativeFileAsync (dirname arcPath) ".~lock.data.xlsx#/inner.csv" "c,d"
 
+                    let backupFolderName = "x.vcs-lfs-backup-" + String.replicate 32 "a"
+                    do! createRelativeDirectoryAsync (dirname arcPath) backupFolderName
+                    do! writeRelativeFileAsync (dirname arcPath) $"{backupFolderName}/data.csv" "e,f"
+
                     do!
                         importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
                             join [| dirname arcPath; "~$archive.old" |]
                             join [| dirname arcPath; ".~lock.data.xlsx#" |]
+                            join [| dirname arcPath; backupFolderName |]
                         |]
                         |> Promise.map ignore
 
@@ -1110,7 +1108,12 @@ Vitest.describe (
                         readRelativeFileAsync arcPath "assays/AssayA/dataset/.~lock.data.xlsx#/inner.csv"
 
                     Vitest.expect(content).toBe ("a,b")
+
+                    let! backupContent =
+                        readRelativeFileAsync arcPath $"assays/AssayA/dataset/{backupFolderName}/data.csv"
+
                     Vitest.expect(libreOfficeContent).toBe ("c,d")
+                    Vitest.expect(backupContent).toBe ("e,f")
                 })
         )
 
@@ -1404,6 +1407,47 @@ Vitest.describe (
                     result |> expectErrorContaining "must not contain path separators"
                     result |> expectErrorContaining "Run1/raw/a\\b.csv"
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "rejects a nested or picked name that ends with a space and writes nothing",
+            TestOptions(skip = (nodePlatform () = "win32")),
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+
+                    let! _ =
+                        fsPromisesDynamic?writeFile (join [| sourcePath; "raw"; "notes.txt " |], "x", "utf8")
+                        |> unbox<JS.Promise<obj>>
+
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let! result = importWithoutCancellation arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    result |> expectErrorContaining "starts or ends with a space"
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+
+                    // A picked name goes through its own check before any folder is scanned.
+                    let pickedPath = join [| dirname arcPath; "picked.txt " |]
+
+                    let! _ = fsPromisesDynamic?writeFile (pickedPath, "x", "utf8") |> unbox<JS.Promise<obj>>
+                    let! pickedResult = importWithoutCancellation arcPath "assays/AssayA/dataset" [| pickedPath |]
+
+                    pickedResult
+                    |> expectErrorContaining
+                        "Cannot import 'picked.txt ' because its name starts or ends with a space."
+
+                    // The relative path helpers trim the name, so the exact path is checked here.
+                    Vitest
+                        .expect(
+                            Main.Bindings.Filesystem.existsSync (
+                                join [| arcPath; "assays"; "AssayA"; "dataset"; "picked.txt " |]
+                            )
+                        )
+                        .toBe (false)
+
                     do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
                 })
         )

@@ -29,6 +29,21 @@ let isOfficeLockFilePath (path: string) =
         """(^|/)(\.?~\$[^/]*\.[^/]+|\.~lock\.[^/]+#)$"""
     )
 
+let isTemporaryImportPath (path: string) =
+    Text.RegularExpressions.Regex.IsMatch(
+        PathHelpers.normalizeSeparators path,
+        """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
+    )
+
+let isLfsBackupPath (path: string) =
+    Text.RegularExpressions.Regex.IsMatch(PathHelpers.normalizeSeparators path, """\.vcs-lfs-backup-[0-9a-fA-F]{32}$""")
+
+let isHiddenArcFilePath (path: string) =
+    isOfficeLockFilePath path || isLfsBackupPath path || isLegacyDataMapPath path
+
+let isHiddenArcFolderName (name: string) =
+    String.Equals(name, ".git", StringComparison.OrdinalIgnoreCase)
+
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with
     | [| candidateRoot |] -> pathsEqual rootFolderName candidateRoot

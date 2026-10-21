@@ -522,9 +522,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            // The watcher ignores temporary import directories, while final imported files and
-                            // unrelated external ARC changes remain eligible for normal watcher merges. Successful
-                            // imports also replay their own events synchronously before the refreshed tree is exposed.
+                            // The watcher ignores temporary import directories. While the import's marks last, creation
+                            // events of imported files and folders start no merge. Later edits and deletions do, and so
+                            // do unrelated external ARC changes. Successful imports also replay their own events
+                            // synchronously before the refreshed tree is exposed.
 
                             let reportImportProgress progress =
                                 if progress <= 0.0 then
