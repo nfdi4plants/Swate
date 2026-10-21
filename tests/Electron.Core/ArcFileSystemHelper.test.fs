@@ -284,6 +284,21 @@ let private rejectedImports = [
         AbsentRelativePath = "assays/AssayA/dataset/.~lock.data.xlsx#"
     }
     {
+        // The file tree and the watcher hide such a folder with everything inside.
+        Description = "a folder that contains a folder named like an Office lock file"
+        PrepareSource =
+            fun arcPath -> promise {
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                let! sourcePath = createExternalRunFolderAsync arcPath
+                do! createRelativeDirectoryAsync sourcePath "~$archive.old"
+                do! writeRelativeFileAsync sourcePath "~$archive.old/data.csv" "a,b"
+                return sourcePath
+            }
+        TargetRelativePath = "assays/AssayA/dataset"
+        ExpectedError = "hides folders named like Office lock files"
+        AbsentRelativePath = "assays/AssayA/dataset/Run1"
+    }
+    {
         Description = "a picked Git LFS pointer file"
         PrepareSource =
             fun arcPath -> promise {

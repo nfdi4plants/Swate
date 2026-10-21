@@ -319,6 +319,8 @@ module ArcFileSystemHelper =
     /// files are rejected, because they only stand in for data that was never downloaded.
     /// Leftovers the watcher ignores, such as Excel lock files, and the git files the ARC manages
     /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
+    /// A folder named like an Office lock file is rejected, because the file tree and the watcher
+    /// hide it with everything inside.
     let rec private collectExternalFolderEntries
         isCancellationRequested
         (sourceDirectory: string)
@@ -342,31 +344,34 @@ module ArcFileSystemHelper =
                 elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
                     raise (exn $"Cannot import '{relativePath}': {legacyDataMapNameError}")
 
-                if
+                let! isLink, isDirectory, isFile =
+                    if dirent.isSymbolicLink () then
+                        lstatAsync sourcePath
+                        |> Promise.map (fun stats -> stats.isSymbolicLink (), stats.isDirectory (), stats.isFile ())
+                    else
+                        Promise.lift (false, dirent.isDirectory (), dirent.isFile ())
+
+                if isDirectory && isOfficeLockFilePath dirent.name then
+                    raise (
+                        exn
+                            $"Cannot import '{relativePath}' because ARCitISA hides folders named like Office lock files, so the folder and its contents would not be visible. Rename the folder and try again."
+                    )
+                elif
                     Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
                     || ArcEntityPathRules.isArcManagedGitFileName dirent.name
                 then
                     ()
+                else if isLink then
+                    raise (symbolicLinkImportError relativePath)
+                elif isDirectory then
+                    let! folderEntries = collectExternalFolderEntries isCancellationRequested sourcePath relativePath
+
+                    entries.AddRange folderEntries
+                elif isFile then
+                    do! rejectGitLfsPointerFileAsync sourcePath relativePath
+                    entries.Add(importEntry sourcePath relativePath false)
                 else
-                    let! isLink, isDirectory, isFile =
-                        if dirent.isSymbolicLink () then
-                            lstatAsync sourcePath
-                            |> Promise.map (fun stats -> stats.isSymbolicLink (), stats.isDirectory (), stats.isFile ())
-                        else
-                            Promise.lift (false, dirent.isDirectory (), dirent.isFile ())
-
-                    if isLink then
-                        raise (symbolicLinkImportError relativePath)
-                    elif isDirectory then
-                        let! folderEntries =
-                            collectExternalFolderEntries isCancellationRequested sourcePath relativePath
-
-                        entries.AddRange folderEntries
-                    elif isFile then
-                        do! rejectGitLfsPointerFileAsync sourcePath relativePath
-                        entries.Add(importEntry sourcePath relativePath false)
-                    else
-                        raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
+                    raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
 
             return entries.ToArray()
         }
