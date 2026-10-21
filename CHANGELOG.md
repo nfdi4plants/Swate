@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In empty tables, the "Utilization of prior tables" feature, now allows importing inputs/outputs from all across the ARC. (by @Freymaurer)
 - Clicking a folder or its arrow in the file tree expands or collapses it. A study, assay, workflow or run folder also opens its metadata, while other folders keep the current view open. (by @Etschbeijer)
 - The right-click menu offers "Open" only for files and for folders that have metadata. (by @Etschbeijer)
+- Large ARCs open much faster: the file tree shows the first 100 entries of a folder, and a "Load more" button shows the next ones. #1381 (by @Etschbeijer)
+- While a large ARC is still loading, the save button shows a loading indicator, and files in the tree can already be previewed. #1381 (by @Etschbeijer)
 
 ### 🐛 Fixed
 
