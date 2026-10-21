@@ -183,39 +183,104 @@ Vitest.describe (
             }
         )
 
+        let importedEvents (folderPaths: string[]) (filePaths: string[]) =
+            WatcherHelpers.createImportedWatcherEvents "C:/arc" "assays/AssayA/dataset" {
+                FolderPaths = folderPaths
+                FilePaths = filePaths
+            }
+
+        let advanceSeconds (seconds: int) =
+            Vitest.vi.advanceTimersByTime (seconds * 1000) |> ignore
+
         Vitest.test (
-            "a completed import releases its file marks later, even when the watcher never reports the files",
+            "a completed import keeps its marks while the watcher still reports its paths",
             fun () ->
                 let vault = ArcVault(TestHelpers.testWindow ())
-
-                let events =
-                    WatcherHelpers.createImportedWatcherEvents "C:/arc" "assays/AssayA/dataset" {
-                        FolderPaths = [||]
-                        FilePaths = [| "Run1/notes.txt"; "Run1/raw/results.csv" |]
-                    }
+                let events = importedEvents [| "Run1" |] [| "Run1/notes.txt" |]
+                let fileEvent = events |> Array.find (fun e -> e.RelativePath.EndsWith "notes.txt")
+                let unrelatedEvent = (importedEvents [||] [| "Other/x.txt" |]).[0]
 
                 Vitest.vi.useFakeTimers () |> ignore
 
                 try
-                    vault.ClaimImportedFileEvents events
-                    vault.ReleaseImportedFileEventsAfterImport(Ok ImportExternalFilesResult.Completed, events)
-                    // The watcher still reports these files soon, and their events must not merge the import again.
-                    Vitest.expect(vault.importedFileWatcherPaths.Count).toBe 2
+                    let token = vault.StartImport()
+                    vault.ClaimImportedFileEvents(token, events)
+                    vault.ReleaseImportedFileEventsAfterImport(token, Ok ImportExternalFilesResult.Completed)
 
-                    Vitest.vi.runAllTimers () |> ignore
-                    Vitest.expect(vault.importedFileWatcherPaths.Count).toBe 0
+                    for _ in 1..3 do
+                        advanceSeconds 20
+                        Vitest.expect(vault.IsImportedWatcherEvent fileEvent).toBe true
+                        Vitest.expect(vault.IsImportedWatcherEvent unrelatedEvent).toBe false
+
+                    advanceSeconds 30
+                    Vitest.expect(vault.IsImportedWatcherEvent fileEvent).toBe false
                 finally
                     Vitest.vi.useRealTimers () |> ignore
         )
 
         Vitest.test (
-            "a cancelled or failed import releases its file marks at once",
+            "a completed import releases its marks after the quiet time, and at the latest after the maximum time",
             fun () ->
-                let events =
-                    WatcherHelpers.createImportedWatcherEvents "C:/arc" "assays/AssayA/dataset" {
-                        FolderPaths = [||]
-                        FilePaths = [| "Run1/notes.txt" |]
-                    }
+                let events = importedEvents [||] [| "Run1/notes.txt" |]
+
+                Vitest.vi.useFakeTimers () |> ignore
+
+                try
+                    let quietVault = ArcVault(TestHelpers.testWindow ())
+                    let quietToken = quietVault.StartImport()
+                    quietVault.ClaimImportedFileEvents(quietToken, events)
+
+                    quietVault.ReleaseImportedFileEventsAfterImport(quietToken, Ok ImportExternalFilesResult.Completed)
+
+                    advanceSeconds 30
+                    Vitest.expect(quietVault.IsImportedWatcherEvent events.[0]).toBe false
+
+                    let busyVault = ArcVault(TestHelpers.testWindow ())
+                    let busyToken = busyVault.StartImport()
+                    busyVault.ClaimImportedFileEvents(busyToken, events)
+
+                    busyVault.ReleaseImportedFileEventsAfterImport(busyToken, Ok ImportExternalFilesResult.Completed)
+
+                    for _ in 1..14 do
+                        advanceSeconds 20
+                        Vitest.expect(busyVault.IsImportedWatcherEvent events.[0]).toBe true
+
+                    advanceSeconds 20
+                    Vitest.expect(busyVault.IsImportedWatcherEvent events.[0]).toBe false
+                finally
+                    Vitest.vi.useRealTimers () |> ignore
+        )
+
+        Vitest.test (
+            "an import never releases the marks of a later import of the same path",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let events = importedEvents [||] [| "Run1/notes.txt" |]
+
+                Vitest.vi.useFakeTimers () |> ignore
+
+                try
+                    let first = vault.StartImport()
+                    vault.ClaimImportedFileEvents(first, events)
+                    vault.ReleaseImportedFileEventsAfterImport(first, Ok ImportExternalFilesResult.Completed)
+
+                    let second = vault.StartImport()
+                    vault.ClaimImportedFileEvents(second, events)
+
+                    advanceSeconds 31
+                    Vitest.vi.runAllTimers () |> ignore
+                    Vitest.expect(vault.IsImportedWatcherEvent events.[0]).toBe true
+
+                    vault.ReleaseImportedFileEventsAfterImport(second, Error(exn "Import failed"))
+                    Vitest.expect(vault.IsImportedWatcherEvent events.[0]).toBe false
+                finally
+                    Vitest.vi.useRealTimers () |> ignore
+        )
+
+        Vitest.test (
+            "a cancelled or failed import releases its marks at once",
+            fun () ->
+                let events = importedEvents [||] [| "Run1/notes.txt" |]
 
                 for result in
                     [
@@ -223,9 +288,66 @@ Vitest.describe (
                         Error(exn "Import failed")
                     ] do
                     let vault = ArcVault(TestHelpers.testWindow ())
-                    vault.ClaimImportedFileEvents events
-                    vault.ReleaseImportedFileEventsAfterImport(result, events)
-                    Vitest.expect(vault.importedFileWatcherPaths.Count).toBe 0
+                    let token = vault.StartImport()
+                    vault.ClaimImportedFileEvents(token, events)
+                    vault.ReleaseImportedFileEventsAfterImport(token, result)
+                    Vitest.expect(vault.IsImportedWatcherEvent events.[0]).toBe false
+        )
+
+        Vitest.test (
+            "only creation events of a marked path count as imported",
+            fun () ->
+                let events = importedEvents [||] [| "Run1/notes.txt" |]
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.ClaimImportedFileEvents(vault.StartImport(), events)
+
+                Vitest.expect(vault.IsImportedWatcherEvent { events.[0] with EventName = "change" }).toBe false
+                Vitest.expect(vault.IsImportedWatcherEvent { events.[0] with EventName = "unlink" }).toBe false
+                Vitest.expect(vault.IsImportedWatcherEvent events.[0]).toBe true
+        )
+
+        Vitest.test (
+            "a completed import's timer removes its marks without any watcher event",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let events = importedEvents [||] [| "Run1/notes.txt" |]
+
+                Vitest.vi.useFakeTimers () |> ignore
+
+                try
+                    let token = vault.StartImport()
+                    vault.ClaimImportedFileEvents(token, events)
+                    vault.ReleaseImportedFileEventsAfterImport(token, Ok ImportExternalFilesResult.Completed)
+
+                    advanceSeconds 31
+                    Vitest.expect(vault.importedPathOwners.Count).toBe 0
+                    Vitest.expect(vault.importedPathLeases.Count).toBe 0
+                finally
+                    Vitest.vi.useRealTimers () |> ignore
+        )
+
+        Vitest.test (
+            "clearing the watcher state drops the marks of a completed import",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let events = importedEvents [||] [| "Run1/notes.txt" |]
+
+                Vitest.vi.useFakeTimers () |> ignore
+
+                try
+                    let token = vault.StartImport()
+                    vault.ClaimImportedFileEvents(token, events)
+                    vault.ReleaseImportedFileEventsAfterImport(token, Ok ImportExternalFilesResult.Completed)
+
+                    vault.ClearPendingFileWatcherState()
+                    Vitest.expect(vault.importedPathOwners.Count).toBe 0
+                    Vitest.expect(vault.importedPathLeases.Count).toBe 0
+
+                    advanceSeconds 301
+                    Vitest.expect(vault.importedPathOwners.Count).toBe 0
+                    Vitest.expect(vault.importedPathLeases.Count).toBe 0
+                finally
+                    Vitest.vi.useRealTimers () |> ignore
         )
 
         Vitest.test (
@@ -1433,6 +1555,7 @@ Vitest.describe (
                         vault.SetArc loadedArc
 
                         vault.ClaimImportedFileEvents(
+                            vault.StartImport(),
                             WatcherHelpers.createImportedWatcherEvents arcPath "assays/AssayA/dataset" {
                                 FolderPaths = [| "Run1"; "Run1/raw" |]
                                 FilePaths = [| "Run1/raw/results.csv" |]

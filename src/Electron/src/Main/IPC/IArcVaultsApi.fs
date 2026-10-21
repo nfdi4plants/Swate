@@ -559,6 +559,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             (fun value -> vault.activeFileImport <- value)
                                             (fun abortSignal -> promise {
                                                 let importedEvents = ResizeArray()
+                                                let importToken = vault.StartImport()
 
                                                 let registerImportedPaths plannedPaths =
                                                     importedEvents.AddRange(
@@ -570,7 +571,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                                     // Chokidar's awaitWriteFinish can emit these well after the import
                                                     // releases the busy flag, so ownership must outlive the write itself.
-                                                    vault.ClaimImportedFileEvents importedEvents
+                                                    vault.ClaimImportedFileEvents(importToken, importedEvents)
 
                                                 let! result =
                                                     ArcFileSystemHelper.importExternalFilesOnDisk
@@ -609,10 +610,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         )
                                                     |> Promise.catch Error
 
-                                                vault.ReleaseImportedFileEventsAfterImport(
-                                                    result,
-                                                    importedEvents.ToArray()
-                                                )
+                                                vault.ReleaseImportedFileEventsAfterImport(importToken, result)
 
                                                 vault.window.setProgressBar -1.0
                                                 return result
