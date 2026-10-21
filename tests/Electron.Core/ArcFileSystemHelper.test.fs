@@ -284,21 +284,6 @@ let private rejectedImports = [
         AbsentRelativePath = "assays/AssayA/dataset/.~lock.data.xlsx#"
     }
     {
-        // The file tree and the watcher hide such a folder with everything inside.
-        Description = "a folder that contains a folder named like an Office lock file"
-        PrepareSource =
-            fun arcPath -> promise {
-                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
-                let! sourcePath = createExternalRunFolderAsync arcPath
-                do! createRelativeDirectoryAsync sourcePath "~$archive.old"
-                do! writeRelativeFileAsync sourcePath "~$archive.old/data.csv" "a,b"
-                return sourcePath
-            }
-        TargetRelativePath = "assays/AssayA/dataset"
-        ExpectedError = "hides folders named like Office lock files"
-        AbsentRelativePath = "assays/AssayA/dataset/Run1"
-    }
-    {
         Description = "a picked Git LFS pointer file"
         PrepareSource =
             fun arcPath -> promise {
@@ -998,6 +983,32 @@ Vitest.describe (
 
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1/empty" true
                     do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "imports folders named like lock files or ARC git files with their contents",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync sourcePath "~$archive.old"
+                    do! createRelativeDirectoryAsync sourcePath ".gitkeep"
+                    do! writeRelativeFileAsync sourcePath "~$archive.old/data.csv" "a,b"
+                    do! writeRelativeFileAsync sourcePath ".gitkeep/inner.txt" "inner"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! plannedFiles = importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    let! lockFolderContent =
+                        readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/~$archive.old/data.csv"
+
+                    let! gitFolderContent =
+                        readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/.gitkeep/inner.txt"
+
+                    Vitest.expect(plannedFiles |> Array.contains "Run1/~$archive.old/data.csv").toBe (true)
+                    Vitest.expect(plannedFiles |> Array.contains "Run1/.gitkeep/inner.txt").toBe (true)
+                    Vitest.expect(lockFolderContent).toBe ("a,b")
+                    Vitest.expect(gitFolderContent).toBe ("inner")
                 })
         )
 

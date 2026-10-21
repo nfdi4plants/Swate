@@ -305,10 +305,11 @@ module ArcFileSystemHelper =
     /// `backup/assays/A/isa.assay.xlsx` as the real assay A. Symbolic links are rejected, because
     /// following one could copy data from outside the picked folder or loop forever. Git LFS pointer
     /// files are rejected, because they only stand in for data that was never downloaded.
-    /// Leftovers the watcher ignores, such as Excel lock files, and the git files the ARC manages
+    /// Leftover files the watcher ignores, such as Excel lock files, and the git files the ARC manages
     /// itself, such as `.gitkeep` and `.gitattributes`, are left out instead of rejected.
-    /// A folder named like an Office lock file is rejected, because the file tree and the watcher
-    /// hide it with everything inside.
+    /// Lock file names and the ARC's git file names only mark files as leftovers. A folder with such a
+    /// name is imported like any other folder, although the watcher does not report changes inside a
+    /// folder named like a lock file. Staging folders from an earlier import are left out.
     let rec private collectExternalFolderEntries
         isCancellationRequested
         (sourceDirectory: string)
@@ -339,15 +340,15 @@ module ArcFileSystemHelper =
                     else
                         Promise.lift (false, dirent.isDirectory (), dirent.isFile ())
 
-                if isDirectory && isOfficeLockFilePath dirent.name then
-                    raise (
-                        exn
-                            $"Cannot import '{relativePath}' because ARCitISA hides folders named like Office lock files, so the folder and its contents would not be visible. Rename the folder and try again."
-                    )
-                elif
-                    Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
-                    || ArcEntityPathRules.isArcManagedGitFileName dirent.name
-                then
+                let isLeftOut =
+                    if isDirectory then
+                        Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
+                        && not (isOfficeLockFilePath dirent.name)
+                    else
+                        Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
+                        || ArcEntityPathRules.isArcManagedGitFileName dirent.name
+
+                if isLeftOut then
                     ()
                 else if isLink then
                     raise (symbolicLinkImportError relativePath)
