@@ -17,6 +17,9 @@ let private newGuidN () = Guid.NewGuid().ToString("N")
 [<Emit("Object.assign(new Error($0), { code: $1 })")>]
 let private nodeError (message: string) (code: string) : exn = jsNative
 
+[<Emit("process.platform")>]
+let private nodePlatform () : string = jsNative
+
 let private withAssayArc =
     TestHelpers.withTempArcWith
         "swate-generic-fs-"
@@ -1178,6 +1181,28 @@ Vitest.describe (
                     result |> expectErrorContaining "Cannot import multiple items named 'Run1'."
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
                     do! expectRelativePathExists arcPath "assays/AssayA/dataset/run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "rejects a nested name with a backslash and writes nothing",
+            fun (context: TestContext) ->
+                context.skip (nodePlatform () = "win32", "Windows does not allow a backslash in a file name")
+
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+
+                    let! _ =
+                        fsPromisesDynamic?writeFile (join [| sourcePath; "raw"; "a\\b.csv" |], "x", "utf8")
+                        |> unbox<JS.Promise<obj>>
+
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let! result = importWithoutCancellation arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    result |> expectErrorContaining "must not contain path separators"
+                    result |> expectErrorContaining "Run1/raw/a\\b.csv"
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
                     do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
                 })
         )

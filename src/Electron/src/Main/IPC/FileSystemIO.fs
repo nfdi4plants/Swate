@@ -310,6 +310,8 @@ module ArcFileSystemHelper =
     /// Lock file names and the ARC's git file names only mark files as leftovers. A folder with such a
     /// name is imported like any other folder, although the watcher does not report changes inside a
     /// folder named like a lock file. Staging folders from an earlier import are left out.
+    /// Every nested name passes the same name check as a picked item, so a name with a backslash, which
+    /// Linux and macOS allow, cannot become a phantom folder in the ARC.
     let rec private collectExternalFolderEntries
         isCancellationRequested
         (sourceDirectory: string)
@@ -325,6 +327,10 @@ module ArcFileSystemHelper =
 
                 let sourcePath = join [| sourceDirectory; dirent.name |]
                 let relativePath = $"{relativeDirectory}/{dirent.name}"
+
+                match validateRenameName dirent.name with
+                | Error validationError -> raise (exn $"Cannot import '{relativePath}': {validationError}")
+                | Ok _ -> ()
 
                 if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
                     raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is not allowed inside an ARC.")
