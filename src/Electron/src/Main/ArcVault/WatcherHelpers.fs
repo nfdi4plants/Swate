@@ -51,23 +51,29 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-/// Builds the watcher events of imported files. Files the watcher ignores, such as `~$data.xlsx`,
-/// are left out: the watcher never reports them, so they could never be released after the import.
-let createImportedFileWatcherEvents arcPath targetRelativePath (importedRelativePaths: string[]) =
+/// Builds the watcher events of an import's planned folders and files. The polling watcher reports
+/// each new folder as addDir, and an unclaimed addDir would start a second ARC merge after the import.
+/// The watcher never reports paths it ignores, such as `~$data.xlsx`, so this function builds no claim for them.
+let createImportedWatcherEvents arcPath targetRelativePath (plannedPaths: PlannedImportPaths) =
     let targetRelativePath =
         PathHelpers.normalizeCanonicalRelativePath targetRelativePath
 
-    importedRelativePaths
-    |> Array.map (fun importedRelativePath ->
-        let relativePath =
-            if String.IsNullOrWhiteSpace targetRelativePath then
-                importedRelativePath
-            else
-                $"{targetRelativePath}/{importedRelativePath}"
-            |> PathHelpers.normalizePath
+    let buildEvents (eventName: Chokidar.Events) (importedRelativePaths: string[]) =
+        importedRelativePaths
+        |> Array.map (fun importedRelativePath ->
+            let relativePath =
+                if String.IsNullOrWhiteSpace targetRelativePath then
+                    importedRelativePath
+                else
+                    $"{targetRelativePath}/{importedRelativePath}"
+                |> PathHelpers.normalizePath
 
-        buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
-    )
+            buildWatcherEvent arcPath (eventName.ToString()) relativePath
+        )
+
+    Array.append
+        (buildEvents Chokidar.Events.AddDir plannedPaths.FolderPaths)
+        (buildEvents Chokidar.Events.Add plannedPaths.FilePaths)
     |> Array.filter (fun event -> not (ArcVaultHelper.isFileWatcherPathIgnored event.AbsolutePath))
 
 /// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.

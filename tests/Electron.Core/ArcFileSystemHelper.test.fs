@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.IPC.FileSystemIO
+open Main.ArcVaultTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
@@ -127,7 +128,7 @@ let private importCollectingPlannedFiles arcPath targetRelativePath sourcePaths 
             sourcePaths
             ignore
             (fun () -> false)
-            plannedFiles.AddRange
+            (fun planned -> plannedFiles.AddRange planned.FilePaths)
             ignore
             acceptImportedFiles
     with
@@ -506,14 +507,53 @@ Vitest.describe (
                 let guidSuffix = String.replicate 32 "a"
 
                 let events =
-                    Main.WatcherHelpers.createImportedFileWatcherEvents "C:/arc" "assays/AssayA/dataset" [|
-                        "Run1/notes.txt"
-                        "Run1/~$results.xlsx"
-                        $"Run1/.swate-import-{guidSuffix}/raw.txt"
-                        $"Run1/data.bin.vcs-lfs-backup-{guidSuffix}"
-                    |]
+                    Main.WatcherHelpers.createImportedWatcherEvents "C:/arc" "assays/AssayA/dataset" {
+                        FolderPaths = [| $"Run1/.swate-import-{guidSuffix}" |]
+                        FilePaths = [|
+                            "Run1/notes.txt"
+                            "Run1/~$results.xlsx"
+                            $"Run1/.swate-import-{guidSuffix}/raw.txt"
+                            $"Run1/data.bin.vcs-lfs-backup-{guidSuffix}"
+                        |]
+                    }
 
                 Vitest.expect(events |> Array.map _.RelativePath).toEqual ([| "assays/AssayA/dataset/Run1/notes.txt" |])
+        )
+
+        Vitest.test (
+            "builds addDir events for planned folders and add events for planned files, below the target or at the ARC root",
+            fun () ->
+                let addDir = Main.Bindings.Chokidar.Events.AddDir.ToString()
+                let add = Main.Bindings.Chokidar.Events.Add.ToString()
+
+                let plannedPaths = {
+                    FolderPaths = [| "Run1"; "Run1/raw" |]
+                    FilePaths = [| "Run1/raw/results.csv" |]
+                }
+
+                let eventsFor target =
+                    Main.WatcherHelpers.createImportedWatcherEvents "C:/arc" target plannedPaths
+                    |> Array.map (fun event -> event.EventName, event.RelativePath)
+
+                Vitest
+                    .expect(eventsFor "assays/AssayA/dataset")
+                    .toEqual (
+                        [|
+                            addDir, "assays/AssayA/dataset/Run1"
+                            addDir, "assays/AssayA/dataset/Run1/raw"
+                            add, "assays/AssayA/dataset/Run1/raw/results.csv"
+                        |]
+                    )
+
+                Vitest
+                    .expect(eventsFor "")
+                    .toEqual (
+                        [|
+                            addDir, "Run1"
+                            addDir, "Run1/raw"
+                            add, "Run1/raw/results.csv"
+                        |]
+                    )
         )
 
         Vitest.test (
@@ -841,13 +881,15 @@ Vitest.describe (
                     let! sourcePath = createExternalRunFolderAsync arcPath
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
                     let mutable plannedFiles = [||]
+                    let mutable plannedFolders = [||]
                     let mutable publishedFolders = [||]
                     let lifecycleOrder = ResizeArray<string>()
 
-                    // The import handler registers watcher ownership in onFilesPlanned, so it must run
+                    // The import handler registers watcher ownership in onPathsPlanned, so it must run
                     // before anything appears in the target.
-                    let onFilesPlanned files =
-                        plannedFiles <- files
+                    let onPathsPlanned (planned: PlannedImportPaths) =
+                        plannedFiles <- planned.FilePaths
+                        plannedFolders <- planned.FolderPaths
 
                         if
                             Main.Bindings.Filesystem.existsSync (absoluteArcPath arcPath "assays/AssayA/dataset/Run1")
@@ -863,7 +905,7 @@ Vitest.describe (
                             [| sourcePath |]
                             ignore
                             (fun () -> false)
-                            onFilesPlanned
+                            onPathsPlanned
                             (fun folders ->
                                 publishedFolders <- folders
                                 lifecycleOrder.Add "published"
@@ -882,6 +924,7 @@ Vitest.describe (
                             )
 
                         Vitest.expect(plannedFiles).toEqual ([| "Run1/notes.txt"; "Run1/raw/results.csv" |])
+                        Vitest.expect(plannedFolders).toEqual ([| "Run1"; "Run1/empty"; "Run1/raw" |])
                         Vitest.expect(lifecycleOrder |> Seq.toArray).toEqual ([| "planned"; "published" |])
 
                         // Only the picked folder is reported, not the folders inside it.

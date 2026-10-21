@@ -189,10 +189,10 @@ Vitest.describe (
                 let vault = ArcVault(TestHelpers.testWindow ())
 
                 let events =
-                    WatcherHelpers.createImportedFileWatcherEvents "C:/arc" "assays/AssayA/dataset" [|
-                        "Run1/notes.txt"
-                        "Run1/raw/results.csv"
-                    |]
+                    WatcherHelpers.createImportedWatcherEvents "C:/arc" "assays/AssayA/dataset" {
+                        FolderPaths = [||]
+                        FilePaths = [| "Run1/notes.txt"; "Run1/raw/results.csv" |]
+                    }
 
                 Vitest.vi.useFakeTimers () |> ignore
 
@@ -212,9 +212,10 @@ Vitest.describe (
             "a cancelled or failed import releases its file marks at once",
             fun () ->
                 let events =
-                    WatcherHelpers.createImportedFileWatcherEvents "C:/arc" "assays/AssayA/dataset" [|
-                        "Run1/notes.txt"
-                    |]
+                    WatcherHelpers.createImportedWatcherEvents "C:/arc" "assays/AssayA/dataset" {
+                        FolderPaths = [||]
+                        FilePaths = [| "Run1/notes.txt" |]
+                    }
 
                 for result in
                     [
@@ -1417,6 +1418,44 @@ Vitest.describe (
                         Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
                         Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
                         Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
+                    })
+        )
+
+        Vitest.test (
+            "a watcher event for a folder an import created does not queue an ARC merge",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        vault.ClaimImportedFileEvents(
+                            WatcherHelpers.createImportedWatcherEvents arcPath "assays/AssayA/dataset" {
+                                FolderPaths = [| "Run1"; "Run1/raw" |]
+                                FilePaths = [| "Run1/raw/results.csv" |]
+                            }
+                        )
+
+                        let loadingChanges = ResizeArray<bool>()
+
+                        let handleFileEvent =
+                            vault._FileEventController (recordingWatcherApi loadingChanges)
+
+                        try
+                            handleFileEvent "addDir" (join [| arcPath; "assays/AssayA/dataset/Run1" |])
+                            handleFileEvent "addDir" (join [| arcPath; "assays/AssayA/dataset/Run1/raw" |])
+
+                            Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                            Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (2)
+
+                            handleFileEvent "addDir" (join [| arcPath; "assays/AssayA/dataset/Other" |])
+
+                            Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
+                        finally
+                            vault.ClearPendingFileWatcherState()
                     })
         )
 

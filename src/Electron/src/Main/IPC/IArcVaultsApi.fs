@@ -560,12 +560,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             (fun abortSignal -> promise {
                                                 let importedEvents = ResizeArray()
 
-                                                let registerImportedFiles importedRelativePaths =
+                                                let registerImportedPaths plannedPaths =
                                                     importedEvents.AddRange(
-                                                        WatcherHelpers.createImportedFileWatcherEvents
+                                                        WatcherHelpers.createImportedWatcherEvents
                                                             vault.path.Value
                                                             request.targetRelativePath
-                                                            importedRelativePaths
+                                                            plannedPaths
                                                     )
 
                                                     // Chokidar's awaitWriteFinish can emit these well after the import
@@ -579,7 +579,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         sourceAbsolutePaths
                                                         reportImportProgress
                                                         (fun () -> abortSignal.aborted)
-                                                        registerImportedFiles
+                                                        registerImportedPaths
                                                         (fun publishedFolders ->
                                                             vault.WatchImportedFolders publishedFolders
 
