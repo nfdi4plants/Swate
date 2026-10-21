@@ -6,9 +6,19 @@ open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
+[<Literal>]
+let LegacyDataMapFileName = "isa_datamap"
+
 let getNonEmptyPathParts (path: string) =
     PathHelpers.normalizePath path
     |> fun p -> p.Split('/', StringSplitOptions.RemoveEmptyEntries)
+
+/// Returns true when a path addresses Git's private repository metadata.
+/// `.gitignore`, `.gitattributes`, and similarly named files remain ordinary ARC payload.
+let isGitMetadataPath (path: string) =
+    path
+    |> getNonEmptyPathParts
+    |> Array.exists (fun segment -> String.Equals(segment, ".git", StringComparison.OrdinalIgnoreCase))
 
 let getPathDepth (path: string) =
     path |> getNonEmptyPathParts |> Array.length
@@ -16,10 +26,19 @@ let getPathDepth (path: string) =
 let pathsEqual (left: string) (right: string) =
     PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
+/// Returns true when a path is, or lies inside, the temporary folder of a running file import.
+let isTemporaryImportPath (path: string) =
+    getNonEmptyPathParts path
+    |> Array.exists (fun segment ->
+        Text.RegularExpressions.Regex.IsMatch(segment, """^\.swate-import-[0-9a-fA-F]{32}$""")
+    )
+
 let isLegacyDataMapPath (path: string) =
     getNonEmptyPathParts path
     |> Array.tryLast
-    |> Option.exists (fun fileName -> String.Equals(fileName, "isa_datamap", StringComparison.OrdinalIgnoreCase))
+    |> Option.exists (fun fileName ->
+        String.Equals(fileName, LegacyDataMapFileName, StringComparison.OrdinalIgnoreCase)
+    )
 
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with
@@ -220,22 +239,6 @@ let private tryGetExistingArcEntityTargetMatch
 let tryGetExistingArcEntityTargetRef (targetSources: seq<string * string * (string -> 'Target)>) (path: string) =
     tryGetExistingArcEntityTargetMatch targetSources path
     |> Option.map (fun (target, _, _) -> target)
-
-let createAvailableArcEntityTargets
-    (targetSources: seq<string * string * (string -> 'Target)>)
-    (fileEntries: seq<FileEntry>)
-    =
-    fileEntries
-    |> Seq.choose (fun entry ->
-        if entry.isDirectory then
-            None
-        else
-            tryGetExistingArcEntityTargetMatch targetSources entry.path
-    )
-    |> Seq.distinctBy (fun (target, _, _) -> target)
-    |> Seq.sortBy (fun (_, name, sortOrder) -> sortOrder, name.ToLowerInvariant())
-    |> Seq.map (fun (target, _, _) -> target)
-    |> ResizeArray
 
 let combineMany = ARCtrl.ArcPathHelper.combineMany
 

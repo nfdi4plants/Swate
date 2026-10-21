@@ -152,6 +152,8 @@ module ArcMergeHelper =
         match entityRef, eventName with
         | ArcEntityRef.Investigation, (EventName.Add | EventName.Change) -> copyInvestigationFields arcLocal arcRemote
         | ArcEntityRef.Investigation, EventName.Unlink -> ()
+        // The reloaded snapshot reflects every license file variant, so it is authoritative for each event kind.
+        | ArcEntityRef.License, _ -> arcLocal.License <- arcRemote.License |> Option.map _.Copy()
         | ArcEntityRef.Assay id, (EventName.Add | EventName.Change) ->
             applyEntityAddOrChange
                 id

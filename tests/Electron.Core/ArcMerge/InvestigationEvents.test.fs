@@ -41,6 +41,26 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "license event copies the license from disc and keeps local investigation edits",
+            fun () ->
+                let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
+                arcLocal.Title <- Some "User Title"
+                arcRemote.Title <- Some "Disc Title"
+                arcRemote.SetLicenseFulltext "Disc license"
+
+                let merged =
+                    ARC.merge arcLocal arcRemote [
+                        {
+                            EventName = EventName.Change
+                            Path = "LICENSE"
+                        }
+                    ]
+
+                Vitest.expect(merged.License |> Option.map _.Content).toEqual (Some "Disc license")
+                Vitest.expect(merged.Title).toEqual (Some "User Title")
+        )
+
+        Vitest.test (
             "unlink event is a no-op (cannot delete investigation without destroying ARC)",
             fun () ->
                 let arcLocal, arcRemote = MockData.createTwoCleanCopies ()

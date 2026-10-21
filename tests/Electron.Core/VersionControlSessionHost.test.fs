@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron
 open Main
+open Main.ArcVault
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Composite.Authentication.Types
@@ -22,6 +23,19 @@ let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
 [<Emit("$0.mock.calls.length")>]
 let private mockCallCount (mock: obj) : int = jsNative
+
+let private waitUntil description predicate =
+    let rec loop remaining = promise {
+        if predicate () then
+            return ()
+        elif remaining = 0 then
+            return failwith $"Timed out waiting for {description}."
+        else
+            do! Promise.sleep 10
+            return! loop (remaining - 1)
+    }
+
+    loop 500
 
 let private git (cwd: string) (args: string list) = execFile "git" (List.toArray args) cwd
 
@@ -524,6 +538,12 @@ let private waitForSessionToClose (host: WorkspaceSessionHost.WorkspaceSessionHo
 let private restoreGates =
     System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
 
+let private restoreInvocations = System.Collections.Generic.HashSet<string>()
+
+let private bindInvocations = System.Collections.Generic.HashSet<string>()
+
+let private providerEvents = ResizeArray<string>()
+
 let private openGates =
     System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
 
@@ -577,6 +597,11 @@ let private fakeProviderRuntimeWithStoragePolicy
         CreateRevision = fun _ _ -> unsupported ()
         RestorePaths =
             fun restoreRequest _ -> async {
+                restoreRequest.Paths
+                |> Array.tryHead
+                |> Option.map RepositoryPath.value
+                |> Option.iter (restoreInvocations.Add >> ignore)
+
                 // A restore waits until the test releases its first path, so two
                 // restores can overlap and the busy flag can be observed in between.
                 match restoreRequest.Paths |> Array.tryHead |> Option.map RepositoryPath.value with
@@ -612,6 +637,9 @@ let private fakeProviderRuntimeWithStoragePolicy
                 }
             Bind =
                 fun bindRequest _ -> async {
+                    providerEvents.Add "bind"
+                    bindInvocations.Add bindRequest.Location.ProviderLocation |> ignore
+
                     // A partial bind: the location is retargeted, but the provider reports a
                     // failure of a later step, so the host must still reopen the session.
                     let binding = {
@@ -630,6 +658,7 @@ let private fakeProviderRuntimeWithStoragePolicy
                 }
             Open =
                 fun binding _ -> async {
+                    providerEvents.Add "open"
                     let rootKey = ProviderResolver.normalizePath binding.WorkspaceRoot
 
                     match openStartResolvers.TryGetValue rootKey with
@@ -771,6 +800,78 @@ let private withCreateArcSetup
             WorkspaceSessionHost.resetForTests ()
     }
 
+/// Runs a test body against a registered vault over a provider that lists two large objects, one at the
+/// root and one in the nested folder, next to a repository index file. The body switches the listed
+/// state with setMaterialized and reads the number of listings with listings.
+let private withListedLargeObjects (windowId: int) testBody = promise {
+    let! root = createTempDirectoryAsync "swate-large-object-state-"
+    let workspace = join [| root; "workspace" |]
+
+    for directory in [ "nested"; ".git" ] do
+        Main.Bindings.Filesystem.mkdirSync
+            (join [| workspace; directory |])
+            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+    writeText (join [| workspace; ".git"; "index" |]) "index"
+
+    for name in [ "root.bin"; "nested/nested.bin" ] do
+        writeText (join [| workspace; name |]) "content"
+
+    let mutable materialized = false
+    let mutable listings = 0
+
+    let objectState name = {
+        Path = RepositoryPath.tryCreate name |> Result.defaultWith failwith
+        IsMaterialized = materialized
+        IsLocallyAvailable = true
+        SizeBytes = Some 7.0
+        ObjectId = Some(String.replicate 64 "b")
+    }
+
+    let materialization: ObjectMaterializationService = {
+        ListObjects =
+            fun _ -> async {
+                listings <- listings + 1
+
+                return
+                    OperationResult.succeeded [|
+                        objectState "root.bin"
+                        objectState "nested/nested.bin"
+                    |]
+            }
+        Materialize = fun _ _ -> async { return OperationResult.succeeded () }
+        Dematerialize = fun _ _ -> async { return OperationResult.succeeded () }
+    }
+
+    let runtime =
+        fakeProviderRuntimeWithStoragePolicy workspace (join [| root; "unused" |]) None (Some materialization)
+
+    let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+    WorkspaceSessionHost.initialize host
+    let vault = registerVault windowId workspace
+
+    let isMaterialized relativePath =
+        vault.fileTree
+            .[join [| workspace; relativePath |]
+              |> Swate.Components.Shared.PathHelpers.normalizePath].largeObject
+        |> Option.map _.IsMaterialized
+
+    let cleanup () = promise {
+        do! vault.StopFileWatcher()
+        ARC_VAULTS.Vaults.Remove windowId |> ignore
+        electronMock?reset () |> ignore
+        do! host.CloseAll() |> Async.StartAsPromise
+        do! removeDirectoryAsync root
+    }
+
+    try
+        do! testBody vault workspace isMaterialized (fun value -> materialized <- value) (fun () -> listings)
+        do! cleanup ()
+    with error ->
+        do! cleanup ()
+        return raise error
+}
+
 Vitest.describe (
     "Version control IPC over a git vault",
     fun () ->
@@ -833,7 +934,196 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "materialization defers successful tree refreshes and refreshes after failure",
+            "File Explorer shares one large-object listing until an invalidation renews it",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-file-tree-objects-"
+                let workspace = join [| root; "workspace" |]
+                let nested = join [| workspace; "nested" |]
+                Main.Bindings.Filesystem.mkdirSync nested (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                let names = Array.init 110 (fun index -> $"file-{index}.dat")
+
+                for name in Array.append names [| "nested/object.dat"; "ordinary.txt" |] do
+                    writeText (join [| workspace; name |]) "content"
+
+                let mutable objects =
+                    Array.append names [| "nested/object.dat" |]
+                    |> Array.map (fun name -> {
+                        Path = RepositoryPath.tryCreate name |> Result.defaultWith failwith
+                        IsMaterialized = false
+                        IsLocallyAvailable = true
+                        SizeBytes = Some 42.0
+                        ObjectId = Some(String.replicate 64 "a")
+                    })
+
+                let mutable listings = 0
+
+                let materialization: ObjectMaterializationService = {
+                    ListObjects =
+                        fun _ -> async {
+                            listings <- listings + 1
+                            return OperationResult.succeeded objects
+                        }
+                    Materialize = fun _ _ -> async { return OperationResult.succeeded () }
+                    Dematerialize = fun _ _ -> async { return OperationResult.succeeded () }
+                }
+
+                let runtime =
+                    fakeProviderRuntimeWithStoragePolicy
+                        workspace
+                        (join [| root; "unused" |])
+                        None
+                        (Some materialization)
+
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                WorkspaceSessionHost.initialize host
+                let vault = registerVault 6061 workspace
+
+                let entryAt relativePath =
+                    let absolutePath =
+                        join [| workspace; relativePath |]
+                        |> Swate.Components.Shared.PathHelpers.normalizePath
+
+                    vault.fileTree.[absolutePath]
+
+                let cleanup () = promise {
+                    do! vault.StopFileWatcher()
+                    ARC_VAULTS.Vaults.Remove 6061 |> ignore
+                    electronMock?reset () |> ignore
+                    do! host.CloseAll() |> Async.StartAsPromise
+                    do! removeDirectoryAsync root
+                }
+
+                try
+                    let! firstPage = vault.EnsureInitialFileTreeRootPage workspace
+                    Vitest.expect(firstPage.Count).toBe 101
+                    Vitest.expect(listings).toBe 1
+
+                    firstPage.Values
+                    |> Seq.filter (fun entry -> entry.name.StartsWith "file-")
+                    |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject.IsSome).toBe true)
+
+                    // Further pages and refreshes reuse the shared repository-wide listing.
+                    do! vault.LoadNextFileTreeDirectoryPage ""
+                    Vitest.expect(vault.fileTree.Count).toBe 113
+
+                    for name in names do
+                        Vitest.expect((entryAt name).largeObject.IsSome).toBe true
+
+                    Vitest.expect((entryAt "ordinary.txt").largeObject.IsNone).toBe true
+
+                    do! vault.RefreshFileTreeDirectory "nested"
+                    Vitest.expect((entryAt "nested/object.dat").largeObject.IsSome).toBe true
+                    do! vault.RefreshFileTreeDirectory ""
+                    Vitest.expect(listings).toBe 1
+
+                    // An entry added to a watched directory is shown without renewing the listing.
+                    writeText (join [| workspace; "nested/added.txt" |]) "added"
+
+                    do!
+                        waitUntil
+                            "entry added to a watched directory"
+                            (fun () ->
+                                vault.fileTree.ContainsKey(
+                                    join [| workspace; "nested/added.txt" |]
+                                    |> Swate.Components.Shared.PathHelpers.normalizePath
+                                )
+                            )
+
+                    Vitest.expect(listings).toBe 1
+
+                    // A watcher batch with changed files, such as a save, reuses the listing as well.
+                    let events =
+                        names.[0..1]
+                        |> Array.map (fun name -> Main.WatcherHelpers.buildWatcherEvent workspace "change" name)
+                        |> Array.toList
+
+                    do! vault.ApplyWatcherFileTreeEvents events
+                    Vitest.expect(listings).toBe 1
+
+                    for name in names.[0..1] do
+                        Vitest.expect((entryAt name).largeObject.IsSome).toBe true
+
+                    // Invalidation, for example after a version control operation, renews it on the next read.
+                    objects <- [||]
+                    vault.LargeObjectMetadata.Invalidate()
+                    do! vault.RefreshFileTreeDirectory ""
+                    Vitest.expect(listings).toBe 2
+
+                    vault.fileTree.Values
+                    |> Seq.filter (fun entry ->
+                        Swate.Components.Shared.PathHelpers.pathsEqual (dirname entry.path) workspace
+                    )
+                    |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject.IsNone).toBe true)
+
+                    // A stopped vault never reopens the version control session for metadata.
+                    do! vault.StopFileWatcher()
+                    let! _ = vault.WithLargeObjectMetadata(workspace, [| entryAt "ordinary.txt" |])
+                    Vitest.expect(listings).toBe 2
+
+                    do! cleanup ()
+                with error ->
+                    do! cleanup ()
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "a renewed large-object listing updates entries of directories that are not read again",
+            fun () ->
+                withListedLargeObjects
+                    6062
+                    (fun vault workspace isMaterialized setMaterialized listings -> promise {
+                        let! _ = vault.EnsureInitialFileTreeRootPage workspace
+                        do! vault.RefreshFileTreeDirectory "nested"
+                        Vitest.expect(isMaterialized "nested/nested.bin").toEqual (Some false)
+                        Vitest.expect(listings ()).toBe 1
+
+                        // Only the root is read again; the renewed listing still reaches the nested entry.
+                        setMaterialized true
+                        vault.LargeObjectMetadata.Invalidate()
+                        do! vault.RefreshFileTreeDirectory ""
+
+                        do!
+                            waitUntil
+                                "renewed state of the nested entry"
+                                (fun () -> isMaterialized "nested/nested.bin" = Some true)
+
+                        Vitest.expect(isMaterialized "root.bin").toEqual (Some true)
+                        Vitest.expect(listings ()).toBe 2
+                    })
+        )
+
+        Vitest.test (
+            "focus renews the large-object state only after the repository index changed",
+            fun () ->
+                withListedLargeObjects
+                    6063
+                    (fun vault workspace isMaterialized setMaterialized listings -> promise {
+                        let! _ = vault.EnsureInitialFileTreeRootPage workspace
+                        Vitest.expect(listings ()).toBe 1
+
+                        setMaterialized true
+                        do! vault.RefreshLargeObjectStateIfRepositoryChanged()
+                        Vitest.expect(listings ()).toBe 1
+                        Vitest.expect(isMaterialized "root.bin").toEqual (Some false)
+
+                        // A checkout outside Swate, such as git lfs pull, rewrites the index.
+                        let later = System.DateTime.UtcNow.AddMinutes(1.0)
+
+                        VersionControlService.Runtime.Node.FileSystem.utimesSync
+                            (join [| workspace; ".git"; "index" |])
+                            later
+                            later
+
+                        do! vault.RefreshLargeObjectStateIfRepositoryChanged()
+                        Vitest.expect(listings ()).toBe 2
+                        Vitest.expect(isMaterialized "root.bin").toEqual (Some true)
+                    })
+        )
+
+        Vitest.test (
+            "materialization renews the large-object state only when asked or after a failure",
             fun () -> promise {
                 let! root = createTempDirectoryAsync "swate-vc-materialize-refresh-"
                 let workspace = join [| root; "workspace" |]
@@ -841,9 +1131,14 @@ Vitest.describe (
                 writeText (join [| workspace; "object.txt" |]) "object\n"
 
                 let mutable materializationFails = false
+                let mutable listings = 0
 
                 let objectMaterialization: ObjectMaterializationService = {
-                    ListObjects = fun _ -> async { return OperationResult.succeeded [||] }
+                    ListObjects =
+                        fun _ -> async {
+                            listings <- listings + 1
+                            return OperationResult.succeeded [||]
+                        }
                     Materialize =
                         fun _ _ -> async {
                             if materializationFails then
@@ -881,8 +1176,10 @@ Vitest.describe (
                 try
                     try
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 65)
-                        vault.fileTree.Clear()
+                        let! _ = vault.EnsureInitialFileTreeRootPage workspace
+                        Vitest.expect(listings).toBe 1
 
+                        // A batch renews the state once, with its last request.
                         let! succeeded =
                             api.materializeObject {
                                 OperationId = "materialize-success-no-refresh"
@@ -891,7 +1188,7 @@ Vitest.describe (
                             }
 
                         expectDtoValue "successful materialization" succeeded |> ignore
-                        Vitest.expect(vault.fileTree.Count).toBe 0
+                        Vitest.expect(listings).toBe 1
 
                         materializationFails <- true
 
@@ -903,7 +1200,7 @@ Vitest.describe (
                             }
 
                         expectDtoFailure "failed materialization" failed |> ignore
-                        Vitest.expect(vault.fileTree.Count).toBeGreaterThan 0
+                        Vitest.expect(listings).toBe 2
                     with error ->
                         do! cleanup ()
                         return raise error
@@ -1379,7 +1676,7 @@ Vitest.describe (
             "a save stores a small dataset file as a large object",
             fun () ->
                 withFixture (fun fixture -> promise {
-                    let vault = registerVault 62 fixture.RepoRoot
+                    registerVault 62 fixture.RepoRoot |> ignore
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 62)
                     let datasetPath = "assays/a1/dataset/raw.bin"
 
@@ -1406,19 +1703,9 @@ Vitest.describe (
                         git fixture.RepoRoot [ "cat-file"; "-p"; $"HEAD:{datasetPath}" ]
 
                     let attributes = git fixture.RepoRoot [ "cat-file"; "-p"; "HEAD:.gitattributes" ]
-                    let datasetAbsolutePath = join [| fixture.RepoRoot; datasetPath |]
-
-                    let datasetEntry =
-                        vault.fileTree.Values
-                        |> Seq.tryFind (fun entry ->
-                            Swate.Components.Shared.PathHelpers.pathsEqual entry.path datasetAbsolutePath
-                        )
-                        |> Option.defaultWith (fun () -> failwith "The refreshed file tree omitted the dataset file.")
-
                     Vitest.expect(datasetContent.StartsWith("version https://git-lfs.github.com/spec/v1")).toBe true
 
                     Vitest.expect(attributes.Contains(datasetPath)).toBe true
-                    Vitest.expect(datasetEntry.largeObject.IsSome).toBe true
                 })
         )
 
@@ -2024,8 +2311,19 @@ Vitest.describe (
             fun () ->
                 withFixture (fun fixture -> promise {
                     let vault = registerVault 48 fixture.RepoRoot
+                    let datasetPath = join [| fixture.RepoRoot; "dataset" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        datasetPath
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    do! vault.EnsureInitialFileTreeRootPage fixture.RepoRoot |> Promise.map ignore
+                    do! vault.RefreshFileTreeDirectory "dataset"
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
                     Vitest.expect(vault.isBusyWriting).toBe false
+
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset").toBe
+                        true
 
                     let running =
                         api.restorePaths {
@@ -2038,6 +2336,10 @@ Vitest.describe (
                     let! result = running
                     expectDtoFailure "stale restore" result |> ignore
                     Vitest.expect(vault.isBusyWriting).toBe false
+                    Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset").toBe
+                        true
                 })
         )
 
@@ -2258,7 +2560,79 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "overlapping mutations keep the vault busy until the last one ends",
+            "an explicit bind persists before opening and keeps loaded directories through watcher restoration",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let workspace = join [| fixture.Root; "explicit-unbound-bind" |]
+                    let unusedRoot = join [| fixture.Root; "unused-explicit-bind" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        (join [| workspace; "dataset" |])
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let fakeRuntime = fakeProviderRuntime workspace unusedRoot
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+                    providerEvents.Clear()
+
+                    try
+                        let vault = registerVault 93 workspace
+                        do! vault.EnsureInitialFileTreeRootPage workspace |> Promise.map ignore
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let datasetObserverBeforeBind =
+                            vault.LoadedDirectoryWatcherController.Current.Watchers.TryFind "dataset"
+
+                        Vitest.expect(datasetObserverBeforeBind.IsSome).toBe true
+                        let targetLocation = "https://example.invalid/explicit-bind.git"
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 93)
+                        providerEvents.Clear()
+
+                        let! result =
+                            api.bindWorkspace {
+                                OperationId = "explicit-unbound-bind"
+                                ProviderLocation = targetLocation
+                                DisplayName = None
+                            }
+
+                        match result with
+                        | Ok(OperationResultDto.PartiallySucceeded _) -> ()
+                        | other -> failwith $"Expected a partial explicit bind, got {other}"
+
+                        Vitest.expect(providerEvents |> Seq.toArray).toEqual [| "bind"; "open" |]
+
+                        Vitest
+                            .expect(
+                                fakeRuntime.Bindings.TryFind workspace
+                                |> Option.map (fun binding -> binding.Location.ProviderLocation)
+                            )
+                            .toEqual (Some targetLocation)
+
+                        // The bind refreshes the loaded tree instead of resetting it, so restoration creates a
+                        // replacement observer for dataset.
+                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "").toBe true
+
+                        let datasetObserverAfterBind =
+                            vault.LoadedDirectoryWatcherController.Current.Watchers.TryFind "dataset"
+
+                        Vitest.expect(datasetObserverAfterBind.IsSome).toBe true
+
+                        Vitest
+                            .expect(
+                                obj.ReferenceEquals(datasetObserverBeforeBind.Value, datasetObserverAfterBind.Value)
+                            )
+                            .toBe
+                            false
+                    finally
+                        providerEvents.Clear()
+                        bindInvocations.Clear()
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "queued mutations, a bind included, are tracked and can be canceled before their bodies run",
             fun () ->
                 withFixture (fun fixture -> promise {
                     let coreOnlyRoot = join [| fixture.Root; "core-overlap" |]
@@ -2280,11 +2654,17 @@ Vitest.describe (
 
                     try
                         let vault = registerVault 52 coreOnlyRoot
+                        let datasetPath = join [| coreOnlyRoot; "dataset" |]
+
+                        Main.Bindings.Filesystem.mkdirSync
+                            datasetPath
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                        do! vault.EnsureInitialFileTreeRootPage coreOnlyRoot |> Promise.map ignore
+                        do! vault.RefreshFileTreeDirectory "dataset"
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 52)
                         let firstGate, releaseFirst = deferred ()
-                        let secondGate, releaseSecond = deferred ()
                         restoreGates.["first.txt"] <- firstGate
-                        restoreGates.["second.txt"] <- secondGate
 
                         let first =
                             api.restorePaths {
@@ -2293,7 +2673,16 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = "v1"
                             }
 
+                        do!
+                            waitUntil
+                                "first restore mutation to start"
+                                (fun () ->
+                                    fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |]
+                                    && vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty
+                                )
+
                         Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watchers.IsEmpty).toBe true
 
                         let second =
                             api.restorePaths {
@@ -2302,15 +2691,53 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = "v1"
                             }
 
+                        let targetLocation = "https://example.invalid/queued-bind.git"
+
+                        let bind =
+                            api.bindWorkspace {
+                                OperationId = "queued-bind"
+                                ProviderLocation = targetLocation
+                                DisplayName = None
+                            }
+
                         Vitest.expect(vault.isBusyWriting).toBe true
+
+                        Vitest.expect(fakeHost.RunningMutationIdsForWindow 52 |> Array.sort).toEqual [|
+                            "queued-bind"
+                            "restore-first"
+                            "restore-second"
+                        |]
+
+                        Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
+                        Vitest.expect(bindInvocations.Contains targetLocation).toBe false
+
+                        let! canceledRestore = api.cancelOperation { OperationId = "restore-second" }
+                        let! canceledBind = api.cancelOperation { OperationId = "queued-bind" }
+                        Vitest.expect(canceledRestore).toEqual (Ok true)
+                        Vitest.expect(canceledBind).toEqual (Ok true)
+
                         releaseFirst ()
                         let! _ = first
                         Vitest.expect(vault.isBusyWriting).toBe true
-                        releaseSecond ()
-                        let! _ = second
+                        let! secondResult = second
+                        let! bindResult = bind
+                        let restoreFailure = expectDtoFailure "queued canceled restore" secondResult
+                        let bindFailure = expectDtoFailure "queued canceled bind" bindResult
+                        Vitest.expect(restoreFailure.Category).toEqual FailureCategoryDto.Canceled
+                        Vitest.expect(bindFailure.Category).toEqual FailureCategoryDto.Canceled
+                        Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
+                        Vitest.expect(bindInvocations.Contains targetLocation).toBe false
                         Vitest.expect(vault.isBusyWriting).toBe false
+                        Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+
+                        Vitest
+                            .expect(vault.LoadedDirectoryWatcherController.Current.Watchers.ContainsKey "dataset")
+                            .toBe
+                            true
                     finally
                         restoreGates.Clear()
+                        restoreInvocations.Clear()
+                        bindInvocations.Clear()
                         WorkspaceSessionHost.initialize fixture.Host
                 })
         )

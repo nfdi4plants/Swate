@@ -14,7 +14,8 @@ open Renderer
 let NotesDraftTarget () =
 
     let notesDraft, setNotesDraft = React.useState NotesDraft.init
-    let notesUiState, setNotesUiState = React.useState NotesUiState.init
+    let notesUiState, updateNotesUiState = React.useStateWithUpdater NotesUiState.init
+    let setNotesUiState state = updateNotesUiState (fun _ -> state)
 
     let pendingOverwriteRequest, setPendingOverwriteRequest =
         React.useState<FileContentDTO option> None
@@ -23,27 +24,25 @@ let NotesDraftTarget () =
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
 
     let availableNotesTargets =
-        React.useMemo (
-            (fun _ ->
-                createAvailableArcEntityTargets
-                    [
-                        (ARCtrl.ArcPathHelper.StudiesFolderName,
-                         ARCtrl.ArcPathHelper.StudyFileName,
-                         fun name -> {
-                             Name = name
-                             Kind = NotesTargetKind.Study
-                         })
-                        (ARCtrl.ArcPathHelper.AssaysFolderName,
-                         ARCtrl.ArcPathHelper.AssayFileName,
-                         fun name -> {
-                             Name = name
-                             Kind = NotesTargetKind.Assay
-                         })
-                    ]
-                    fileStateCtx.state.FileTree
-            ),
-            [| box fileStateCtx.state.FileTree |]
-        )
+        MainSyncedState.useMainSyncedState {
+            initial = ResizeArray<ExistingTargetRef>()
+            load =
+                fun () -> promise {
+                    match! Api.ipcArcVaultApi.getNoteTargets () with
+                    | Ok targets -> return ResizeArray targets
+                    | Error error -> return raise error
+                }
+            subscribe = fun _ -> ignore
+            onError =
+                fun error ->
+                    updateNotesUiState (fun current -> {
+                        current with
+                            Error = Some $"Failed to load note targets: {error.Message}"
+                    })
+            // The targets come from the ARC model, which the main process waits for, so the page loads them
+            // once when it opens instead of on every File Explorer update.
+            dependencies = [||]
+        }
 
     let setSubmitState isSubmitting error =
         setNotesUiState {
@@ -115,7 +114,7 @@ let NotesDraftTarget () =
             submitRequest false request
 
     React.Fragment [
-        Notes.Wizard(notesDraft, setNotesDraft, notesUiState, setNotesUiState, onSubmit, availableNotesTargets)
+        Notes.Wizard(notesDraft, setNotesDraft, notesUiState, setNotesUiState, onSubmit, availableNotesTargets.state)
         FileTargetConflictModal.Main(
             isOpen = pendingOverwriteRequest.IsSome,
             targetPath = (pendingOverwriteRequest |> Option.map _.path),

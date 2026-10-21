@@ -50,6 +50,31 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "dematerializing a directory keeps other known materialized paths",
+            fun () ->
+                let state = {
+                    ArcScopeId = Some "C:/arc"
+                    Paths = Set.ofList [ "arc"; "arc/notes" ]
+                }
+
+                let collapsed = dematerialize "arc\\notes" state
+
+                Vitest.expect(collapsed.ArcScopeId).toEqual (Some "C:/arc")
+                Vitest.expect(collapsed.Paths |> Set.toList).toEqual ([ "arc" ])
+        )
+
+        Vitest.test (
+            "expanding loads only directories that were never read",
+            fun () ->
+                let paging = Map.ofList [ "assays/complete", false; "assays/incomplete", true ]
+
+                Vitest.expect(needsInitialDirectoryLoad "assays/new" paging).toBe true
+                // Expanding again shows the loaded pages; further pages stay behind "Load more".
+                Vitest.expect(needsInitialDirectoryLoad "assays\\incomplete" paging).toBe false
+                Vitest.expect(needsInitialDirectoryLoad "assays/complete" paging).toBe false
+        )
+
+        Vitest.test (
             "maps an unmaterialized non-empty directory without children or expansion state",
             fun () ->
                 let directory =
@@ -59,6 +84,16 @@ Vitest.describe (
 
                 Vitest.expect(item.Children.IsNone).toBe (true)
                 Vitest.expect(item.IsExpanded).toBe (false)
+        )
+
+        Vitest.test (
+            "maps an unmaterialized directory with no known children as expandable",
+            fun () ->
+                let directory = directoryNode "dataset" "arc/dataset" []
+                let item = toFileItemTree Set.empty directory
+
+                Vitest.expect(item.Children.IsNone).toBe (true)
+                Vitest.expect(item.IsDirectory).toBe (true)
         )
 
         Vitest.test (
@@ -143,7 +178,11 @@ Vitest.describe (
                 }
 
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
+                    reconcileMaterializedState
+                        (Some "C:/arc")
+                        (Some "arc/selected/selected.txt")
+                        (collectTreeDirectories (Some root))
+                        current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
         )
@@ -162,7 +201,7 @@ Vitest.describe (
                 }
 
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) current
+                    reconcileMaterializedState (Some "C:/new-arc") None (collectTreeDirectories (Some root)) current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])

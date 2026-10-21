@@ -125,6 +125,36 @@ let pathExistsAsync (path: string) : JS.Promise<bool> = promise {
         return false
 }
 
+/// Reads the first entryCount entries of a File Explorer directory and closes the listing.
+let readFileTreeDirectoryPrefix (arcPath: string) (relativeDirectoryPath: string) (entryCount: int) = promise {
+    let! page, cursor =
+        Main.FileTreeCreator.readFileTreeDirectoryPrefixWithCursor arcPath relativeDirectoryPath entryCount
+
+    match cursor with
+    | Some cursor -> do! cursor.Directory.close ()
+    | None -> ()
+
+    return page
+}
+
+/// Adds a study, assay, workflow and run that each carry a DataMap.
+let addDataMapToAllEntityTypes (arc: ARC) =
+    let study = ArcStudy("Study With DataMap")
+    study.DataMap <- Some(DataMap.init ())
+    arc.AddStudy(study)
+
+    let assay = ArcAssay("Assay With DataMap")
+    assay.DataMap <- Some(DataMap.init ())
+    arc.AddAssay(assay)
+
+    let workflow = ArcWorkflow("Workflow With DataMap")
+    workflow.DataMap <- Some(DataMap.init ())
+    arc.AddWorkflow(workflow)
+
+    let run = ArcRun("Run With DataMap")
+    run.DataMap <- Some(DataMap.init ())
+    arc.AddRun(run)
+
 let loadArcAsync (arcPath: string) : JS.Promise<ARC> = promise {
     let! loaded = ARC.tryLoadAsync arcPath
     return expectLoadedArc loaded

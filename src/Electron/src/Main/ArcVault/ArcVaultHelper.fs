@@ -177,12 +177,6 @@ type OpenArcRootRenamePlan = {
 let private resolveAbsolutePath (pathValue: string) =
     pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
 
-let private tryGetNodeErrorCode (error: exn) : string option =
-    try
-        error?code |> unbox<string> |> Option.ofObj
-    with _ ->
-        None
-
 let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
     let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
 
@@ -216,7 +210,7 @@ let private renameWithRetriesAsync
 
             return Ok()
         with renameError ->
-            let errorCode = tryGetNodeErrorCode renameError
+            let errorCode = Filesystem.tryGetNodeErrorCode renameError
 
             if attemptIndex < retryDelaysMs.Length - 1 && isTransientRenameError errorCode then
                 return! attempt (attemptIndex + 1)
@@ -227,7 +221,7 @@ let private renameWithRetriesAsync
     attempt 0
 
 let private mapArcRootRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
-    match tryGetNodeErrorCode renameError with
+    match Filesystem.tryGetNodeErrorCode renameError with
     | Some "EPERM"
     | Some "EACCES" ->
         exn
@@ -350,55 +344,3 @@ let loadWindow (window: BrowserWindow) = promise {
 
     window.show ()
 }
-
-let shouldUsePollingByDefault (platform: string) =
-    System.String.Equals(platform, "win32", System.StringComparison.OrdinalIgnoreCase)
-
-let private currentNodePlatform () : string =
-    emitJsExpr () "process.platform" |> unbox<string>
-
-let isFileWatcherPathIgnored (path: string) =
-    let normalizedPath = PathHelpers.normalizeSeparators path
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
-
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || isGitMetadataPath normalizedPath
-    || isLegacyDataMapPath normalizedPath
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
-
-let createFileWatcher (path: string) (usePolling: bool option) =
-
-    // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling =
-        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
-
-    let watcherOptions =
-        if usePolling then
-            Chokidar.WatchOptions(
-                cwd = path,
-                awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
-                ignoreInitial = true,
-                usePolling = true,
-                interval = 200,
-                binaryInterval = 400
-            )
-        else
-            Chokidar.WatchOptions(
-                cwd = path,
-                awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
-                ignoreInitial = true
-            )
-
-    let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
-
-    watcher
-
-let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
-    WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
-        window
-        (fun api -> api.arcUnsavedChangesUpdate hasUnsavedChanges)

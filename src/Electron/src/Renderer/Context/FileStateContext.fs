@@ -6,16 +6,19 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Renderer
 
 type FileState = {
     FileTree: FileEntry[]
+    FileTreeDirectoryHasMore: Map<string, bool>
     Selection: ArcSelection
 } with
 
     static member init() : FileState = {
         FileTree = [||]
+        FileTreeDirectoryHasMore = Map.empty
         Selection = ArcSelection.empty
     }
 
@@ -49,7 +52,7 @@ let FileStateCtx =
 [<Hook>]
 let useFileStateCtx () = React.useContext FileStateCtx
 
-type FileTreeSnapshotLoader = unit -> JS.Promise<Result<Dictionary<string, FileEntry>, exn>>
+type FileTreeSnapshotLoader = unit -> JS.Promise<Result<FileTreeSnapshot, exn>>
 type ActiveFileImportLoader = unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
 
 type FileImportApi = {
@@ -59,7 +62,11 @@ type FileImportApi = {
     cancelImport: string -> JS.Promise<Result<unit, exn>>
 }
 
-let private fileTreeFromDictionary (fileTreeDict: Dictionary<string, FileEntry>) = fileTreeDict.Values |> Seq.toArray
+let private fileTreeStateFromSnapshot (snapshot: FileTreeSnapshot) =
+    snapshot.entries.Values |> Seq.toArray,
+    snapshot.directoryHasMore
+    |> Seq.map (fun pair -> pair.Key, pair.Value)
+    |> Map.ofSeq
 
 [<ReactComponent>]
 let FileStateCtxProviderWithSnapshots
@@ -71,17 +78,17 @@ let FileStateCtxProviderWithSnapshots
 
     let fileTree =
         Renderer.MainSyncedState.useMainSyncedState {
-            initial = [||]
+            initial = [||], Map.empty
             load =
                 fun () -> promise {
                     match! loadFileTreeSnapshot () with
-                    | Ok fileTreeDict -> return fileTreeFromDictionary fileTreeDict
+                    | Ok snapshot -> return fileTreeStateFromSnapshot snapshot
                     | Error ex -> return raise ex
                 }
             subscribe =
                 fun setFileTree ->
                     Renderer.IpcReceiver.subscribeProxyReceiver<IFileTreeRendererApi> {
-                        fileTreeUpdate = fileTreeFromDictionary >> setFileTree
+                        fileTreeUpdate = fileTreeStateFromSnapshot >> setFileTree
                     }
             onError = fun ex -> console.error ("Failed to load file tree snapshot.", ex.Message)
             dependencies = [||]
@@ -90,7 +97,8 @@ let FileStateCtxProviderWithSnapshots
     let fileState =
         React.useMemo (
             (fun _ -> {
-                FileTree = fileTree.state
+                FileTree = fst fileTree.state
+                FileTreeDirectoryHasMore = snd fileTree.state
                 Selection = selection
             }),
             [| box fileTree.state; box selection |]

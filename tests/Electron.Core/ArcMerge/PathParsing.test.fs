@@ -12,6 +12,14 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "license files at the root, but not in folders",
+            fun () ->
+                Vitest.expect(ArcEntityRef.fromPath "LICENSE").toEqual (ArcEntityRef.License)
+                Vitest.expect(ArcEntityRef.fromPath "LICENSE.md").toEqual (ArcEntityRef.License)
+                Vitest.expect(ArcEntityRef.fromPath "docs/LICENSE").toEqual (ArcEntityRef.Unknown "docs/LICENSE")
+        )
+
+        Vitest.test (
             "investigation file with leading folder",
             fun () ->
                 Vitest

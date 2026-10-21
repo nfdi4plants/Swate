@@ -22,6 +22,7 @@
     <Compile Include="GitLabCreateProject.test.fs" />
     <Compile Include="LfsActivityContext.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
+    <Compile Include="NotesDraftTarget.test.rtl.fs" />
     <Compile Include="ProvenanceGraphPage.test.fs" />
   </ItemGroup>
   <ItemGroup>

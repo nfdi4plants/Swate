@@ -241,7 +241,9 @@ let tryGetInlineArcCreateKind (rootPath: string) (item: FileItem) =
             |> Option.map _.Kind
         | _ -> None
 
-let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq) =
+/// Builds the default ARC file for a new entity. Whether the identifier is already taken is decided by
+/// the main process against the loaded ARC, because File Explorer only knows the directories it has read.
+let tryBuildArcCreateDraft kind (identifier: string) =
     let identifier = identifier.Trim()
 
     if isArcCreateIdentifierValid identifier |> not then
@@ -255,16 +257,7 @@ let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq)
             match FileContentDTO.fromArcFile arcFile with
             | None -> Error $"Creating {config.Label} files is not supported in Electron yet."
             | Some request ->
-                let requestedPath = PathHelpers.normalizePath request.path
-
-                let alreadyExists =
-                    existingPaths
-                    |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) requestedPath)
-
-                if alreadyExists then
-                    Error $"{config.Label} '{identifier}' already exists."
-                else
-                    Ok {
-                        ArcFile = arcFile
-                        Path = requestedPath
-                    }
+                Ok {
+                    ArcFile = arcFile
+                    Path = PathHelpers.normalizePath request.path
+                }

@@ -137,16 +137,26 @@ type FileTree =
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
-        let reconciledMaterializedState =
-            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
+        // Prevent overlapping page requests for the same directory.
+        let directoriesLoadingPage = React.useRef Set.empty<string>
+
+        React.useEffect ((fun () -> directoriesLoadingPage.current <- Set.empty), [| box arcScopeId |])
+
+        let treeDirectories =
+            React.useMemo ((fun () -> collectTreeDirectories fileTree), [| box fileTree |])
+
+        // Every update reconciles the latest state instead of the one this render saw: a tree update and
+        // an expansion can land at the same moment, and neither may discard the other's change.
+        let reconcileWithTree current =
+            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath treeDirectories current
+
+        let reconciledMaterializedState = reconcileWithTree materializedState
 
         React.useEffect (
             (fun () ->
                 setMaterializedState (fun current ->
-                    if reconciledMaterializedState = current then
-                        current
-                    else
-                        reconciledMaterializedState
+                    let reconciled = reconcileWithTree current
+                    if reconciled = current then current else reconciled
                 )
             ),
             [|
@@ -286,11 +296,31 @@ type FileTree =
             [| box fileStateCtx.state.FileTree |]
         )
 
+        let loadNextDirectoryPage (path: string) =
+            let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
+
+            if not (directoriesLoadingPage.current.Contains normalizedPath) then
+                directoriesLoadingPage.current <- directoriesLoadingPage.current.Add normalizedPath
+
+                promise {
+                    try
+                        match! Api.ipcArcVaultApi.loadNextFileTreeDirectoryPage normalizedPath with
+                        | Ok _ -> ()
+                        | Error error -> console.error ($"Unable to load File Explorer directory page: {error.Message}")
+                    finally
+                        directoriesLoadingPage.current <- directoriesLoadingPage.current.Remove normalizedPath
+                }
+                |> Promise.start
+
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
-            if willExpand then
-                match item.Path with
-                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
-                | None -> ()
+            match item.Path with
+            | Some path when willExpand ->
+                setMaterializedState (reconcileWithTree >> materialize path)
+
+                if needsInitialDirectoryLoad path fileStateCtx.state.FileTreeDirectoryHasMore then
+                    loadNextDirectoryPage path
+            | Some path -> setMaterializedState (reconcileWithTree >> dematerialize path)
+            | None -> ()
 
         let openDialog dialog =
             setIsDialogBusy false
@@ -361,10 +391,7 @@ type FileTree =
 
         let createArcEntry kind (identifier: string) =
             if not isDialogBusy then
-                let existingPaths =
-                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
-
-                match tryBuildArcCreateDraft kind identifier existingPaths with
+                match tryBuildArcCreateDraft kind identifier with
                 | Error errorMessage -> applyCreateError errorMessage
                 | Ok draft ->
                     setIsDialogBusy true
@@ -618,7 +645,22 @@ type FileTree =
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,
                             delegateHorizontalScrollToParent = true,
-                            truncateOverflowingItemNames = true
+                            truncateOverflowingItemNames = true,
+                            hasMoreChildren =
+                                (fun item ->
+                                    item.Path
+                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                    |> Option.bind (fun path ->
+                                        Map.tryFind path fileStateCtx.state.FileTreeDirectoryHasMore
+                                    )
+                                    |> Option.defaultValue false
+                                ),
+                            onLoadMoreChildren = (fun item -> item.Path |> Option.iter loadNextDirectoryPage),
+                            hasMoreRootItems =
+                                (fileStateCtx.state.FileTreeDirectoryHasMore
+                                 |> Map.tryFind ""
+                                 |> Option.defaultValue false),
+                            onLoadMoreRootItems = (fun () -> loadNextDirectoryPage "")
                         )
                     ]
                 ]

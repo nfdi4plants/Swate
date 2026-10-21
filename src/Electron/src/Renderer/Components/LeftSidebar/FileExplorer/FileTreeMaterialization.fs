@@ -16,6 +16,18 @@ let materialize path state = {
         Paths = state.Paths.Add(PathHelpers.normalizePath path)
 }
 
+let dematerialize path state = {
+    state with
+        Paths = state.Paths.Remove(PathHelpers.normalizePath path)
+}
+
+/// A directory without paging metadata has never been read. Expanding it loads its first page;
+/// expanding it again shows the pages that are already loaded, and further pages stay behind "Load more".
+let needsInitialDirectoryLoad path (directoryHasMore: Map<string, bool>) =
+    directoryHasMore
+    |> Map.containsKey (PathHelpers.normalizeCanonicalRelativePath path)
+    |> not
+
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then
         node.children.Values
@@ -25,20 +37,35 @@ let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<
     else
         directoryPaths
 
+/// A file tree with its directory paths, collected once so that every reconciliation against the same
+/// tree only intersects sets instead of walking the tree again.
+type TreeDirectories = {
+    Root: FileTreeNode
+    DirectoryPaths: Set<string>
+}
+
+let collectTreeDirectories (root: FileTreeNode option) =
+    root
+    |> Option.map (fun root -> {
+        Root = root
+        DirectoryPaths = collectDirectoryPaths root Set.empty
+    })
+
 let reconcileMaterializedState
     (arcScopeId: string option)
     (selectedTreeItemPath: string option)
-    (root: FileTreeNode option)
+    (tree: TreeDirectories option)
     (current: MaterializedState)
     =
-    match root with
+    match tree with
     | None -> {
         ArcScopeId = arcScopeId
         Paths = Set.empty
       }
-    | Some root ->
-        let validDirectoryPaths = collectDirectoryPaths root Set.empty
-
+    | Some {
+               Root = root
+               DirectoryPaths = validDirectoryPaths
+           } ->
         let requiredPaths =
             selectedTreeItemPath
             |> Option.map (fun selectedPath ->
@@ -99,8 +126,6 @@ let rec toMaterializedFileItemTree
                 |> List.ofSeq
                 |> Some
 
-            elif parent.children.Count = 0 then
-                Some []
             else
                 None
 

@@ -6,6 +6,7 @@ open Fable.Electron
 open Main.Bindings
 open Main.Bindings.Filesystem
 open Main.ArcMerge
+open Main.WatcherConfiguration
 open Main.ArcVaultTypes
 open Main.Bindings.Path
 open Swate.Components.Shared
@@ -15,10 +16,16 @@ open Swate.Electron.Shared.FileIOTypes
 let eventNameEquals (expected: Chokidar.Events) (actual: string) =
     String.Equals(actual, expected.ToString(), StringComparison.OrdinalIgnoreCase)
 
+/// Returns a check whether a child of the directory exists with exactly its name, so a case-only rename
+/// counts as gone. The directory is listed once, on the first check of a path that exists, however many
+/// children are checked; a large directory takes milliseconds to list. A check reflects the directory at
+/// that first listing, so a later moment needs a new check.
+let existsSyncWithExactNameIn (directoryPath: string) =
+    let names = lazy HashSet<string>(readdirSync directoryPath)
+    fun (path: string) -> existsSync path && names.Value.Contains(basename path)
+
 let existsSyncWithExactName (path: string) =
-    existsSync path
-    && (readdirSync (dirname path)
-        |> Array.exists (fun name -> String.Equals(name, basename path, StringComparison.Ordinal)))
+    existsSyncWithExactNameIn (dirname path) path
 
 /// Builds an ARC-root-relative watcher event from the raw chokidar payload.
 let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
@@ -68,6 +75,39 @@ let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePat
 
         buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
     )
+
+let filterArcMergeRelevantEvents (events: ArcVaultFileSystemEvent[]) =
+    events
+    |> Array.filter (fun event ->
+        let isCanonicalFileEvent =
+            (eventNameEquals Chokidar.Events.Add event.EventName
+             || eventNameEquals Chokidar.Events.Change event.EventName
+             || eventNameEquals Chokidar.Events.Unlink event.EventName)
+            && ((ArcEntityPathRules.tryParseCanonicalArcFileTarget event.RelativePath
+                 |> Option.isSome)
+                || ArcEntityPathRules.isLicensePath event.RelativePath)
+
+        let isEntityDirectoryUnlink =
+            eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+            && (ArcEntityPathRules.buildFallbackUnlinkPaths event.RelativePath
+                |> List.isEmpty
+                |> not)
+
+        isCanonicalFileEvent || isEntityDirectoryUnlink
+    )
+
+let filterImportedFileWatcherOwnershipEvents arcPath (events: ArcVaultFileSystemEvent[]) =
+    events
+    |> filterArcMergeRelevantEvents
+    |> Array.filter (fun event -> not (isPermanentFileWatcherPathIgnored arcPath event.AbsolutePath))
+
+let tryTriggerImportedArcMerge mergeArcEvents (events: ArcVaultFileSystemEvent[]) =
+    let metadataEvents = filterArcMergeRelevantEvents events
+
+    if metadataEvents.Length = 0 then
+        promise { return Ok() }
+    else
+        mergeArcEvents (metadataEvents |> Array.toList)
 
 /// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
 let queueFileWatcherEvent

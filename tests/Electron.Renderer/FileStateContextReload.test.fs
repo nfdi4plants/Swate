@@ -10,6 +10,7 @@ open Renderer.Context.FileStateContext
 open Renderer.Types
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes
 open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Vitest
@@ -47,6 +48,17 @@ let private FileTreeProbe (onFileTree: string[] -> unit) =
     Html.none
 
 [<ReactComponent>]
+let private FileTreePagingProbe (onHasMore: bool option -> unit) =
+    let fileStateCtx = useFileStateCtx ()
+
+    React.useEffect (
+        (fun () -> fileStateCtx.state.FileTreeDirectoryHasMore |> Map.tryFind "assays" |> onHasMore),
+        [| box fileStateCtx.state.FileTreeDirectoryHasMore |]
+    )
+
+    Html.none
+
+[<ReactComponent>]
 let private FileImportProbe (onImport: ActiveFileImportState option -> unit) =
     let fileStateCtx = useFileStateCtx ()
 
@@ -55,16 +67,19 @@ let private FileImportProbe (onImport: ActiveFileImportState option -> unit) =
     Html.none
 
 let private createSnapshot () =
-    let snapshot = Dictionary<string, FileEntry>()
-    snapshot.Add("", FileEntry.create ("arc", "", true, None))
-    snapshot.Add("assays", FileEntry.create ("assays", "assays", true, None))
+    let entries = Dictionary<string, FileEntry>()
+    entries.Add("", FileEntry.create ("arc", "", true, None))
+    entries.Add("assays", FileEntry.create ("assays", "assays", true, None))
 
-    snapshot.Add(
+    entries.Add(
         "assays/assay-1/isa.assay.xlsx",
         FileEntry.create ("isa.assay.xlsx", "assays/assay-1/isa.assay.xlsx", false, None)
     )
 
-    snapshot
+    {
+        entries = entries
+        directoryHasMore = Dictionary<string, bool>(dict [ "assays", true ])
+    }
 
 let private fileImportApi loadActiveImport = {
     loadActiveImport = loadActiveImport
@@ -82,6 +97,7 @@ Vitest.describe (
                 let name = bridgeName "IFileTreeRendererApi"
                 let importBridgeName = bridgeName "IFileImportRendererApi"
                 let observedFileTrees = ResizeArray<string[]>()
+                let observedAssayHasMore = ResizeArray<bool option>()
                 let mutable listenerRegistered = false
                 let mutable disposeCalled = false
                 let mutable snapshotLoadCalls = 0
@@ -98,7 +114,7 @@ Vitest.describe (
                         name
                         (createObj [
                             "fileTreeUpdate"
-                            ==> fun (_listener: Dictionary<string, FileEntry> -> unit) ->
+                            ==> fun (_listener: FileTreeSnapshot -> unit) ->
                                 listenerRegistered <- true
 
                                 fun () -> disposeCalled <- true
@@ -122,7 +138,10 @@ Vitest.describe (
                         FileStateCtxProviderWithSnapshots(
                             loadSnapshot,
                             fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
-                            FileTreeProbe(fun paths -> observedFileTrees.Add paths)
+                            React.Fragment [
+                                FileTreeProbe(fun paths -> observedFileTrees.Add paths)
+                                FileTreePagingProbe(fun hasMore -> observedAssayHasMore.Add hasMore)
+                            ]
                         )
                     )
 
@@ -133,6 +152,7 @@ Vitest.describe (
 
                     Vitest.expect(listenerRegistered).toBe (true)
                     Vitest.expect(snapshotLoadCalls).toBe (1)
+                    Vitest.expect(observedAssayHasMore |> Seq.contains (Some true)).toBe true
 
                     root.unmount ()
                     rootUnmounted <- true
@@ -177,7 +197,7 @@ Vitest.describe (
                         fileTreeBridgeName
                         (createObj [
                             "fileTreeUpdate"
-                            ==> fun (_: Dictionary<string, FileEntry> -> unit) ->
+                            ==> fun (_: FileTreeSnapshot -> unit) ->
                                 fileTreeDisposeCalled <- false
                                 fun () -> fileTreeDisposeCalled <- true
                         ])

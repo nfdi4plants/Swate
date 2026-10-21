@@ -25,6 +25,7 @@ type Stats =
     abstract member isFile: unit -> bool
     abstract member isSymbolicLink: unit -> bool
     abstract member size: float
+    abstract member mtimeMs: float
 
 type Dirent =
     abstract member name: string
@@ -32,8 +33,39 @@ type Dirent =
     abstract member isFile: unit -> bool
     abstract member isSymbolicLink: unit -> bool
 
+type Directory =
+    /// Resolves to null after the directory iterator has been exhausted.
+    abstract member read: unit -> JS.Promise<Dirent>
+    abstract member close: unit -> JS.Promise<unit>
+
+/// The kind of a native directory change: Rename when an entry appears, disappears or is renamed,
+/// Change when the content or metadata of an entry changes.
+[<StringEnum(CaseRules.LowerFirst)>]
+type WatchEventType =
+    | Rename
+    | Change
+
+/// A native watcher of one directory. It holds one handle, whatever the number of entries.
+type FSWatcher =
+    abstract member close: unit -> unit
+    abstract member on: eventName: string * callback: (exn -> unit) -> FSWatcher
+
+[<Erase>]
+type NativeWatch =
+    /// Watches the direct entries of a directory. The listener receives the event type and the entry
+    /// name; the name is None when the system dropped events and the changed entry is unknown.
+    [<Import("watch", "fs")>]
+    static member watch(path: string, listener: WatchEventType -> string option -> unit) : FSWatcher = jsNative
+
+/// Returns the Node.js system error code of a filesystem failure, such as ENOENT.
+[<Emit("(typeof $0?.code === 'string' ? $0.code : undefined)")>]
+let tryGetNodeErrorCode (error: exn) : string option = jsNative
+
 [<Import("mkdirSync", "fs")>]
 let mkdirSync (path: string) (options: MkdirOptions) : unit = jsNative
+
+[<Import("statSync", "fs")>]
+let statSync (path: string) : Stats = jsNative
 
 [<Import("existsSync", "fs")>]
 let existsSync (path: string) : bool = jsNative
@@ -99,3 +131,6 @@ let readdirAsync (path: string) : JS.Promise<string[]> = jsNative
 
 [<Import("readdir", "fs/promises")>]
 let readdirWithTypesAsync (path: string) (options: ReaddirOptions) : JS.Promise<Dirent[]> = jsNative
+
+[<Import("opendir", "fs/promises")>]
+let openDirectoryAsync (path: string) : JS.Promise<Directory> = jsNative

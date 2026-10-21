@@ -49,6 +49,8 @@
     <Compile Include="FileTreeCreator.fs" />
     <Compile Include="ArcVault\Types.fs" />
     <Compile Include="ArcVault\ArcVaultHelper.fs" />
+    <Compile Include="ArcVault\WatcherConfiguration.fs" />
+    <Compile Include="ArcVault\LoadedDirectoryWatcher.fs" />
     <Compile Include="ArcVault\ArcPersonsReader.fs" />
     <Compile Include="ArcVault\ArcNodesReader.fs" />
     <Compile Include="ArcVault\WatcherHelpers.fs" />

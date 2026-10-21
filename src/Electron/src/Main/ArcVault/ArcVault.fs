@@ -14,13 +14,21 @@ open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.ArcMerge
 open Main.ArcVaultHelper
+open Main.LoadedDirectoryWatcher
+open Main.WatcherConfiguration
 open Main.FileImportCoordinator
 open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+
+type internal FileWatcherReadyOutcome =
+    | Ready
+    | WatcherError of exn
+    | Cancelled
 
 type ArcLoadCancelledException(targetWindowId: int) =
     inherit exn($"Loading the ARC was cancelled because window {targetWindowId} was closed.")
@@ -62,9 +70,7 @@ type ArcVault(window: BrowserWindow) =
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
-
-    let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
-        JS.Constructors.Promise.resolve ()
+    let loadedDirectoryWatcherController = LoadedDirectoryWatcherController()
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
@@ -77,12 +83,15 @@ type ArcVault(window: BrowserWindow) =
     /// Dirty marker for unsaved in-memory ARC mutations.
     member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
+    member val fileTreeDirectoryHasMore: Dictionary<string, bool> = Dictionary<string, bool>() with get
     member val watcher: Chokidar.IWatcher option = None with get, set
+
+    member _.loadedFileTreeDirectories =
+        loadedDirectoryWatcherController.Current.LoadedDirectories
+
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
-    /// The barrier stays None outside tests. The watcher path awaits it between snapshot loading and the final eligibility check.
-    member val internal WatcherMergeBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
     /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
     member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
@@ -90,9 +99,24 @@ type ArcVault(window: BrowserWindow) =
     member val activeFileImport: ActiveFileImport option = None with get, set
     member val isWaitingForImportCleanup = false with get, set
     /// True only while an ARC is being opened or initially created in this vault.
-    member val isInitializingArc = false with get, set
+    member val isInitializingArc = false with get, private set
     member val isWaitingForOperationsOnClose = false with get, set
     member val isOperationCloseApproved = false with get, set
+    member val internal FileWatcherReady: Fable.Core.JS.Promise<FileWatcherReadyOutcome> option = None with get, set
+    member val internal CancelFileWatcherReadyWait: (unit -> unit) option = None with get, set
+    member val internal SchedulePendingFileWatcherEvents: (unit -> unit) option = None with get, set
+    /// Settles when the in-memory ARC model for the currently opening path is ready.
+    member val internal ArcInitialization: Fable.Core.JS.Promise<unit> option = None with get, set
+    member val internal FileTreeUpdateTail: JS.Promise<unit> = JS.Constructors.Promise.resolve () with get, set
+    /// Starts the watcher of one covered File Explorer directory. Tests replace it to observe or fail watchers.
+    member val internal StartDirectoryWatcher = createDirectoryWatcher with get, set
+    /// The open listing of each partially loaded directory, so its next page continues where the
+    /// previous read ended.
+    member val internal FileTreeDirectoryCursors = Dictionary<string, FileTreeDirectoryCursor>() with get
+    /// One repository-wide large-object listing shared by File Explorer reads until it is invalidated.
+    member val internal LargeObjectMetadata = LargeObjectMetadataCache() with get
+    /// The number of large-object listings already applied to every loaded entry.
+    member val internal AnnotatedListingCount = 0 with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -115,9 +139,57 @@ type ArcVault(window: BrowserWindow) =
 
     member internal this.IncrementWatcherEpoch() = watcherEpoch <- watcherEpoch + 1
 
-    member internal this.FileTreeUpdateTail
-        with get () = fileTreeUpdateTail
-        and set value = fileTreeUpdateTail <- value
+    member internal _.LoadedDirectoryWatcherController = loadedDirectoryWatcherController
+
+    /// Keeps the open listing of a directory for its next page. A replaced or removed cursor is closed.
+    member internal this.SetFileTreeDirectoryCursor
+        (relativeDirectoryPath: string, cursor: FileTreeDirectoryCursor option)
+        =
+        match this.FileTreeDirectoryCursors.TryGetValue relativeDirectoryPath with
+        | true, previous when cursor |> Option.forall (fun next -> not (obj.ReferenceEquals(next, previous))) ->
+            this.FileTreeDirectoryCursors.Remove relativeDirectoryPath |> ignore
+            previous.Directory.close () |> Promise.catch ignore |> Promise.start
+        | _ -> ()
+
+        cursor
+        |> Option.iter (fun next -> this.FileTreeDirectoryCursors.[relativeDirectoryPath] <- next)
+
+    /// Closes the open listings of a directory and everything below it, or of every directory.
+    /// Callers run it inside the FileTree queue, so no page read uses a cursor while it is closed.
+    member internal this.CloseFileTreeDirectoryCursors(?underPath: string) = promise {
+        let closing =
+            this.FileTreeDirectoryCursors.Keys
+            |> Seq.filter (fun cursorPath ->
+                underPath
+                |> Option.forall (fun path -> PathHelpers.isSameOrDescendantPath cursorPath path)
+            )
+            |> Seq.toArray
+
+        for cursorPath in closing do
+            let cursor = this.FileTreeDirectoryCursors.[cursorPath]
+            this.FileTreeDirectoryCursors.Remove cursorPath |> ignore
+
+            try
+                do! cursor.Directory.close ()
+            with _ ->
+                ()
+    }
+
+    member this.arcActivityState: ArcActivityState = {
+        isInitializing = this.isInitializingArc
+        hasUnsavedChanges = this.hasUnsavedArcChanges
+    }
+
+    member internal this.PublishArcActivityState() =
+        if not (this.window.isDestroyed ()) then
+            WindowSend.send<IArcActivityRendererApi>
+                this.window
+                (fun api -> api.arcActivityChanged this.arcActivityState)
+
+    member internal this.SetArcInitializationState(isInitializing: bool) =
+        if this.isInitializingArc <> isInitializing then
+            this.isInitializingArc <- isInitializing
+            this.PublishArcActivityState()
 
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
@@ -176,11 +248,15 @@ type ArcVault(window: BrowserWindow) =
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
+        let dirtyStateChanged = this.hasUnsavedArcChanges
         this.arc <- None
         this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+
+        if dirtyStateChanged then
+            this.PublishArcActivityState()
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -191,12 +267,112 @@ type ArcVault(window: BrowserWindow) =
             this.hasUnsavedArcChanges <- hasNewChanges
 
             if valueIsChanging then
-                sendArcHasUnsavedChangesUpdate hasNewChanges this.window
+                this.PublishArcActivityState()
+
+/// How File Explorer reads a directory.
+[<RequireQualifiedAccess>]
+type internal FileTreeDirectoryRead =
+    /// Reads the first entries from the start of the directory. The listing stays open for the next page.
+    | Prefix of entryCount: int
+    /// Reads the next page from the directory's open listing without reading the loaded entries again.
+    | NextPage
+    | Nothing
 
 [<AutoOpen>]
 module ArcVaultExtensions =
 
     type ArcVault with
+
+        /// Serializes FileTree mutations while keeping the tail usable after a rejected update.
+        member private this.EnqueueFileTreeUpdate<'T>(operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+            let queuedUpdate = this.FileTreeUpdateTail |> Promise.bind operation
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.map (fun _ -> ()) |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
+        /// Annotates entries from the shared large-object listing. A closing vault never reopens the
+        /// version control session that its window close releases.
+        member private this.AnnotateFromLargeObjectListing(arcPath: string, entries: FileEntry[]) =
+            this.LargeObjectMetadata.Enrich(
+                arcPath,
+                entries,
+                fun () ->
+                    this.LoadedDirectoryWatcherController.Current.LifecycleActive
+                    && WindowSend.isAlive this.window
+            )
+
+        /// Applies the shared large-object listing to every loaded file entry and publishes the tree once,
+        /// if an annotation changed. Runs inside the FileTree queue.
+        member private this.AnnotateLoadedEntries(arcPath: string) = promise {
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            match this.path with
+            | Some currentPath when PathHelpers.pathsEqual currentPath arcPath ->
+                let fileEntries =
+                    this.fileTree.Values
+                    |> Seq.filter (fun entry -> not entry.isDirectory)
+                    |> Seq.toArray
+
+                let! annotated = this.AnnotateFromLargeObjectListing(arcPath, fileEntries)
+                this.AnnotatedListingCount <- this.LargeObjectMetadata.ListingCount
+
+                let changed =
+                    annotated
+                    |> Array.filter (fun entry ->
+                        match this.fileTree.TryGetValue entry.path with
+                        | true, current -> current.largeObject <> entry.largeObject
+                        | _ -> false
+                    )
+
+                if changed.Length > 0 && capturedWatcherEpoch = this.WatcherEpoch then
+                    let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+
+                    for entry in changed do
+                        nextFileTree.[entry.path] <- entry
+
+                    this.SetFileTree nextFileTree
+            | _ -> ()
+        }
+
+        /// Annotates entries from the shared large-object listing. A listing that is newer than the one
+        /// applied to the loaded tree is applied to every loaded entry as well, so entries of directories
+        /// that are not read again never keep a stale state.
+        member internal this.WithLargeObjectMetadata(arcPath: string, entries: FileEntry[]) : JS.Promise<FileEntry[]> = promise {
+            let! annotated = this.AnnotateFromLargeObjectListing(arcPath, entries)
+
+            if this.LargeObjectMetadata.ListingCount > this.AnnotatedListingCount then
+                this.AnnotatedListingCount <- this.LargeObjectMetadata.ListingCount
+
+                this.EnqueueFileTreeUpdate(fun () -> this.AnnotateLoadedEntries arcPath)
+                |> Promise.catch (fun error ->
+                    swatelogfn this.window.id "Unable to apply the large-object listing: %s" error.Message
+                )
+                |> Promise.start
+
+            return annotated
+        }
+
+        /// Applies a renewed large-object listing to every loaded file entry.
+        member private this.ApplyRenewedLargeObjectState(arcPath: string) =
+            this.EnqueueFileTreeUpdate(fun () -> this.AnnotateLoadedEntries arcPath)
+            |> Promise.catch (fun error ->
+                swatelogfn this.window.id "Unable to renew the large-object state: %s" error.Message
+            )
+
+        /// Renews the large-object state of the loaded tree, for example after Swate materialized an object.
+        member internal this.RenewLargeObjectState() =
+            match this.path with
+            | Some arcPath ->
+                this.LargeObjectMetadata.Invalidate()
+                this.ApplyRenewedLargeObjectState arcPath
+            | None -> JS.Constructors.Promise.resolve ()
+
+        /// Renews the large-object state of the loaded tree when the repository changed outside Swate,
+        /// for example through git lfs pull. Called when the window gains focus.
+        member internal this.RefreshLargeObjectStateIfRepositoryChanged() =
+            match this.path with
+            | Some arcPath when this.LargeObjectMetadata.InvalidateIfRepositoryChanged arcPath ->
+                this.ApplyRenewedLargeObjectState arcPath
+            | _ -> JS.Constructors.Promise.resolve ()
 
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
             try
@@ -248,53 +424,385 @@ module ArcVaultExtensions =
             // Capture the epoch at the call so an update queued before a pending-state reset cannot publish the old root.
             let capturedWatcherEpoch = this.WatcherEpoch
 
-            let queuedUpdate =
-                this.FileTreeUpdateTail
-                |> Promise.bind (fun () -> promise {
-                    match this.path with
-                    | None -> ()
-                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
-                    | Some arcPath ->
-                        let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
-                        let mutable nextFileTree = this.fileTree
-                        let mutable hasFileTreeChanges = false
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                match this.path with
+                | None -> ()
+                | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                | Some arcPath ->
+                    let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
+                    let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+                    let mutable hasFileTreeChanges = false
 
-                        for event in normalizedEvents do
-                            try
-                                if
-                                    WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
-                                    || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
-                                then
-                                    let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
-                                    nextFileTree <- upsertFileEntry changedFile nextFileTree
-                                    hasFileTreeChanges <- true
-                                elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
-                                    let! addedDirectory = getFileEntry event.AbsolutePath
-                                    nextFileTree <- upsertFileEntry addedDirectory nextFileTree
-                                    hasFileTreeChanges <- true
-                                elif
-                                    WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
-                                    || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
-                                        && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath))
-                                then
-                                    // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
-                                    // stay admitted, so they still need this check.
-                                    nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
-                                    hasFileTreeChanges <- true
-                            with fileTreeError ->
-                                swatelogfn
-                                    this.window.id
-                                    "Unable to update file tree for watcher event '%s' on '%s': %s"
-                                    event.EventName
-                                    event.RelativePath
-                                    fileTreeError.Message
+                    let! readEntries =
+                        normalizedEvents
+                        |> List.map (fun event -> promise {
+                            if
+                                WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
+                                || WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName
+                            then
+                                try
+                                    let! entry = getFileEntry event.AbsolutePath
+                                    return Some entry
+                                with fileTreeError ->
+                                    swatelogfn
+                                        this.window.id
+                                        "Unable to update file tree for watcher event '%s' on '%s': %s"
+                                        event.EventName
+                                        event.RelativePath
+                                        fileTreeError.Message
 
-                        if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
-                            this.SetFileTree(nextFileTree)
-                })
+                                    return None
+                            else
+                                return None
+                        })
+                        |> Promise.all
 
-            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
-            queuedUpdate
+                    let changedFiles =
+                        Array.zip (normalizedEvents |> List.toArray) readEntries
+                        |> Array.choose (fun (event, entry) ->
+                            match entry with
+                            | Some entry when
+                                not entry.isDirectory
+                                && (WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                    || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName)
+                                ->
+                                Some entry
+                            | _ -> None
+                        )
+
+                    // The shared listing is kept: renewing it costs seconds in a large repository and would hold
+                    // up every File Explorer read queued behind it after each save. A file that git switches
+                    // between pointer and content is caught by the focus check or the version control operation.
+                    let! enrichedChangedFiles = this.WithLargeObjectMetadata(arcPath, changedFiles)
+                    let mutable enrichedChangedFileIndex = 0
+
+                    for event, readEntry in Array.zip (normalizedEvents |> List.toArray) readEntries do
+                        try
+                            if
+                                WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
+                            then
+                                match readEntry with
+                                | Some changedFile when not changedFile.isDirectory ->
+                                    let enrichedChangedFile = enrichedChangedFiles.[enrichedChangedFileIndex]
+                                    enrichedChangedFileIndex <- enrichedChangedFileIndex + 1
+                                    nextFileTree.[enrichedChangedFile.path] <- enrichedChangedFile
+                                    hasFileTreeChanges <- true
+                                | Some changedFile ->
+                                    nextFileTree.[changedFile.path] <- changedFile
+                                    hasFileTreeChanges <- true
+                                | None -> ()
+                            elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
+                                match readEntry with
+                                | Some addedDirectory ->
+                                    nextFileTree.[addedDirectory.path] <- addedDirectory
+                                    hasFileTreeChanges <- true
+                                | None -> ()
+                            elif
+                                WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
+                                || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                                    && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath))
+                            then
+                                // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
+                                // stay admitted, so they still need this check.
+                                removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
+                                hasFileTreeChanges <- true
+                        with fileTreeError ->
+                            swatelogfn
+                                this.window.id
+                                "Unable to update file tree for watcher event '%s' on '%s': %s"
+                                event.EventName
+                                event.RelativePath
+                                fileTreeError.Message
+
+                    if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
+                        this.SetFileTree(nextFileTree)
+            })
+
+        member private this.CountLoadedDirectoryChildren(arcPath: string, relativeDirectoryPath: string) =
+            let absoluteDirectoryPath =
+                join [| arcPath; relativeDirectoryPath |] |> PathHelpers.normalizePath
+
+            this.fileTree.Values
+            |> Seq.filter (fun entry ->
+                PathHelpers.pathsEqual (dirname (PathHelpers.normalizePath entry.path)) absoluteDirectoryPath
+            )
+            |> Seq.length
+
+        /// The root is always loaded while an ARC is open; other directories are loaded once File Explorer read them.
+        member this.IsFileTreeDirectoryLoaded(relativeDirectoryPath: string) =
+            let normalizedPath =
+                PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+            if normalizedPath = RootDirectory then
+                this.path.IsSome
+            else
+                this.loadedFileTreeDirectories.Contains normalizedPath
+
+        member private this.RemoveUnavailableLoadedDirectories(arcPath: string) =
+            this.loadedFileTreeDirectories
+            |> Seq.filter (fun relativePath ->
+                let absolutePath = join [| arcPath; relativePath |] |> PathHelpers.normalizePath
+                not (existsSync absolutePath)
+            )
+            |> Seq.toArray
+            |> Array.iter this.ForgetFileTreeDirectoryState
+
+        /// Forgets the paging, listing and loaded state of a directory and of everything below it, so a
+        /// directory created again at the same path is loaded from scratch.
+        member private this.ForgetFileTreeDirectoryState(relativeDirectoryPath: string) =
+            if relativeDirectoryPath <> RootDirectory then
+                this.fileTreeDirectoryHasMore.Keys
+                |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path relativeDirectoryPath)
+                |> Seq.toArray
+                |> Array.iter (this.fileTreeDirectoryHasMore.Remove >> ignore)
+
+                // The cursors leave the store immediately; only the handle release runs in the background.
+                this.CloseFileTreeDirectoryCursors(underPath = relativeDirectoryPath)
+                |> Promise.start
+
+                let controller = this.LoadedDirectoryWatcherController
+                controller.RemoveLoadedDirectory relativeDirectoryPath
+
+                // A native watcher stays on the directory it was opened on, so a directory created again at
+                // the same path needs a new one.
+                let watchedBelow =
+                    controller.Current.Watchers
+                    |> Map.toSeq
+                    |> Seq.map fst
+                    |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path relativeDirectoryPath)
+                    |> Seq.toArray
+
+                for observer in controller.RetireWatchers watchedBelow do
+                    observer.Close()
+
+        /// Returns a check that stays true while the vault keeps the ARC path and the watcher epoch of
+        /// this moment, so work that started earlier can tell that a stop or another ARC replaced it.
+        member internal this.CaptureLifecycle() =
+            let capturedWatcherEpoch = this.WatcherEpoch
+            let capturedArcPath = this.path
+
+            fun () ->
+                capturedWatcherEpoch = this.WatcherEpoch
+                && match capturedArcPath, this.path with
+                   | Some expectedPath, Some currentPath -> PathHelpers.pathsEqual expectedPath currentPath
+                   | None, None -> true
+                   | _ -> false
+
+        member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string) =
+            let controller = this.LoadedDirectoryWatcherController
+
+            let normalizedRelativePath =
+                PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+            let lifecycleIsCurrent = this.CaptureLifecycle()
+
+            if controller.Current.LifecycleActive then
+                match controller.Current.Refreshes.TryFind normalizedRelativePath with
+                | Some _ -> controller.UpdateRefreshes(fun refreshes -> refreshes.Add(normalizedRelativePath, true))
+                | None ->
+                    controller.UpdateRefreshes(fun refreshes -> refreshes.Add(normalizedRelativePath, false))
+
+                    let rec refreshWhileDirty () = promise {
+                        try
+                            do! this.RefreshFileTreeDirectory normalizedRelativePath
+                        with refreshError ->
+                            swatelogfn
+                                this.window.id
+                                "Unable to refresh loaded directory '%s': %s"
+                                normalizedRelativePath
+                                refreshError.Message
+
+                        if
+                            lifecycleIsCurrent ()
+                            && controller.Current.Refreshes.TryFind normalizedRelativePath = Some true
+                            && this.IsFileTreeDirectoryLoaded normalizedRelativePath
+                        then
+                            controller.UpdateRefreshes(fun refreshes -> refreshes.Add(normalizedRelativePath, false))
+
+                            return! refreshWhileDirty ()
+                        elif lifecycleIsCurrent () then
+                            controller.UpdateRefreshes(fun refreshes -> refreshes.Remove normalizedRelativePath)
+                    }
+
+                    refreshWhileDirty () |> Promise.start
+
+        /// Turns a change in a watched directory into a refresh of that directory. Changes reported by a
+        /// watcher that is no longer the directory's active watcher are dropped.
+        /// The shared large-object listing is kept: adding, removing or renaming an entry does not change
+        /// the large-object state of other entries, and renewing it costs seconds in a large repository.
+        /// Window focus and version control operations renew it.
+        member private this.HandleDirectoryChange(directory: string, observer: DirectoryObserver) =
+            let controller = this.LoadedDirectoryWatcherController
+
+            // QueueLoadedDirectoryRefresh checks that the lifecycle is still active.
+            if
+                controller.OwnsDirectory(directory, observer)
+                && this.IsFileTreeDirectoryLoaded directory
+            then
+                this.QueueLoadedDirectoryRefresh directory
+
+        /// Retires the watcher of a directory that was removed or moved, or whose watcher failed, and forgets
+        /// the directory. Until File Explorer loads it again, which starts a new watcher, it is not watched.
+        member private this.HandleDirectoryWatcherLost(directory: string, observer: DirectoryObserver, reason: exn) =
+            let controller = this.LoadedDirectoryWatcherController
+
+            if controller.OwnsDirectory(directory, observer) then
+                swatelogfn this.window.id "Loaded-directory watcher for '%s' ended: %s" directory reason.Message
+                controller.RetireWatchers [ directory ] |> ignore
+                this.ForgetFileTreeDirectoryState directory
+
+        /// The sole owner of loaded-directory watcher creation and retirement. The root and every loaded
+        /// directory have their own native watcher, which watches as soon as it exists, so covering a new
+        /// directory leaves the watchers of all other directories untouched. Directories that are no longer
+        /// loaded lose their watcher. A directory that cannot be watched stays uncovered and keeps its
+        /// pending handoff, so the next coverage tries it again. Returns whether coverage is established.
+        member internal this.UpdateLoadedDirectoryWatcherCoverage(shouldWatch: bool) =
+            let controller = this.LoadedDirectoryWatcherController
+
+            let startWatcher arcPath directory =
+                let observer = ref None
+
+                let forObserver handle = observer.Value |> Option.iter handle
+
+                try
+                    let stop =
+                        this.StartDirectoryWatcher
+                            (join [| arcPath; directory |])
+                            (fun () -> forObserver (fun observer -> this.HandleDirectoryChange(directory, observer)))
+                            (fun reason ->
+                                forObserver (fun observer ->
+                                    this.HandleDirectoryWatcherLost(directory, observer, reason)
+                                )
+                            )
+
+                    let watcher = DirectoryObserver stop
+                    observer.Value <- Some watcher
+                    controller.ActivateWatcher(directory, watcher)
+                with error ->
+                    swatelogfn this.window.id "Unable to watch loaded directory '%s': %s" directory error.Message
+
+            match this.path with
+            | Some arcPath when
+                shouldWatch
+                && controller.Current.LifecycleActive
+                && not controller.Current.MutationActive
+                ->
+                this.RemoveUnavailableLoadedDirectories arcPath
+                let desired = controller.Current.LoadedDirectories |> Set.add RootDirectory
+                let covered = controller.Current.Watchers |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+
+                for observer in controller.RetireWatchers(Set.difference covered desired) do
+                    observer.Close()
+
+                for directory in Set.difference desired covered do
+                    startWatcher arcPath directory
+
+                true
+            | currentPath ->
+                if currentPath.IsNone then
+                    controller.ClearLifecycleData()
+
+                for observer in controller.RetireWatchers() do
+                    observer.Close()
+
+                false
+
+        /// Re-reads each directory whose watcher started after its listing was read. Runs inside the
+        /// FileTree queue. Parents go first, so a vanished parent is forgotten before its children.
+        member private this.CatchUpPendingLoadedDirectoryHandoffs(arcPath: string) = promise {
+            let controller = this.LoadedDirectoryWatcherController
+
+            let pendingDirectories =
+                controller.Current.PendingHandoffs
+                |> Seq.sortBy (fun path -> getPathDepth path, path)
+                |> Seq.toArray
+
+            let isCurrent = this.CaptureLifecycle()
+
+            for relativePath in pendingDirectories do
+                if
+                    isCurrent ()
+                    && controller.Current.Watchers.ContainsKey relativePath
+                    && this.IsFileTreeDirectoryLoaded relativePath
+                then
+                    try
+                        let! _ =
+                            this.LoadFileTreeDirectoryCore(
+                                arcPath,
+                                relativePath,
+                                FileTreeDirectoryRead.Prefix(this.RefreshEntryCount(arcPath, relativePath)),
+                                isCurrent
+                            )
+
+                        controller.RemovePendingHandoff relativePath
+                    with catchUpError ->
+                        swatelogfn
+                            this.window.id
+                            "Unable to catch up loaded directory '%s': %s"
+                            relativePath
+                            catchUpError.Message
+        }
+
+        /// Establishes watcher coverage for the root and every loaded directory, then catches up every
+        /// directory whose changes may have been missed before its watcher started.
+        member internal this.EnsureLoadedDirectoryWatcherCoverage() = promise {
+            match this.path with
+            | Some arcPath when this.UpdateLoadedDirectoryWatcherCoverage true ->
+                do! this.EnqueueFileTreeUpdate(fun () -> this.CatchUpPendingLoadedDirectoryHandoffs arcPath)
+            | _ -> ()
+        }
+
+        member this.WithLoadedDirectoryWatcherSuspended<'T>(operation: unit -> JS.Promise<'T>) =
+            let controller = this.LoadedDirectoryWatcherController
+            let preceding = controller.Current.MutationQueueTail
+
+            let captureOperationOutcome () =
+                try
+                    operation () |> Promise.map Ok |> Promise.catch (fun error -> Error error)
+                with error ->
+                    JS.Constructors.Promise.resolve (Error error)
+
+            let lifecycle = promise {
+                do! preceding
+                controller.BeginMutation()
+
+                try
+                    controller.AddCoveredDirectoriesToPendingHandoffs()
+                    this.UpdateLoadedDirectoryWatcherCoverage false |> ignore
+                    // Open listings hold directory handles as well. Releasing them keeps the operation from
+                    // being blocked; the catch-up after the operation hands every directory a fresh listing.
+                    do! this.EnqueueFileTreeUpdate(fun () -> this.CloseFileTreeDirectoryCursors())
+
+                    let! operationOutcome = captureOperationOutcome ()
+
+                    // The mutation ends before coverage is restored, which starts the watchers synchronously.
+                    // A following mutation still waits for the whole restoration, catch-up included.
+                    controller.EndMutation()
+
+                    let! restorationOutcome =
+                        this.EnsureLoadedDirectoryWatcherCoverage()
+                        |> Promise.map Ok
+                        |> Promise.catch (fun error -> Error error)
+
+                    match operationOutcome, restorationOutcome with
+                    | Ok result, Ok() -> return result
+                    | Error operationError, Ok() -> return raise operationError
+                    | Ok _, Error restorationError -> return raise restorationError
+                    | Error operationError, Error restorationError ->
+                        swatelogfn
+                            this.window.id
+                            "Unable to restore loaded-directory watcher after failed operation: %s"
+                            restorationError.Message
+
+                        return raise operationError
+                finally
+                    controller.EndMutation()
+            }
+
+            controller.SetMutationQueueTail(lifecycle |> Promise.map ignore |> Promise.catch (fun _ -> ()))
+            lifecycle
 
         /// Returns the load error to the import caller when loading fails. The import can then report that its in-memory merge did not happen.
         member this.TryTriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
@@ -334,10 +842,6 @@ module ArcVaultExtensions =
                         else
                             return WatcherMergeOutcome.Failed loadError
                     | Ok snapshot ->
-                        match this.WatcherMergeBarrier with
-                        | Some barrier -> do! barrier ()
-                        | None -> ()
-
                         if
                             not this.IsFileWatcherArcMergeEligible
                             || capturedWriteGeneration <> this.WriteGeneration
@@ -372,13 +876,6 @@ module ArcVaultExtensions =
                                 | Ok() -> return WatcherMergeOutcome.Applied
                                 | Error mergeError -> return WatcherMergeOutcome.Failed mergeError
             })
-
-        member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
-            match! this.TryTriggerArcInMemoryMergeOnFileWatcherEvents events with
-            | Ok() -> ()
-            | Error mergeError ->
-                swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
-        }
 
         member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
             // A long write retries every 500 ms, so only the first deferral and the limit crossing are logged.
@@ -548,6 +1045,11 @@ module ArcVaultExtensions =
                 ownTimeoutId <- Some timeoutId
                 this.fileWatcherReloadArcTimeout <- Some timeoutId
 
+            this.SchedulePendingFileWatcherEvents <- Some scheduleReload
+
+            let isArcMergeRelevantEvent event =
+                WatcherHelpers.filterArcMergeRelevantEvents [| event |] |> Array.isEmpty |> not
+
             fun (eventName: string) (path: string) ->
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
@@ -559,8 +1061,11 @@ module ArcVaultExtensions =
                                 PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
                             )
 
-                        not isImportedPath
-                        && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
+                        isArcMergeRelevantEvent event
+                        && not isImportedPath
+                        && (this.isInitializingArc
+                            || this.activeFileImport.IsSome
+                            || this.IsFileWatcherArcMergeEligible)
                     )
                     this.path
                     this.fileWatcherPendingEvents
@@ -568,13 +1073,14 @@ module ArcVaultExtensions =
                     eventName
                     path
 
-                match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId ->
-                    Fable.Core.JS.clearTimeout timeoutId
-                    this.fileWatcherReloadArcTimeout <- None
-                | None -> sendMsgApi.IsLoadingChanges true
+                if not this.isInitializingArc then
+                    match this.fileWatcherReloadArcTimeout with
+                    | Some timeoutId ->
+                        Fable.Core.JS.clearTimeout timeoutId
+                        this.fileWatcherReloadArcTimeout <- None
+                    | None -> sendMsgApi.IsLoadingChanges true
 
-                scheduleReload ()
+                    scheduleReload ()
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -638,13 +1144,7 @@ module ArcVaultExtensions =
 
                                     match arcFile with
                                     | ArcFiles.DataMap(Some parentInfo, _) ->
-                                        let! refreshedFileTree =
-                                            refreshFileTreeEntry
-                                                arcPath
-                                                (DatamapParentInfo.toPath parentInfo)
-                                                this.fileTree
-
-                                        this.SetFileTree refreshedFileTree
+                                        do! this.RevealCreatedFileTreePaths [ DatamapParentInfo.toPath parentInfo ]
                                     | _ -> ()
 
                                     return Ok()
@@ -665,29 +1165,350 @@ module ArcVaultExtensions =
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
 
-            let rendererFileTree =
+            let rendererSnapshot =
                 match this.path with
-                | Some arcPath -> toRendererFileTree arcPath fileTree.Values
-                | None -> Dictionary<string, FileEntry>()
+                | Some arcPath ->
+                    let entries = toRendererFileTree arcPath fileTree.Values
+                    this.ForgetRemovedFileTreeDirectories entries
 
-            WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
+                    {
+                        entries = entries
+                        directoryHasMore = Dictionary<string, bool>(this.fileTreeDirectoryHasMore)
+                    }
+                | None -> {
+                    entries = Dictionary<string, FileEntry>()
+                    directoryHasMore = Dictionary<string, bool>()
+                  }
+
+            WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererSnapshot)
+
+        /// Paging and loaded state belong to directories in the tree. A directory that is missing from the
+        /// tree although its parent's listing is known was removed, so its state is forgotten. Without this,
+        /// a directory created again at the same path would inherit a stale "fully loaded" state.
+        /// Forgetting a directory also releases its watchers right away: on Windows a watcher handle keeps
+        /// a folder that was moved elsewhere busy.
+        member private this.ForgetRemovedFileTreeDirectories(rendererEntries: Dictionary<string, FileEntry>) =
+            let directoryPaths =
+                rendererEntries.Values
+                |> Seq.filter _.isDirectory
+                |> Seq.map (fun entry -> PathHelpers.normalizeCanonicalRelativePath entry.path)
+                |> Set.ofSeq
+
+            Seq.append this.fileTreeDirectoryHasMore.Keys this.loadedFileTreeDirectories
+            |> Seq.distinct
+            |> Seq.filter (fun path ->
+                path <> RootDirectory
+                && not (directoryPaths.Contains path)
+                && PathHelpers.tryGetParentPath path
+                   |> Option.defaultValue RootDirectory
+                   |> this.IsFileTreeDirectoryLoaded
+            )
+            |> Seq.toArray
+            |> Array.iter this.ForgetFileTreeDirectoryState
+
+        /// Publishes a fresh directory listing and its paging metadata together.
+        member private this.PublishFreshFileTreeDirectorySnapshot
+            (arcPath: string, relativeDirectoryPath: string, snapshot: FileTreeDirectoryPage)
+            =
+            let directoryPath =
+                join [| arcPath; relativeDirectoryPath |] |> PathHelpers.normalizePath
+
+            // The directory is listed only when a partial listing leaves loaded children unconfirmed.
+            let existsWithExactName = WatcherHelpers.existsSyncWithExactNameIn directoryPath
+
+            let nextFileTree =
+                applyFreshFileTreeDirectorySnapshot
+                    arcPath
+                    relativeDirectoryPath
+                    (existsWithExactName >> not)
+                    snapshot
+                    this.fileTree
+
+            // A directory that was just read exists, so its own entry belongs to the tree even when it was
+            // created after its parent was listed. Its children are never published without it.
+            if
+                relativeDirectoryPath <> RootDirectory
+                && not (
+                    nextFileTree.Values
+                    |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path directoryPath)
+                )
+            then
+                nextFileTree.[directoryPath] <- FileEntry.create (basename directoryPath, directoryPath, true, None)
+
+            this.fileTreeDirectoryHasMore.[relativeDirectoryPath] <- snapshot.HasMore
+            this.SetFileTree nextFileTree
+
+        /// A refresh re-reads every loaded entry of a directory, and at least one page.
+        member private this.RefreshEntryCount(arcPath: string, relativeDirectoryPath: string) =
+            max FileTreeDirectoryPageSize (this.CountLoadedDirectoryChildren(arcPath, relativeDirectoryPath))
+
+        /// Removes a directory that no longer exists from the tree together with its state.
+        member private this.RemoveVanishedFileTreeDirectory(arcPath: string, relativeDirectoryPath: string) =
+            let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+            removePathAndDescendantsInPlace (join [| arcPath; relativeDirectoryPath |]) nextFileTree
+            this.ForgetFileTreeDirectoryState relativeDirectoryPath
+            this.SetFileTree nextFileTree
+
+        /// The single read path for File Explorer directories; it runs inside the FileTree queue.
+        /// A prefix read publishes a fresh snapshot and keeps its open listing for the next page; a next-page
+        /// read continues that listing and adds its entries. A directory that was not loaded yet is
+        /// registered with a pending watcher handoff, and true is returned while it still needs watcher
+        /// coverage. A directory that no longer exists is removed from the tree together with its state.
+        member private this.LoadFileTreeDirectoryCore
+            (arcPath: string, relativeDirectoryPath: string, read: FileTreeDirectoryRead, isCurrent: unit -> bool)
+            =
+            promise {
+                let continuation =
+                    match read, this.FileTreeDirectoryCursors.TryGetValue relativeDirectoryPath with
+                    | FileTreeDirectoryRead.NextPage, (true, cursor) -> Some cursor
+                    | _ -> None
+
+                let prefixEntryCount =
+                    match read with
+                    | FileTreeDirectoryRead.Prefix entryCount -> Some entryCount
+                    // A listing closed by a mutation is opened again once, with the next page included.
+                    | FileTreeDirectoryRead.NextPage when continuation.IsNone ->
+                        Some(
+                            this.CountLoadedDirectoryChildren(arcPath, relativeDirectoryPath)
+                            + FileTreeDirectoryPageSize
+                        )
+                    | _ -> None
+
+                let! readResult =
+                    promise {
+                        match continuation, prefixEntryCount with
+                        | Some cursor, _ ->
+                            let! page = readFileTreeDirectoryCursorPage cursor FileTreeDirectoryPageSize
+                            let! entries = this.WithLargeObjectMetadata(arcPath, page.Entries)
+                            return Some({ page with Entries = entries }, Some cursor, false)
+                        | None, Some entryCount ->
+                            let! page, cursor =
+                                readFileTreeDirectoryPrefixWithCursor arcPath relativeDirectoryPath entryCount
+
+                            let! entries = this.WithLargeObjectMetadata(arcPath, page.Entries)
+                            return Some({ page with Entries = entries }, cursor, true)
+                        | None, None -> return None
+                    }
+                    |> Promise.result
+
+                match readResult with
+                | Ok None -> return false
+                | Ok(Some(_, cursor, isFresh)) when not (isCurrent ()) ->
+                    // A fresh listing nobody will continue is closed; a continued one stays with its owner.
+                    if isFresh then
+                        cursor
+                        |> Option.iter (fun cursor ->
+                            cursor.Directory.close () |> Promise.catch ignore |> Promise.start
+                        )
+
+                    return false
+                | Error _ when not (isCurrent ()) -> return false
+                | Ok(Some(page, cursor, isFresh)) ->
+                    if isFresh then
+                        this.PublishFreshFileTreeDirectorySnapshot(arcPath, relativeDirectoryPath, page)
+                    else
+                        let nextFileTree = mergeFileTreeDirectoryPage page.Entries this.fileTree
+                        this.fileTreeDirectoryHasMore.[relativeDirectoryPath] <- page.HasMore
+                        this.SetFileTree nextFileTree
+
+                    // An exhausted listing leaves the store, which closes it.
+                    this.SetFileTreeDirectoryCursor(relativeDirectoryPath, if page.HasMore then cursor else None)
+
+                    if this.IsFileTreeDirectoryLoaded relativeDirectoryPath then
+                        return false
+                    else
+                        this.LoadedDirectoryWatcherController.AddLoadedDirectory(relativeDirectoryPath, true)
+                        return true
+                | Error readError ->
+                    if continuation.IsSome then
+                        this.SetFileTreeDirectoryCursor(relativeDirectoryPath, None)
+
+                    match tryGetNodeErrorCode readError with
+                    | Some "ENOENT"
+                    | Some "ENOTDIR" when relativeDirectoryPath <> RootDirectory ->
+                        this.RemoveVanishedFileTreeDirectory(arcPath, relativeDirectoryPath)
+                        return false
+                    | _ -> return raise readError
+            }
+
+        /// Loads one directory through the shared read path. chooseRead decides how the directory is read.
+        /// Watcher coverage for a newly loaded directory is established after the FileTree queue entry,
+        /// because the catch-up read that follows it runs in that queue.
+        member private this.LoadFileTreeDirectory
+            (relativeDirectoryPath: string, chooseRead: string -> string -> FileTreeDirectoryRead)
+            =
+            let normalizedRelativePath =
+                PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+            let capturedArcPath = this.path
+            let lifecycleIsCurrent = this.CaptureLifecycle()
+
+            promise {
+                let! needsCoverage =
+                    this.EnqueueFileTreeUpdate(fun () -> promise {
+                        match capturedArcPath with
+                        | None -> return raise (arcNotOpenError ())
+                        | Some _ when not (lifecycleIsCurrent ()) -> return false
+                        | Some arcPath ->
+                            return!
+                                this.LoadFileTreeDirectoryCore(
+                                    arcPath,
+                                    normalizedRelativePath,
+                                    chooseRead arcPath normalizedRelativePath,
+                                    lifecycleIsCurrent
+                                )
+                    })
+
+                // During a mutation the restoration after the mutation covers the directory.
+                if
+                    needsCoverage
+                    && not this.LoadedDirectoryWatcherController.Current.MutationActive
+                then
+                    try
+                        do! this.EnsureLoadedDirectoryWatcherCoverage()
+                    with coverageError ->
+                        swatelogfn
+                            this.window.id
+                            "Failed to establish loaded-directory watcher coverage: %s"
+                            coverageError.Message
+            }
+
+        /// Re-reads a directory with all of its loaded entries and loads it if it was not loaded yet.
+        member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) =
+            this.LoadFileTreeDirectory(
+                relativeDirectoryPath,
+                fun arcPath relativePath -> FileTreeDirectoryRead.Prefix(this.RefreshEntryCount(arcPath, relativePath))
+            )
+
+        /// Loads the first page of a directory that is not loaded yet, or continues a loaded directory with
+        /// its next page without reading the loaded entries again.
+        member this.LoadNextFileTreeDirectoryPage(relativeDirectoryPath: string) =
+            this.LoadFileTreeDirectory(
+                relativeDirectoryPath,
+                fun arcPath relativePath ->
+                    if not (this.IsFileTreeDirectoryLoaded relativePath) then
+                        FileTreeDirectoryRead.Prefix(
+                            max FileTreeDirectoryPageSize (this.CountLoadedDirectoryChildren(arcPath, relativePath))
+                        )
+                    else
+                        match this.fileTreeDirectoryHasMore.TryGetValue relativePath with
+                        | true, false -> FileTreeDirectoryRead.Nothing
+                        | _ -> FileTreeDirectoryRead.NextPage
+            )
+
+        /// Applies the outcome of an app-initiated mutation to the affected paths directly, so the change
+        /// is visible even beyond the loaded entries of a large directory, where a refresh of the parent
+        /// cannot see it. A path that still exists is added when its parent is loaded; a path that is
+        /// gone is removed together with its descendants.
+        member internal this.ReconcileFileTreePaths(relativePaths: string seq) =
+            let normalizedPaths =
+                relativePaths
+                |> Seq.map PathHelpers.normalizeCanonicalRelativePath
+                |> Seq.filter (fun path -> path <> RootDirectory)
+                |> Seq.distinctBy PathHelpers.normalizeForComparison
+                |> Seq.toArray
+
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                match this.path with
+                | Some arcPath when capturedWatcherEpoch = this.WatcherEpoch ->
+                    let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+
+                    for relativePath in normalizedPaths do
+                        let absolutePath = join [| arcPath; relativePath |] |> PathHelpers.normalizePath
+                        removePathAndDescendantsInPlace absolutePath nextFileTree
+
+                        let parentPath =
+                            PathHelpers.tryGetParentPath relativePath |> Option.defaultValue RootDirectory
+
+                        if
+                            this.IsFileTreeDirectoryLoaded parentPath
+                            && WatcherHelpers.existsSyncWithExactName absolutePath
+                        then
+                            let! entry = getFileEntry absolutePath
+                            let! enrichedEntries = this.WithLargeObjectMetadata(arcPath, [| entry |])
+                            nextFileTree.[entry.path] <- enrichedEntries.[0]
+
+                    this.SetFileTree nextFileTree
+                | _ -> ()
+            })
+
+        /// Reconciles the root and every loaded directory with disk. Each directory is re-read with all
+        /// of its loaded entries, so expanded folders, paging and the selection survive. Directories that
+        /// no longer exist are forgotten, and a failure in one directory does not stop the others.
+        member this.RefreshLoadedFileTree() = promise {
+            let directories =
+                this.loadedFileTreeDirectories
+                |> Set.add RootDirectory
+                |> Seq.sortBy (fun path -> getPathDepth path, path)
+                |> Seq.toArray
+
+            for relativePath in directories do
+                if this.IsFileTreeDirectoryLoaded relativePath then
+                    try
+                        do! this.RefreshFileTreeDirectory relativePath
+                    with refreshError ->
+                        swatelogfn
+                            this.window.id
+                            "Unable to refresh File Explorer directory '%s': %s"
+                            relativePath
+                            refreshError.Message
+        }
+
+        /// Shows paths that Swate just created. Every ancestor that is not loaded yet is loaded first, from
+        /// the top down: File Explorer expands the folders on the path to a selected new item, and a folder
+        /// shown without its listing would hide its other children. Every path is then added directly,
+        /// because a partly loaded parent may not list it within its loaded entries.
+        member this.RevealCreatedFileTreePaths(relativePaths: string list) = promise {
+            let rec ancestorsOf (path: string) =
+                match PathHelpers.tryGetParentPath path with
+                | Some parentPath -> ancestorsOf parentPath @ [ parentPath ]
+                | None -> []
+
+            let ancestorPaths =
+                relativePaths
+                |> List.collect (PathHelpers.normalizeCanonicalRelativePath >> ancestorsOf)
+                |> List.distinctBy PathHelpers.normalizeForComparison
+                |> List.sortBy getPathDepth
+
+            for ancestorPath in ancestorPaths do
+                if not (this.IsFileTreeDirectoryLoaded ancestorPath) then
+                    do! this.RefreshFileTreeDirectory ancestorPath
+
+            do! this.ReconcileFileTreePaths relativePaths
+        }
 
         member this.GetRendererFileTreeSnapshot() = promise {
             match this.path with
-            | None -> return Dictionary<string, FileEntry>()
+            | None ->
+                return {
+                    entries = Dictionary<string, FileEntry>()
+                    directoryHasMore = Dictionary<string, bool>()
+                }
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
-                    let! fileTree = getFileTree arcPath
-                    this.fileTree <- fileTree
+                    do! this.EnsureInitialFileTreeRootPage arcPath |> Promise.map ignore
 
-                return toRendererFileTree arcPath this.fileTree.Values
+                return {
+                    entries = toRendererFileTree arcPath this.fileTree.Values
+                    directoryHasMore = Dictionary<string, bool>(this.fileTreeDirectoryHasMore)
+                }
         }
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
-                match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
+                let arcPath = this.path.Value
+                let watcherEpoch = this.WatcherEpoch
+
+                match! ARC.LoadAsyncSwateZeroByteRepair arcPath with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
-                | Ok _ when this.window.isDestroyed () -> return raise (ArcLoadCancelledException this.window.id)
+                | Ok _ when
+                    not (WindowSend.isAlive this.window)
+                    || watcherEpoch <> this.WatcherEpoch
+                    || not (this.path |> Option.exists (fun path -> PathHelpers.pathsEqual path arcPath))
+                    ->
+                    return raise (ArcLoadCancelledException this.window.id)
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()
@@ -695,12 +1516,75 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
+        member internal this.EnsureInitialFileTreeRootPage(arcPath: string) =
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            let ensureCurrentLifecycle () =
+                if
+                    capturedWatcherEpoch <> this.WatcherEpoch
+                    || not (WindowSend.isAlive this.window)
+                    || not (this.path |> Option.exists (fun path -> PathHelpers.pathsEqual path arcPath))
+                then
+                    raise (ArcLoadCancelledException this.window.id)
+
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                ensureCurrentLifecycle ()
+
+                if this.fileTree.Count = 0 then
+                    let normalizedArcPath = normalizeRootPath arcPath
+                    let! rootEntry = getFileEntry normalizedArcPath
+
+                    if rootEntry.isDirectory then
+                        let! page, cursor =
+                            readFileTreeDirectoryPrefixWithCursor
+                                normalizedArcPath
+                                RootDirectory
+                                FileTreeDirectoryPageSize
+
+                        let! entries =
+                            this.WithLargeObjectMetadata(normalizedArcPath, page.Entries)
+                            |> Promise.catch (fun error ->
+                                cursor |> Option.iter (fun cursor -> cursor.Directory.close () |> Promise.start)
+                                raise error
+                            )
+
+                        try
+                            ensureCurrentLifecycle ()
+                        with cancellation ->
+                            cursor |> Option.iter (fun cursor -> cursor.Directory.close () |> Promise.start)
+                            raise cancellation
+
+                        this.SetFileTreeDirectoryCursor(RootDirectory, cursor)
+                        this.fileTreeDirectoryHasMore.[RootDirectory] <- page.HasMore
+                        // The initialization publisher sends the path and tree together, in that order.
+                        this.fileTree <- createFileEntryTree (Array.append [| rootEntry |] entries)
+                    else
+                        ensureCurrentLifecycle ()
+                        this.fileTreeDirectoryHasMore.[RootDirectory] <- false
+                        this.fileTree <- createFileEntryTree [| rootEntry |]
+
+                return this.fileTree
+            })
+
         member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
+                this.LoadedDirectoryWatcherController.ActivateLifecycle()
+
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
+                    let watcher, ready =
+                        createFileWatcherWithReady
+                            this.path.Value
+                            usePolling
+                            (fun error -> swatelogfn this.window.id "Permanent ARC watcher error: %s" error.Message)
+
+                    let mutable cancelReadyWait = ignore
+
+                    let cancelled =
+                        JS.Constructors.Promise.Create(fun resolve _ ->
+                            cancelReadyWait <- fun () -> resolve FileWatcherReadyOutcome.Cancelled
+                        )
 
                     let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
@@ -711,6 +1595,21 @@ module ArcVaultExtensions =
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
+
+                    this.FileWatcherReady <-
+                        Some(
+                            race [|
+                                ready
+                                |> Promise.map (
+                                    function
+                                    | Ok() -> FileWatcherReadyOutcome.Ready
+                                    | Error error -> FileWatcherReadyOutcome.WatcherError error
+                                )
+                                cancelled
+                            |]
+                        )
+
+                    this.CancelFileWatcherReadyWait <- Some cancelReadyWait
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
 
@@ -724,6 +1623,14 @@ module ArcVaultExtensions =
             this.importedFileWatcherPaths.Clear()
 
         member this.StopFileWatcher() = promise {
+            this.ClearPendingFileWatcherState()
+            this.CancelFileWatcherReadyWait |> Option.iter (fun cancel -> cancel ())
+            this.CancelFileWatcherReadyWait <- None
+            // Reject callbacks synchronously. The loaded-directory watchers are retired at once, so their
+            // callbacks are no longer owned and cannot join a later restarted lifecycle.
+            this.LoadedDirectoryWatcherController.StopLifecycle()
+            this.UpdateLoadedDirectoryWatcherCoverage false |> ignore
+
             match this.watcher with
             | None -> ()
             | Some watcher ->
@@ -733,44 +1640,70 @@ module ArcVaultExtensions =
                     ()
 
             this.watcher <- None
+            this.FileWatcherReady <- None
+            this.SchedulePendingFileWatcherEvents <- None
+
+            // Work that started before the stop may have touched these collections while the permanent
+            // watcher closed. Reassert the completed-stop invariants.
+            this.LoadedDirectoryWatcherController.ClearLifecycleData()
             this.ClearPendingFileWatcherState()
+            this.LargeObjectMetadata.Invalidate()
+            do! this.EnqueueFileTreeUpdate(fun () -> this.CloseFileTreeDirectoryCursors())
         }
 
         member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
+            let hadFileTree = this.fileTree.Count > 0
             do! this.StopFileWatcher()
 
-            let hadUnsavedArcChanges = this.hasUnsavedArcChanges
-
-            this.isInitializingArc <- false
+            this.SetArcInitializationState false
             this.path <- None
             this.fileTree.Clear()
+            this.fileTreeDirectoryHasMore.Clear()
 
             try
                 this.ClearArc()
             with error ->
                 swatelogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
 
-            if not (this.window.isDestroyed ()) then
-                if hadUnsavedArcChanges then
-                    try
-                        sendArcHasUnsavedChangesUpdate false this.window
-                    with error ->
-                        swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
+            if hadFileTree && not (this.window.isDestroyed ()) then
+                WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange None)
+                this.SetFileTree(Dictionary<string, FileEntry>())
         }
 
-        /// Loads the ARC during initialization. The watcher is activated only after the initial
-        /// file-tree snapshot has been installed, so an older scan cannot overwrite watcher updates.
-        member this.Startup() = promise { do! this.LoadArc() }
+        /// Starts permanent observation and ARC loading together. The watcher is attached
+        /// synchronously before LoadArc begins, so initialization can safely buffer events without
+        /// putting the watcher's initial scan on the model-loading critical path.
+        member this.Startup() = promise {
+            this.StartFileWatcher()
 
-        /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
-        member internal this.FinalizeArcInitialization(fileTree: Dictionary<string, FileEntry>) =
+            let watcherReady = promise {
+                match this.FileWatcherReady with
+                | Some ready ->
+                    match! ready with
+                    | FileWatcherReadyOutcome.Ready -> ()
+                    | FileWatcherReadyOutcome.WatcherError error ->
+                        // Chokidar keeps watching after a path-level error, so an error during the initial
+                        // scan degrades live updates instead of preventing the ARC from opening.
+                        swatelogfn
+                            this.window.id
+                            "Permanent ARC watcher reported an error before it became ready: %s"
+                            error.Message
+                    | FileWatcherReadyOutcome.Cancelled -> return raise (ArcLoadCancelledException this.window.id)
+                | None -> ()
+            }
+
+            let! _ = [| watcherReady; this.LoadArc() |] |> Promise.all
+
+            return ()
+        }
+
+        /// Publishes the bounded root snapshot while ARC metadata continues loading in the background.
+        member internal this.PublishArcInitializationSnapshot(fileTree: Dictionary<string, FileEntry>) =
             match this.window.isDestroyed (), this.path with
             | true, _ -> raise (ArcLoadCancelledException this.window.id)
-            | false, None -> swatefailfn this.window.id "Unable to commit ARC initialization without a path."
+            | false, None -> swatefailfn this.window.id "Unable to publish ARC initialization without a path."
             | false, Some normalizedPath ->
                 this.fileTree <- fileTree
-                this.StartFileWatcher()
-                this.isInitializingArc <- false
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
 
@@ -781,6 +1714,27 @@ module ArcVaultExtensions =
                 // throws and does not hold up the ARC.
                 Main.VersionControl.TextDiffWorkers.prewarm ()
 
+        /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
+        member internal this.FinalizeArcInitialization() =
+            this.SetArcInitializationState false
+
+            // The published root listing was read before the root watcher existed, so the root gets a
+            // catch-up read once its watcher is ready.
+            this.LoadedDirectoryWatcherController.AddPendingHandoff RootDirectory
+
+            this.EnsureLoadedDirectoryWatcherCoverage()
+            |> Promise.catch (fun error ->
+                swatelogfn this.window.id "Failed to establish File Explorer watcher coverage: %s" error.Message
+            )
+            |> Promise.start
+
+            if
+                this.fileWatcherPendingEvents.Count > 0
+                || this.fileWatcherPendingArcMergeEvents.Count > 0
+            then
+                this.SchedulePendingFileWatcherEvents
+                |> Option.iter (fun schedule -> schedule ())
+
         member this.OpenARC(path: string) = promise {
             match this.path with
             | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."
@@ -788,11 +1742,17 @@ module ArcVaultExtensions =
                 let normalizedPath = PathHelpers.normalizePath path
 
                 swatelogfn this.window.id "path: %s" normalizedPath
-                this.isInitializingArc <- true
+                this.SetArcInitializationState true
                 this.path <- Some normalizedPath
 
                 try
-                    do! this.Startup()
+                    let initialization = this.Startup()
+                    this.ArcInitialization <- Some initialization
+
+                    try
+                        do! initialization
+                    finally
+                        this.ArcInitialization <- None
                 with error ->
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
@@ -806,7 +1766,7 @@ module ArcVaultExtensions =
                 let normalizedPath = PathHelpers.normalizePath path
 
                 try
-                    this.isInitializingArc <- true
+                    this.SetArcInitializationState true
                     let arc = ARC(identifier)
                     this.path <- Some normalizedPath
                     this.SetArc(arc)
@@ -844,11 +1804,13 @@ module ArcVaultExtensions =
             | Some _ when this.isBusyWriting -> return Error(busyWritingError ())
             | Some currentPath ->
                 let hadWatcher = this.watcher.IsSome
+                let controller = this.LoadedDirectoryWatcherController
+                // Loaded directories are ARC-relative, so they stay valid for the renamed root.
+                let loadedDirectories = this.loadedFileTreeDirectories
 
-                if hadWatcher then
-                    do! this.StopFileWatcher()
-                else
-                    this.ClearPendingFileWatcherState()
+                // Release every watcher handle before moving the ARC folder. On platforms such as Windows,
+                // an open handle anywhere below the root can otherwise prevent the rename.
+                do! this.StopFileWatcher()
 
                 // A write can start while the watcher stops.
                 let! renameResult =
@@ -857,13 +1819,35 @@ module ArcVaultExtensions =
                     else
                         renameOpenArcRootDirectoryOnDisk currentPath newName
 
-                match renameResult with
-                | Error renameError ->
+                let resumeWatching () =
                     if hadWatcher then
                         this.StartFileWatcher()
+                    else
+                        controller.ActivateLifecycle()
 
+                    // Every directory was read before its watcher existed again, so each gets a catch-up read.
+                    for directory in loadedDirectories do
+                        controller.AddLoadedDirectory(directory, true)
+
+                    controller.AddPendingHandoff RootDirectory
+
+                let ensureCoverage () = promise {
+                    try
+                        do! this.EnsureLoadedDirectoryWatcherCoverage()
+                    with coverageError ->
+                        swatelogfn
+                            this.window.id
+                            "ARC folder rename finished, but File Explorer watching could not resume: %s"
+                            coverageError.Message
+                }
+
+                match renameResult with
+                | Error renameError ->
+                    resumeWatching ()
+                    do! ensureCoverage ()
                     return Error renameError
                 | Ok renamedPath ->
+                    this.fileTree <- remapFileTreeRoot currentPath renamedPath this.fileTree
                     this.path <- Some renamedPath
 
                     match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
@@ -890,25 +1874,14 @@ module ArcVaultExtensions =
                                 renamedPath
                                 loadError.Message
 
-                    if hadWatcher then
-                        try
-                            this.StartFileWatcher()
-                        with watcherError ->
-                            swatelogfn
-                                this.window.id
-                                "ARC folder was renamed to '%s', but file watcher restart failed: %s"
-                                renamedPath
-                                watcherError.Message
-
                     try
-                        let! fileTree = getFileTree renamedPath
-                        this.SetFileTree fileTree
-                    with refreshError ->
+                        resumeWatching ()
+                    with watcherError ->
                         swatelogfn
                             this.window.id
-                            "ARC folder was renamed to '%s', but file tree refresh failed: %s"
+                            "ARC folder was renamed to '%s', but file watcher restart failed: %s"
                             renamedPath
-                            refreshError.Message
+                            watcherError.Message
 
                     try
                         WindowSend.send<IPathChangeRendererApi>
@@ -921,6 +1894,7 @@ module ArcVaultExtensions =
                             renamedPath
                             notifyError.Message
 
+                    do! ensureCoverage ()
                     return Ok renamedPath
         }
 
@@ -1045,6 +2019,10 @@ type ArcVaults() =
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+        // The root and every loaded directory are watched, so focus does not re-read the tree. External
+        // tools may have changed large-object state in the meantime, which the repository index shows.
+        window.onFocus (fun () -> vault.RefreshLargeObjectStateIfRepositoryChanged() |> Promise.start)
+
         window.onClose (fun closeEvent ->
             let operationCloseApproved = vault.isOperationCloseApproved
             vault.isOperationCloseApproved <- false
@@ -1262,9 +2240,8 @@ type ArcVaults() =
 
     member private this.RegisterVaultWithValidatedArc(path: string) =
         this.RegisterVaultCore(fun vault -> promise {
-            do! vault.OpenARC(path)
-            let! fileTree = this.InitializeFileTreeForActiveVault(vault.window.id, vault, path)
-            vault.FinalizeArcInitialization fileTree
+            do! this.InitializeFileTreeWhileArcLoads(vault.window.id, vault, path, fun () -> vault.OpenARC(path))
+            vault.FinalizeArcInitialization()
         })
 
     member private this.ValidateArcRoot(path: string) = promise {
@@ -1294,7 +2271,8 @@ type ArcVaults() =
             let! fileTree = this.InitializeFileTreeForCreatedVault(vault.window.id, vault, path)
 
             try
-                vault.FinalizeArcInitialization fileTree
+                vault.PublishArcInitializationSnapshot fileTree
+                vault.FinalizeArcInitialization()
             with ArcLoadCancelledException targetWindowId ->
                 return raise (ArcCreatedButClosedException targetWindowId)
         })
@@ -1349,11 +2327,11 @@ type ArcVaults() =
         | _ -> raise (ArcLoadCancelledException windowId)
 
     member private this.InitializeFileTreeForActiveVault(windowId: int, expectedVault: ArcVault, arcPath: string) = promise {
-        let! fileTreeResult = promise { return! getFileTree arcPath } |> Promise.result
+        let! rootPageResult = expectedVault.EnsureInitialFileTreeRootPage arcPath |> Promise.result
 
         this.EnsureVaultIsStillActive(windowId, expectedVault)
 
-        match fileTreeResult with
+        match rootPageResult with
         | Ok fileTree -> return fileTree
         | Error error -> return raise error
     }
@@ -1365,21 +2343,51 @@ type ArcVaults() =
             return raise (ArcCreatedButClosedException targetWindowId)
     }
 
+    member private this.InitializeFileTreeWhileArcLoads
+        (windowId: int, vault: ArcVault, arcPath: string, initialize: unit -> JS.Promise<unit>)
+        =
+        promise {
+            // Observe both operations immediately; a root-read failure must not orphan ARC loading.
+            let initialization = initialize () |> Promise.result
+
+            let! publication =
+                promise {
+                    let! fileTree = this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
+                    vault.PublishArcInitializationSnapshot fileTree
+                }
+                |> Promise.result
+
+            if Result.isError publication then
+                do! vault.StopFileWatcher()
+
+            let! initialized = initialization
+
+            match publication, initialized with
+            | Error(ArcLoadCancelledException _), Error error
+            | Error error, _
+            | _, Error error -> return raise error
+            | Ok(), Ok() -> ()
+        }
+
     member private this.InitializeArcInCurrentVault
         (windowId: int, vault: ArcVault, arcPath: string, create: bool, initialize: unit -> JS.Promise<unit>)
         =
         promise {
             try
-                do! initialize ()
-
-                let! fileTree =
+                do! promise {
                     if create then
-                        this.InitializeFileTreeForCreatedVault(windowId, vault, arcPath)
+                        // Creation must finish writing the scaffold before its root can be read.
+                        do! initialize ()
+                        let! fileTree = this.InitializeFileTreeForCreatedVault(windowId, vault, arcPath)
+                        vault.PublishArcInitializationSnapshot fileTree
                     else
-                        this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
+                        // Existing ARC metadata loading and the bounded root read can run together.
+                        // Publishing the root first lets large ARCs leave the opening page immediately.
+                        do! this.InitializeFileTreeWhileArcLoads(windowId, vault, arcPath, initialize)
+                }
 
                 try
-                    vault.FinalizeArcInitialization fileTree
+                    vault.FinalizeArcInitialization()
                 with ArcLoadCancelledException targetWindowId when create ->
                     return raise (ArcCreatedButClosedException targetWindowId)
             with error ->

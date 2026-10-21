@@ -32,6 +32,52 @@ const createStableFolder = (name: string, path: string, id: string, children?: F
     Children: children === undefined ? undefined : ofArray(children),
   });
 
+const ManualPaginationFileExplorer = () => {
+  const [loadedCount, setLoadedCount] = React.useState(100);
+  const items = React.useMemo(() => {
+    const children = Array.from({ length: loadedCount }, (_, index) => {
+      const name = `file-${String(index).padStart(3, "0")}.txt`;
+      return createStableFile(name, `files/${name}`, name);
+    });
+    const folder = createStableFolder("Files", "files", "files", children);
+    folder.IsExpanded = true;
+    return ofArray([folder]);
+  }, [loadedCount]);
+
+  return (
+    <div className="swt:p-4">
+      <p>Loaded {loadedCount} of 250 files. Click Load more to request the next page.</p>
+      <FileExplorer
+        initialItems={items}
+        hasMoreChildren={(item) => item.Id === "files" && loadedCount < 250}
+        onLoadMoreChildren={() => setLoadedCount((count) => Math.min(250, count + 100))}
+      />
+    </div>
+  );
+};
+
+const RootPaginationFileExplorer = () => {
+  const [loadedCount, setLoadedCount] = React.useState(100);
+  const items = React.useMemo(
+    () => ofArray(Array.from({ length: loadedCount }, (_, index) => {
+      const name = `file-${String(index).padStart(3, "0")}.txt`;
+      return createStableFile(name, name, name);
+    })),
+    [loadedCount],
+  );
+
+  return (
+    <div className="swt:p-4">
+      <p>Loaded {loadedCount} of 250 root files.</p>
+      <FileExplorer
+        initialItems={items}
+        hasMoreRootItems={loadedCount < 250}
+        onLoadMoreRootItems={() => setLoadedCount((count) => Math.min(250, count + 100))}
+      />
+    </div>
+  );
+};
+
 const InMemoryCreateFileExplorer = () => {
   const [pendingPath, setPendingPath] = React.useState<string | null>(null);
   const [savedPaths, setSavedPaths] = React.useState<string[]>([]);
@@ -558,6 +604,30 @@ const meta: Meta<typeof FileExplorerExample> = {
 
 export default meta;
 type Story = StoryObj<typeof FileExplorerExample>;
+
+export const RootPagination: StoryObj<typeof RootPaginationFileExplorer> = {
+  render: () => <RootPaginationFileExplorer />,
+};
+
+export const ManualPagination: StoryObj<typeof ManualPaginationFileExplorer> = {
+  render: () => <ManualPaginationFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByText("file-099.txt")).toBeInTheDocument();
+    await expect(canvas.queryByText("file-100.txt")).toBeNull();
+    await userEvent.click(await canvas.findByRole("button", { name: "Load more" }));
+
+    await expect(await canvas.findByText("file-199.txt")).toBeInTheDocument();
+    await expect(canvas.queryByText("file-200.txt")).toBeNull();
+    await userEvent.click(await canvas.findByRole("button", { name: "Load more" }));
+
+    await expect(await canvas.findByText("file-249.txt")).toBeInTheDocument();
+    await expect(canvas.getByText("file-000.txt")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: "Load more" })).toBeNull();
+  },
+};
 
 export const Default: Story = {
   render: () => <FileExplorerExample />,
