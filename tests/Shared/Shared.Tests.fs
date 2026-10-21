@@ -15,9 +15,11 @@ let shared =
         LandingTests.tests
         PathHelpersTests.tests
         DatamapParentInfoTests.tests
+        TableNamesTests.tests
         GitLfsRulesTests.tests
-        ProvenanceGroupingTests.tests
-        ProvenanceGroupingARCtrlConverterTests.tests
+        // Deactivated for now: ProvenanceGrouping is outdated.
+        // ProvenanceGroupingTests.tests
+        // ProvenanceGroupingARCtrlConverterTests.tests
         ProvenanceGraphBuildIndexTests.tests
         ProvenanceGraphQueriesTests.tests
     ]

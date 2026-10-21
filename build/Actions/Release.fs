@@ -177,13 +177,38 @@ let electron () =
 
     ()
 
-/// File extensions electron-forge make produces per GitHub runner.os name.
-let private electronMakeExtensions (os: string) : string list =
-    match os with
-    | "Windows" -> [ ".exe"; ".nupkg" ]
-    | "macOS" -> [ ".zip"; ".dmg" ]
-    | "Linux" -> [ ".deb"; ".rpm" ]
-    | other -> failwithf "Unknown runner OS: %s" other
+/// What one release_electron_binaries matrix entry builds. Makers is None when electron-forge
+/// runs every maker for the platform. Extensions are the files the release must contain.
+type private ElectronTarget = {
+    Makers: string list option
+    Extensions: string list
+}
+
+let private electronTarget (os: string) (arch: string) : ElectronTarget =
+    match os, arch with
+    | "Windows", "x64" -> {
+        Makers = None
+        Extensions = [ ".exe"; ".nupkg" ]
+      }
+    | "macOS", ("x64" | "arm64") -> {
+        Makers = None
+        Extensions = [ ".zip"; ".dmg" ]
+      }
+    | "Linux", "x64" -> {
+        Makers = None
+        Extensions = [ ".deb"; ".rpm"; ".zip"; ".AppImage"; ".pkg.tar.zst" ]
+      }
+    // The pinned AppImage runtime and the pacman package are x64 only.
+    | "Linux", "arm64" -> {
+        Makers =
+            Some [
+                "@electron-forge/maker-zip"
+                "@electron-forge/maker-deb"
+                "@electron-forge/maker-rpm"
+            ]
+        Extensions = [ ".deb"; ".rpm"; ".zip" ]
+      }
+    | _ -> failwithf "No electron release target for %s %s" os arch
 
 let private currentRunnerOs () : string =
     if OperatingSystem.IsWindows() then
@@ -196,9 +221,9 @@ let private currentRunnerOs () : string =
         failwith "Unsupported operating system for electron binaries."
 
 let private hasExtension (ext: string) (file: string) =
-    String.Equals(Path.GetExtension file, ext, StringComparison.OrdinalIgnoreCase)
+    file.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
 
-let private verifyElectronMakeOutput (builtAfterUtc: DateTime) =
+let private verifyElectronMakeOutput (arch: string) (builtAfterUtc: DateTime) =
 
     let makeDir = Path.Combine(ProjectPaths.electronPath, "out", "make")
 
@@ -206,7 +231,7 @@ let private verifyElectronMakeOutput (builtAfterUtc: DateTime) =
         failwithf "electron-forge make produced no output in %s" makeDir
 
     let os = currentRunnerOs ()
-    let expected = electronMakeExtensions os
+    let expected = (electronTarget os arch).Extensions
 
     let freshFiles =
         Directory.GetFiles(makeDir, "*", SearchOption.AllDirectories)
@@ -224,8 +249,9 @@ let private verifyElectronMakeOutput (builtAfterUtc: DateTime) =
                 String.Join(", ", freshFiles)
 
         failwithf
-            "electron-forge make on %s is missing fresh files with extension %s in %s. Fresh files found: %s"
+            "electron-forge make on %s %s is missing fresh files with extension %s in %s. Fresh files found: %s"
             os
+            arch
             (String.Join(", ", missing))
             makeDir
             found
@@ -234,17 +260,95 @@ let private verifyElectronMakeOutput (builtAfterUtc: DateTime) =
         if expected |> List.exists (fun ext -> hasExtension ext file) then
             printGreenfn "Found electron binary: %s" file
 
-let electronBinaries (arch: string) =
+/// Builds the Arch Linux package from the unpacked app that electron-forge leaves in out/.
+let private pacmanPackage (version: Changelog.Version) (arch: string) =
+
+    // pacman forbids '-' in pkgver. Dropping it turns 3.1.0-alpha.1 into 3.1.0alpha.1, which vercmp
+    // sorts below 3.1.0. A '_' or '.' in its place would sort the prerelease above the release.
+    let pkgver = version.Version.ToString().Replace("-", "")
+
+    let outPath = Path.Combine(ProjectPaths.electronPath, "out")
+    let appDir = Path.Combine(outPath, $"ARCitISA-linux-{arch}")
+
+    if not (Directory.Exists appDir) then
+        failwithf "Cannot build the pacman package, the packaged app is missing: %s" appDir
+
+    let packagingDir = Path.Combine(ProjectPaths.electronPath, "packaging", "pacman")
+    let iconsDir = Path.Combine(ProjectPaths.electronPath, "assets", "icons", "png")
+    let stagingDir = Path.Combine(outPath, "pacman-build")
+    let outDir = Path.Combine(outPath, "make", "pacman", arch)
+
+    if Directory.Exists stagingDir then
+        Directory.Delete(stagingDir, true)
+
+    Directory.CreateDirectory stagingDir |> ignore
+    Directory.CreateDirectory(Path.Combine(stagingDir, "icons")) |> ignore
+    Directory.CreateDirectory outDir |> ignore
+
+    for file in [ "PKGBUILD"; "arcitisa.desktop" ] do
+        File.Copy(Path.Combine(packagingDir, file), Path.Combine(stagingDir, file))
+
+    File.Copy(Path.GetFullPath "LICENSE", Path.Combine(stagingDir, "LICENSE"))
+
+    for icon in Directory.GetFiles(iconsDir, "*.png") do
+        File.Copy(icon, Path.Combine(stagingDir, "icons", Path.GetFileName icon))
+
+    // makepkg needs Arch and refuses to run as root. docker cp instead of bind mounts keeps this
+    // working when the build itself runs inside a container that talks to the host docker daemon.
+    let container = $"arcitisa-pacman-{Guid.NewGuid():N}"
+
+    let buildCommand =
+        """useradd -m builder && mkdir -p /out && chown -R builder: /build /out && cd /build && runuser -u builder -- env ARCITISA_PKGVER="$ARCITISA_PKGVER" PKGDEST=/out makepkg --nodeps --noconfirm"""
+
+    try
+        run
+            "docker"
+            [
+                "create"
+                "--name"
+                container
+                "-e"
+                $"ARCITISA_PKGVER={pkgver}"
+                "archlinux:base-devel"
+                "bash"
+                "-c"
+                buildCommand
+            ]
+            ""
+
+        try
+            run "docker" [ "cp"; $"{stagingDir}/."; $"{container}:/build" ] ""
+            run "docker" [ "cp"; appDir; $"{container}:/build/ARCitISA-linux-x64" ] ""
+            run "docker" [ "start"; "-a"; container ] ""
+            run "docker" [ "cp"; $"{container}:/out/."; outDir ] ""
+        finally
+            run "docker" [ "rm"; "-f"; container ] ""
+    finally
+        Directory.Delete(stagingDir, true)
+
+let electronBinaries (version: Changelog.Version) (arch: string) =
 
     let builtAfterUtc = DateTime.UtcNow.AddSeconds(-2.0)
+    let target = electronTarget (currentRunnerOs ()) arch
 
     run "npm" [ "run"; "fable" ] ProjectPaths.electronPath
 
-    run "node" [ "scripts/forge-make.cjs"; sprintf "--arch=%s" arch ] ProjectPaths.electronPath
+    let makeArgs = [
+        "scripts/forge-make.cjs"
+        sprintf "--arch=%s" arch
+        match target.Makers with
+        | Some makers -> sprintf "--targets=%s" (String.Join(",", makers))
+        | None -> ()
+    ]
+
+    run "node" makeArgs ProjectPaths.electronPath
+
+    if target.Extensions |> List.contains ".pkg.tar.zst" then
+        pacmanPackage version arch
 
     // forge-make.cjs turns a killed make into a failure. A make run can also exit 0 without writing
     // every installer, so verifyElectronMakeOutput looks in out/make for each expected extension (#1421).
-    verifyElectronMakeOutput builtAfterUtc
+    verifyElectronMakeOutput arch builtAfterUtc
 
     ()
 
@@ -252,12 +356,19 @@ let verifyReleaseAssets (dir: string) =
 
     // Must match the artifact names uploaded by the electron-web target of the release job and by
     // the release_electron_binaries matrix in .github/workflows/release-pipeline.yml.
+    let electronMatrix = [
+        "Windows", "x64"
+        "macOS", "x64"
+        "macOS", "arm64"
+        "Linux", "x64"
+        "Linux", "arm64"
+    ]
+
     let expectedArtifacts = [
         "release-assets-client", [ ".zip" ]
-        "release-assets-electron-Windows-x64", electronMakeExtensions "Windows"
-        "release-assets-electron-macOS-x64", electronMakeExtensions "macOS"
-        "release-assets-electron-macOS-arm64", electronMakeExtensions "macOS"
-        "release-assets-electron-Linux-x64", electronMakeExtensions "Linux"
+        yield!
+            electronMatrix
+            |> List.map (fun (os, arch) -> $"release-assets-electron-{os}-{arch}", (electronTarget os arch).Extensions)
     ]
 
     let problems =

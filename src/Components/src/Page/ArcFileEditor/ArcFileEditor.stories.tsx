@@ -243,19 +243,30 @@ export const RenameThenDeleteAndAddTable: Story = {
   },
 };
 
-export const RejectDuplicateTableName: Story = {
+// Tables are saved as spreadsheet sheets, which ignore case and reject some characters.
+export const RejectUnusableTableNames: Story = {
   parameters: { isolated: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.dblClick(canvas.getByRole('button', { name: 'Table 2' }));
-    const nameInput = canvas.getByRole('textbox');
-    await userEvent.clear(nameInput);
-    await userEvent.type(nameInput, 'Table 1{enter}');
+    for (const [name, message] of [
+      ['Table 1', 'A table named "Table 1" already exists.'],
+      ['table 1', 'A table named "table 1" already exists.'],
+      ['Sugar/day 2', 'A table name cannot contain * ? : \\ / [ ].'],
+    ]) {
+      await userEvent.dblClick(canvas.getByRole('button', { name: 'Table 2' }));
+      const nameInput = canvas.getByRole('textbox');
+      await userEvent.clear(nameInput);
+      await userEvent.type(nameInput, `${name}{enter}`);
 
-    expect(nameInput).toHaveValue('Table 1');
-    await userEvent.keyboard('{Escape}');
+      expect(nameInput).toHaveValue(name);
+      expect(canvas.getByRole('alert')).toHaveTextContent(message);
+      await userEvent.keyboard('{Escape}');
+      expect(canvas.getByRole('button', { name: 'Table 2' })).toBeInTheDocument();
+    }
+
     expect(canvas.getAllByRole('button', { name: 'Table 1' })).toHaveLength(1);
-    expect(canvas.getByRole('button', { name: 'Table 2' })).toBeInTheDocument();
+    expect(canvas.queryByRole('button', { name: 'table 1' })).not.toBeInTheDocument();
+    expect(canvas.queryByRole('button', { name: 'Sugar/day 2' })).not.toBeInTheDocument();
   },
 };

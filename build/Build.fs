@@ -49,6 +49,10 @@ let main args =
             match Test.Run.electronCore |> Async.RunSynchronously with
             | Ok() -> 0
             | Error _ -> 1
+        | "run" :: "electron-renderer" :: _ ->
+            match Test.Run.electronRenderer |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
         | "run" :: "components" :: _ ->
             match Test.Run.components |> Async.RunSynchronously with
             | Ok() -> 0
@@ -127,7 +131,7 @@ let main args =
                 printRedfn "No --arch provided for electron-bin target!"
                 exit 1
 
-            Release.electronBinaries arch.Value
+            Release.electronBinaries latestVersion arch.Value
             printGreenfn "Release electron-bin for arch %s!" arch.Value
             0
         | "storybook" ->

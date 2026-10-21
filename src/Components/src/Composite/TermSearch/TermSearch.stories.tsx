@@ -9,6 +9,9 @@ import {
   type Term,
 } from './Types.fs.js';
 
+// Waits for a live term search response get more time, because the API can be slow.
+const LIVE_API_TIMEOUT = 15_000;
+
 const TERMSEARCH_INPUT_TESTID = 'term-search-input'
 
 const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
@@ -73,7 +76,9 @@ export const Default: Story = {
   }
 }
 
+// Calls the live term search API, so test runs skip it. TermSearch.test.rtl.fs covers the behavior with mocked responses.
 export const ParentSearch: Story = {
+  tags: ['skip-test'],
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
@@ -96,7 +101,7 @@ export const ParentSearch: Story = {
       expect(directedOutput).toBeInTheDocument();
       const expectedIcons = screen.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
-    }, { timeout: 5000 });
+    }, { timeout: LIVE_API_TIMEOUT });
   }
 }
 
@@ -159,11 +164,13 @@ export const DefaultAdvancedSearch: Story = {
     await waitFor(() => {
       const results = screen.getByText(/Results: \d+/);
       expect(results).toBeInTheDocument();
-    });
+    }, { timeout: LIVE_API_TIMEOUT });
   }
 }
 
+// Calls the live term search API, so test runs skip it. TermSearch.test.rtl.fs covers the behavior with mocked responses.
 export const TIBSearch: Story = {
+  tags: ['skip-test'],
   render: renderTermSearch,
   args: {
     term: undefined,
@@ -208,7 +215,7 @@ export const TIBSearch: Story = {
       expect(directedOutput).toBeInTheDocument();
       const expectedIcons = screen.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
-    }, { timeout: 3000 });
+    }, { timeout: LIVE_API_TIMEOUT });
 
     await userEvent.clear(input);
 
@@ -221,7 +228,7 @@ export const TIBSearch: Story = {
     await waitFor(() => { // await api call response
       const debugValue = input.getAttribute("data-debugresultcount")
       expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
-    }, { timeout: 5000 });
+    }, { timeout: LIVE_API_TIMEOUT });
   }
 }
 
