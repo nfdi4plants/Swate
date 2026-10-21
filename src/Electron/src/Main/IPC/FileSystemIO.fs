@@ -10,6 +10,7 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open VersionControlService.Git.TextDiff
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -277,29 +278,16 @@ module ArcFileSystemHelper =
     let private symbolicLinkImportError path =
         exn $"Cannot import '{path}' because it is a symbolic link."
 
-    /// The first line of a Git LFS pointer file. `hawser` is the name Git LFS had before its release.
-    let private gitLfsPointerVersionLines = [
-        "version https://git-lfs.github.com/spec/v1"
-        "version https://hawser.github.com/spec/v1"
-    ]
-
-    let private minimumGitLfsPointerBytes =
-        (gitLfsPointerVersionLines |> List.map String.length |> List.min)
-        + "\noid sha256:".Length
-        + 64
-        + "\nsize 0\n".Length
-
+    /// Uses the strict pointer parser, so only the exact layout git-lfs writes counts as a pointer.
+    /// A text file that only starts like a pointer is imported as a file.
     let private isGitLfsPointerFileAsync (absolutePath: string) = promise {
         let! stats = statAsync absolutePath
 
-        if stats.size < float minimumGitLfsPointerBytes || stats.size >= 1024.0 then
+        if stats.size > float TextDiffLfsPointer.MaximumPointerBytes then
             return false
         else
-            let! content = readFileAsync absolutePath TextEncoding.Utf8
-
-            return
-                gitLfsPointerVersionLines
-                |> List.exists (fun versionLine -> content.StartsWith(versionLine, StringComparison.Ordinal))
+            let! bytes = readFileBytesAsync absolutePath
+            return (TextDiffLfsPointer.tryParseStrict bytes).IsSome
     }
 
     let private rejectGitLfsPointerFileAsync (absolutePath: string) (importedPath: string) = promise {

@@ -245,12 +245,12 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
-        // The shortest possible pointer: the old version line, an `oid` and a one-digit `size`.
+        // The shortest possible pointer: an `oid` and a one-digit `size` after the version line.
         Description = "a folder that contains the shortest possible Git LFS pointer file"
         PrepareSource =
             createExternalRunFolderWithAsync
                 "raw/empty.bin"
-                ("version https://hawser.github.com/spec/v1\noid sha256:"
+                ("version https://git-lfs.github.com/spec/v1\noid sha256:"
                  + String.replicate 64 "a"
                  + "\nsize 0\n")
         TargetRelativePath = ""
@@ -1077,18 +1077,27 @@ Vitest.describe (
                             sourcePath
                             "raw/lfs-notes.md"
                             $"A pointer looks like this:\n{gitLfsPointerContent}"
-                    // Git LFS never reads a file of 1024 bytes or more as a pointer.
+                    // A pointer never exceeds 1024 bytes, and this file has extra content after the `size` line.
                     do!
                         writeRelativeFileAsync
                             sourcePath
                             "raw/pointer-like.txt"
                             (gitLfsPointerContent + String.replicate 1024 "x")
-                    // Too short to hold an `oid` and a `size`, so it can't be a pointer.
+                    // It has no `oid` and no `size` line, so it can't be a pointer.
                     do!
                         writeRelativeFileAsync
                             sourcePath
                             "raw/version-only.txt"
                             "version https://git-lfs.github.com/spec/v1\n"
+                    // Well under 1024 bytes, but the lines after the version line are prose.
+                    do!
+                        writeRelativeFileAsync
+                            sourcePath
+                            "raw/prose-after-version.md"
+                            ("version https://git-lfs.github.com/spec/v1\n"
+                             + String.replicate
+                                 4
+                                 "This note describes the measurement setup and how the samples were prepared.\n")
 
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
 
@@ -1097,6 +1106,7 @@ Vitest.describe (
                     Vitest.expect(plannedFiles).toContain ("Run1/raw/lfs-notes.md")
                     Vitest.expect(plannedFiles).toContain ("Run1/raw/pointer-like.txt")
                     Vitest.expect(plannedFiles).toContain ("Run1/raw/version-only.txt")
+                    Vitest.expect(plannedFiles).toContain ("Run1/raw/prose-after-version.md")
                 })
         )
 
