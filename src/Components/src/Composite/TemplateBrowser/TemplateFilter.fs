@@ -390,6 +390,7 @@ type TemplateFilter =
                         props: ResizeArray<IReactProperty>
                     |}) ->
                 Html.li [
+                    prop.testId $"template-filter-option-{props.item.Id}"
                     prop.key (props.item.Id)
                     prop.className [
                         "swt:border-l-4 swt:border-transparent swt:list-row swt:rounded-none swt:p-1"
@@ -477,6 +478,9 @@ type TemplateFilter =
             onChange = onChangeFn,
             itemRenderer = itemRenderFn,
             inputLeadingVisual = InputLeadingBadges,
+            props = {|
+                ``data-testid`` = "template-filter-search"
+            |},
             labelClassName = labelClasses,
             onKeyDown = onKeyDown
         )
@@ -496,6 +500,7 @@ type TemplateFilter =
         let TriggerRenderFn =
             fun _ ->
                 Html.button [
+                    prop.testId "template-community-filter"
                     prop.title "Filter communities"
                     prop.type'.button
                     prop.tabIndex -1
@@ -606,7 +611,7 @@ type TemplateFilter =
         )
 
         Html.div [
-            prop.className "swt:flex swt:flex-row swt:gap-2"
+            prop.className "swt:flex swt:shrink-0 swt:min-w-0 swt:flex-row swt:flex-wrap swt:gap-2"
             prop.children [
                 TemplateFilter.TemplateSearch(
                     availableTokens,

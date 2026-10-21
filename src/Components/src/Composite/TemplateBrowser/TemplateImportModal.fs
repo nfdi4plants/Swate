@@ -18,14 +18,21 @@ type TemplateImportModal =
             selectedTemplates: Template[],
             setIsOpen,
             setImportType,
-            submitImport: ImportModalConfirmPayload -> unit
+            submitImport: ImportModalConfirmPayload -> unit,
+            ?existingTableNames: string[],
+            ?importError: string
         ) =
+
+        let existingTableNames = defaultArg existingTableNames [||]
 
         let templateImportDecisions, setTemplateImportDecisions =
             React.useStateWithUpdater (Map.empty<System.Guid, TemplateImportAction>)
 
         let deselectedTemplateColumns, setDeselectedTemplateColumns =
             React.useStateWithUpdater (Set.empty<System.Guid * int>)
+
+        let enteredNewTableNames, setEnteredNewTableNames =
+            React.useStateWithUpdater (Map.empty<System.Guid, string>)
 
         let selectedTemplateIds =
             React.useMemo (
@@ -44,6 +51,12 @@ type TemplateImportModal =
                 setDeselectedTemplateColumns (fun deselected ->
                     deselected
                     |> Set.filter (fun (templateId, _) -> selectedTemplateIds.Contains templateId)
+                )
+                |> ignore
+
+                setEnteredNewTableNames (fun names ->
+                    names
+                    |> Map.filter (fun templateId _ -> selectedTemplateIds.Contains templateId)
                 )
                 |> ignore
             ),
@@ -71,7 +84,25 @@ type TemplateImportModal =
         let selectedTemplatesForImport =
             TemplateActions.selectedTemplatesForImport selectedTemplates selectedTemplateIds templateImportDecisions
 
-        let canConfirmImport = selectedTemplatesForImport.Length > 0
+        let newTableNames =
+            TemplateActions.newTableNames existingTableNames selectedTemplatesForImport enteredNewTableNames
+
+        let importInputs =
+            importType,
+            selectedTemplatesForImport
+            |> Array.map (fun (template, action) -> template.Id, action),
+            deselectedTemplateColumns,
+            enteredNewTableNames
+
+        let submittedImportInputs, setSubmittedImportInputs = React.useState None
+
+        let importError =
+            importError
+            |> Option.filter (fun _ -> submittedImportInputs = Some importInputs)
+
+        let canConfirmImport =
+            selectedTemplatesForImport.Length > 0
+            && newTableNames |> Map.forall (fun _ newTableName -> newTableName.Error.IsNone)
 
         let previewCallbacks: TemplatePreviewCallbacks = {
             GetTemplateImportAction = getTemplateImportAction
@@ -80,16 +111,23 @@ type TemplateImportModal =
             ToggleColumnSelection = toggleTemplateColumnSelection
             SelectAllTemplateColumns = selectAllTemplateColumns
             UnselectAllTemplateColumns = unselectAllTemplateColumns
+            GetNewTableName = newTableNames.TryFind
+            SetNewTableName =
+                fun templateId name -> setEnteredNewTableNames (fun names -> names.Add(templateId, name)) |> ignore
         }
 
         let confirmImport () =
+            setSubmittedImportInputs (Some importInputs)
+
             submitImport {
                 ImportType = importType
                 SelectedTemplatesForImport = selectedTemplatesForImport
                 DeselectedTemplateColumns = deselectedTemplateColumns
+                NewTableNames = newTableNames |> Map.map (fun _ newTableName -> newTableName.Name)
             }
 
         BaseModal.Modal(
+            debug = "template-import",
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Import templates",
@@ -140,6 +178,14 @@ type TemplateImportModal =
                                 )
                             ]
                         ]
+                        match importError with
+                        | Some message ->
+                            Html.div [
+                                prop.role.alert
+                                prop.className "swt:alert swt:alert-error swt:text-sm"
+                                prop.text $"Import failed: {message}"
+                            ]
+                        | None -> Html.none
                     ]
                 ],
             footer =
@@ -147,11 +193,13 @@ type TemplateImportModal =
                     prop.className "swt:flex swt:w-full swt:gap-2"
                     prop.children [
                         Html.button [
+                            prop.testId "template-import-cancel"
                             prop.className "swt:btn swt:btn-outline"
                             prop.text "Cancel"
                             prop.onClick (fun _ -> setIsOpen false)
                         ]
                         Html.button [
+                            prop.testId "template-import-confirm"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
                             prop.disabled (not canConfirmImport)
                             prop.text "Import"

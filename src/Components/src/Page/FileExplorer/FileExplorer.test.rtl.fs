@@ -217,10 +217,11 @@ Vitest.test (
         Vitest.expect(isRendered "folder-149").toBe true
         Vitest.expect(isRendered "folder-249").toBe true
 
-        RTL.fireEvent.click (RTL.screen.getByRole ("button", ByRoleOptions(name = Text "Collapse folder")))
+        // Clicking a folder collapses or expands it; the selection belongs to the caller and stays.
+        RTL.fireEvent.click (RTL.screen.getByText "folder")
         Vitest.expect(isRendered "folder-149").toBe false
 
-        RTL.fireEvent.click (RTL.screen.getByRole ("button", ByRoleOptions(name = Text "Expand folder")))
+        RTL.fireEvent.click (RTL.screen.getByText "folder")
         Vitest.expect(isRendered "folder-149").toBe true
         Vitest.expect((RTL.screen.getByText "folder-149").classList.contains "swt:text-primary").toBe true
 )

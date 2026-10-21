@@ -200,19 +200,7 @@ type FileTree =
                 Renderer.Types.PageState.ArcFilePage(arcFile, Some activeView)
             | pageState -> pageState
 
-        let tryGetArcEntityWorkbookName (path: string) =
-            ArcEntityPathRules.tryGetRenameEntityFolderTarget (PathHelpers.normalizePath path)
-            |> Option.bind (fun (zone, identifier) ->
-                ArcEntityPathRules.buildCanonicalEntityPaths zone identifier
-                |> List.tryHead
-                |> Option.map PathHelpers.getFileName
-            )
-
-        let isArcEntityDirectory (item: FileItem) =
-            item.IsDirectory
-            && item.Path |> Option.bind tryGetArcEntityWorkbookName |> Option.isSome
-
-        let openPreview (item: FileItem) =
+        let openPreview (alwaysOpen: bool) (item: FileItem) =
             promise {
                 match item.Path with
                 | None ->
@@ -221,21 +209,26 @@ type FileTree =
                     )
                 | Some path when item.IsDirectory ->
                     let selectedPath = PathHelpers.normalizePath path
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    if isArcEntityDirectory item then
-                        match tryGetArcEntityWorkbookName selectedPath with
-                        | Some workbookName ->
-                            let! result = openView $"{selectedPath}/{workbookName}"
+                    let isAlreadyOpen =
+                        Helper.isArcEntityFolderViewOpen
+                            pageStateCtx.state
+                            fileStateCtx.state.Selection.TreePath
+                            selectedPath
 
-                            result
-                            |> Result.map (
-                                withStartingView Swate.Components.Page.ArcFileEditor.Types.ActiveView.Metadata
-                            )
-                            |> applyPreviewResult item.Name
-                        | None -> pageStateCtx.setState None
-                    else
-                        pageStateCtx.setState None
+                    // Only folders with ARC metadata open a view, and only if it is not on screen yet. Otherwise the
+                    // click just expands or collapses the folder and keeps the selection, because the open view, such
+                    // as the Markdown editor, saves to the selected path.
+                    match Helper.tryGetArcEntityWorkbookName selectedPath with
+                    | Some _ when isAlreadyOpen && not alwaysOpen -> ()
+                    | Some workbookName ->
+                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                        let! result = openView $"{selectedPath}/{workbookName}"
+
+                        result
+                        |> Result.map (withStartingView Swate.Components.Page.ArcFileEditor.Types.ActiveView.Metadata)
+                        |> applyPreviewResult item.Name
+                    | None -> ()
                 | Some path ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
@@ -517,7 +510,7 @@ type FileTree =
         }
 
         let contextMenuConfig: ContextMenuConfig = {
-            openItem = openPreview
+            openItem = openPreview true
             arcRootPath = appStateCtx
             openCreateModal = (fun kind -> openDialog (CreateDialog kind))
             openNoteDraft = (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage))
@@ -635,7 +628,7 @@ type FileTree =
                     prop.children [
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
-                            onItemClick = openPreview,
+                            onItemClick = openPreview false,
                             onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,
