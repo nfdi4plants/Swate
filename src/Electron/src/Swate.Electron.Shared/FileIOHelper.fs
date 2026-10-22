@@ -19,7 +19,19 @@ let pathsEqual (left: string) (right: string) =
 let isLegacyDataMapPath (path: string) =
     getNonEmptyPathParts path
     |> Array.tryLast
-    |> Option.exists (fun fileName -> String.Equals(fileName, "isa_datamap", StringComparison.OrdinalIgnoreCase))
+    |> Option.exists (fun fileName ->
+        String.Equals(fileName, ArcEntityPathRules.legacyDataMapFileName, StringComparison.OrdinalIgnoreCase)
+    )
+
+let isOfficeLockFilePath = RenamePathRules.isOfficeLockFilePath
+let isTemporaryImportPath = RenamePathRules.isTemporaryImportPath
+let isLfsBackupPath = RenamePathRules.isLfsBackupPath
+
+let isHiddenArcFilePath (path: string) =
+    isOfficeLockFilePath path || isLfsBackupPath path || isLegacyDataMapPath path
+
+let isHiddenArcFolderName (name: string) =
+    String.Equals(name, ".git", StringComparison.OrdinalIgnoreCase)
 
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with

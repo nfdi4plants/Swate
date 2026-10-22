@@ -62,6 +62,9 @@ let readFileAsync (path: string) (encoding: TextEncoding) : JS.Promise<string> =
 [<Import("readFile", "fs/promises")>]
 let readFileBufferAsync (path: string) : JS.Promise<obj> = jsNative
 
+[<Import("readFile", "fs/promises")>]
+let readFileBytesAsync (path: string) : JS.Promise<byte[]> = jsNative
+
 [<Emit("$0.toString('base64')")>]
 let bufferToBase64 (buffer: obj) : string = jsNative
 
@@ -93,6 +96,9 @@ let statAsync (path: string) : JS.Promise<Stats> = jsNative
 
 [<Import("lstat", "fs/promises")>]
 let lstatAsync (path: string) : JS.Promise<Stats> = jsNative
+
+[<Import("realpath", "fs/promises")>]
+let realpathAsync (path: string) : JS.Promise<string> = jsNative
 
 [<Import("readdir", "fs/promises")>]
 let readdirAsync (path: string) : JS.Promise<string[]> = jsNative

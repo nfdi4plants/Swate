@@ -4,8 +4,18 @@ open Swate.Electron.Shared.RenamePathRules
 open Swate.Components.Shared
 open Vitest
 
-let private targetRejectedMessage = "must not target canonical ARC files"
+let private mainFolderMessage =
+    "is one of the ARC's main folders, which ARCitISA manages itself."
+
+let private reservedMetadataMessage = "is reserved for ARC metadata."
+
+let private protectedNameMessage =
+    "so it could not be renamed or deleted afterwards."
+
+let private gitFolderMessage = "'.git' is not allowed inside an ARC."
 let private extensionRequiredMessage = "file extension"
+
+let private hex32 (digit: char) = String.replicate 32 (string digit)
 
 let private addZones = [ "studies"; "assays"; "workflows"; "runs" ]
 
@@ -30,9 +40,84 @@ Vitest.describe (
             fun () ->
                 let result = validateRenameName "bad/name"
 
-                Vitest
-                    .expect(result)
-                    .toEqual (Error "The new name must not contain path separators or null characters.")
+                Vitest.expect(result).toEqual (Error "The name must not contain path separators or null characters.")
+        )
+
+        Vitest.test (
+            "validateRenameName rejects characters Windows does not allow",
+            fun () ->
+                [
+                    "a<b"
+                    "a>b"
+                    "a:b"
+                    "a\"b"
+                    "a|b"
+                    "a?b"
+                    "a*b"
+                    "a\u0001b"
+                    "a\tb"
+                ]
+                |> List.iter (fun name ->
+                    validateRenameName name
+                    |> expectErrorContaining "must not contain < > : \" | ? * or control characters"
+                )
+        )
+
+        Vitest.test (
+            "validateRenameName rejects a trailing dot",
+            fun () -> validateRenameName "trail." |> expectErrorContaining "must not end with a dot"
+        )
+
+        Vitest.test (
+            "validateRenameName rejects Windows device names",
+            fun () ->
+                [
+                    "aux", "aux"
+                    "AUX.txt", "AUX"
+                    "com1.csv", "com1"
+                    "lpt9", "lpt9"
+                    "con.txt.bak", "con"
+                    "PRN", "PRN"
+                    "nul.log", "nul"
+                    "CONIN$", "CONIN$"
+                    "conout$.txt", "conout$"
+                    "COM\u00B9", "COM\u00B9"
+                    "lpt\u00B3.txt", "lpt\u00B3"
+                    "aux .txt", "aux"
+                ]
+                |> List.iter (fun (name, baseName) ->
+                    validateRenameName name
+                    |> expectErrorContaining
+                        $"must not be '{baseName}' or start with '{baseName}.', because Windows reserves it for a device."
+                )
+        )
+
+        Vitest.test (
+            "validateRenameName accepts names that only resemble Windows restrictions",
+            fun () ->
+                [
+                    "console.txt"
+                    "auxiliary.txt"
+                    "com10.csv"
+                    "notes.v2.md"
+                    "T12-30-00.csv"
+                    "my notes. v2.txt"
+                ]
+                |> List.iter (fun name ->
+                    match validateRenameName name with
+                    | Ok normalizedName -> Vitest.expect(normalizedName).toBe (name)
+                    | Error errorMessage -> failwith errorMessage
+                )
+        )
+
+        Vitest.test (
+            "New File and Rename refuse a timestamp name with colons",
+            fun () ->
+                tryBuildGenericFileSystemChildPath true "notes" "T12:30:00.csv"
+                |> expectErrorContaining "because Windows does not allow them"
+
+                tryBuildRenameTargetPath "notes/old.csv" "T12:30:00.csv"
+                |> expectErrorContaining "because Windows does not allow them"
         )
 
         Vitest.test (
@@ -114,6 +199,50 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "the legacy DataMap name cannot be created or used as a rename target",
+            fun () ->
+                // Loading an ARC renames any `isa_datamap` to `isa.datamap.xlsx`.
+                [
+                    ""
+                    "assays/AssayA"
+                    "assays/AssayA/dataset"
+                    "backup/assays/AssayA"
+                ]
+                |> List.iter (fun parentPath ->
+                    [ "isa_datamap"; "ISA_DATAMAP" ]
+                    |> List.iter (fun name ->
+                        [ true; false ]
+                        |> List.iter (fun isFile ->
+                            tryBuildGenericFileSystemChildPath isFile parentPath name
+                            |> expectErrorContaining legacyDataMapNameError
+                        )
+                    )
+                )
+
+                tryBuildGenericFileSystemRenameTargetPath true false "assays/AssayA/dataset/map.xlsx" "isa_datamap"
+                |> expectErrorContaining legacyDataMapNameError
+        )
+
+        Vitest.test (
+            "existing items with the legacy DataMap name can still be renamed, moved, deleted and used as parents",
+            fun () ->
+                let existingFolder = "backup/isa_datamap"
+
+                Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed false existingFolder).toBe (true)
+                Vitest.expect(ArcEntityPathRules.isItemRenamePathAllowed false existingFolder).toBe (true)
+                Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed existingFolder).toBe (true)
+                Vitest.expect(ArcEntityPathRules.isGenericFileSystemParentAllowed existingFolder).toBe (true)
+
+                match tryBuildGenericFileSystemRenameTargetPath false false existingFolder "old_maps" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("backup/old_maps")
+                | Error errorMessage -> failwith errorMessage
+
+                match tryBuildGenericFileSystemChildPath true existingFolder "notes.txt" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("backup/isa_datamap/notes.txt")
+                | Error errorMessage -> failwith errorMessage
+        )
+
+        Vitest.test (
             "protected entity child folders can still be used as generic filesystem parents",
             fun () ->
                 Vitest.expect(ArcEntityPathRules.isGenericFileSystemParentAllowed "assays/AssayA/dataset").toBe (true)
@@ -135,11 +264,11 @@ Vitest.describe (
                 | Error errorMessage -> failwith errorMessage
 
                 let rejectedRootTargets = [
-                    yield! addZones |> List.map (fun zone -> zone, targetRejectedMessage)
-                    "isa.investigation.xlsx", targetRejectedMessage
-                    ".git", targetRejectedMessage
-                    ".gitattributes", targetRejectedMessage
-                    ".gitkeep", targetRejectedMessage
+                    yield! addZones |> List.map (fun zone -> zone, mainFolderMessage)
+                    "isa.investigation.xlsx", reservedMetadataMessage
+                    ".git", gitFolderMessage
+                    ".gitattributes", protectedNameMessage
+                    ".gitkeep", protectedNameMessage
                     "../escape", "path separators"
                 ]
 
@@ -150,6 +279,127 @@ Vitest.describe (
                         tryBuildGenericFileSystemChildPath isFile "" name
                         |> expectErrorContaining expectedMessagePart
                     )
+                )
+        )
+
+        Vitest.test (
+            "New File and New Folder name the cause when a target is blocked",
+            fun () ->
+                tryBuildGenericFileSystemChildPath false "assays/AssayA" "dataset"
+                |> expectErrorContaining "'dataset' is a folder that ARCitISA manages inside a study or assay."
+
+                tryBuildGenericFileSystemChildPath false "" "assays"
+                |> expectErrorContaining "'assays' is one of the ARC's main folders, which ARCitISA manages itself."
+
+                tryBuildGenericFileSystemChildPath true "data" "isa.investigation.xlsx"
+                |> expectErrorContaining "'isa.investigation.xlsx' is reserved for ARC metadata."
+
+                tryBuildGenericFileSystemChildPath true "data" ".gitkeep"
+                |> expectErrorContaining
+                    "ARCitISA protects the name '.gitkeep', so it could not be renamed or deleted afterwards."
+
+                tryBuildGenericFileSystemChildPath false "data" ".git"
+                |> expectErrorContaining gitFolderMessage
+
+                Vitest
+                    .expect(ArcEntityPathRules.describeBlockedGenericCreateTarget false "assays/AssayB")
+                    .toEqual (
+                        Some
+                            "'AssayB' is a study, assay, workflow or run folder, which ARCitISA creates through its own dialogs."
+                    )
+
+                Vitest.expect(ArcEntityPathRules.describeBlockedGenericCreateTarget true "data/notes.md").toEqual (None)
+        )
+
+        Vitest.test (
+            "names the file tree hides are rejected for new files and renamed files",
+            fun () ->
+                let lockMessage = "lock file of a document that is open in Office or LibreOffice"
+                let lfsMessage = "Git LFS backups"
+                let stagingName = $".swate-import-{hex32 'a'}"
+
+                [
+                    "~$draft.md", lockMessage
+                    ".~lock.a.xlsx#", lockMessage
+                    $"data.bin.vcs-lfs-backup-{hex32 'b'}", lfsMessage
+                ]
+                |> List.iter (fun (name, expectedMessagePart) ->
+                    tryBuildGenericFileSystemChildPath true "data" name
+                    |> expectErrorContaining expectedMessagePart
+                )
+
+                tryBuildGenericFileSystemRenameTargetPath true false "data/report.xlsx" "~$report.xlsx"
+                |> expectErrorContaining lockMessage
+
+                // Folders named like lock files stay visible in the tree, so only the staging name is rejected for folders.
+                match tryBuildGenericFileSystemChildPath false "data" "~$archive.old" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("data/~$archive.old")
+                | Error errorMessage -> failwith errorMessage
+
+                match tryBuildGenericFileSystemRenameTargetPath false false "data/archive" "~$archive.old" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("data/~$archive.old")
+                | Error errorMessage -> failwith errorMessage
+
+                tryBuildGenericFileSystemChildPath false "data" stagingName
+                |> expectErrorContaining "import staging folders"
+
+                tryBuildGenericFileSystemRenameTargetPath false false "data/archive" stagingName
+                |> expectErrorContaining "import staging folders"
+        )
+
+        Vitest.test (
+            "files with an import staging name are rejected when created or renamed to",
+            fun () ->
+                let stagingName = $".swate-import-{hex32 'd'}"
+
+                tryBuildGenericFileSystemChildPath true "data" stagingName
+                |> expectErrorContaining "so the file would not show changes"
+
+                tryBuildGenericFileSystemRenameTargetPath true false "data/report.xlsx" stagingName
+                |> expectErrorContaining "so the file would not show changes"
+        )
+
+        Vitest.test (
+            "items inside an import staging folder cannot be renamed, the staging folder itself can",
+            fun () ->
+                let stagingFolder = $"data/.swate-import-{hex32 'e'}"
+
+                [ true; false ]
+                |> List.iter (fun isFile ->
+                    tryBuildGenericFileSystemRenameTargetPath isFile false $"{stagingFolder}/item" "renamed"
+                    |> expectErrorContaining "the renamed item would not show up"
+                )
+
+                match tryBuildGenericFileSystemRenameTargetPath false false stagingFolder "restored" with
+                | Ok targetPath -> Vitest.expect(targetPath).toBe ("data/restored")
+                | Error errorMessage -> failwith errorMessage
+        )
+
+        Vitest.test (
+            "rename targets get the same per-cause messages as new items",
+            fun () ->
+                tryBuildGenericFileSystemRenameTargetPath true false "assays/AssayA/notes.txt" "isa.assay.xlsx"
+                |> expectErrorContaining "'isa.assay.xlsx' is reserved for ARC metadata."
+
+                tryBuildGenericFileSystemRenameTargetPath false false "assays/AssayA/old" "dataset"
+                |> expectErrorContaining "'dataset' is a folder that ARCitISA manages inside a study or assay."
+
+                tryBuildGenericFileSystemRenameTargetPath false false "data/old" ".git"
+                |> expectErrorContaining gitFolderMessage
+        )
+
+        Vitest.test (
+            "nothing can be created inside an import staging folder",
+            fun () ->
+                let stagingFolder = $"data/.swate-import-{hex32 'c'}"
+
+                [ true; false ]
+                |> List.iter (fun isFile ->
+                    tryBuildGenericFileSystemChildPath isFile stagingFolder "notes.txt"
+                    |> expectErrorContaining "does not watch import staging folders"
+
+                    tryBuildGenericFileSystemChildPath isFile $"{stagingFolder}/inner" "notes.txt"
+                    |> expectErrorContaining "does not watch import staging folders"
                 )
         )
 
@@ -176,7 +426,7 @@ Vitest.describe (
                 )
 
                 tryBuildGenericFileSystemChildPath false "" "README.md"
-                |> expectErrorContaining targetRejectedMessage
+                |> expectErrorContaining protectedNameMessage
 
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "README.md").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/AssayA/README.md").toBe (false)
@@ -198,7 +448,7 @@ Vitest.describe (
                     |> expectErrorContaining "only allowed inside safe ARC directories"
 
                     tryBuildGenericFileSystemChildPath true zone ".gitkeep"
-                    |> expectErrorContaining targetRejectedMessage
+                    |> expectErrorContaining protectedNameMessage
                 )
         )
 
@@ -235,15 +485,15 @@ Vitest.describe (
         Vitest.test (
             "files directly inside add zones are generic rename targets",
             fun () ->
-                match tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "summary.md" with
+                match tryBuildGenericFileSystemRenameTargetPath true true "studies/overview.md" "summary.md" with
                 | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/summary.md")
                 | Error errorMessage -> failwith errorMessage
 
-                tryBuildGenericFileSystemRenameTargetPath false "studies/StudyA" "StudyB"
+                tryBuildGenericFileSystemRenameTargetPath false false "studies/StudyA" "StudyB"
                 |> expectErrorContaining "rename is only allowed for safe non-canonical paths"
 
-                tryBuildGenericFileSystemRenameTargetPath true "studies/overview.md" "README.md"
-                |> expectErrorContaining targetRejectedMessage
+                tryBuildGenericFileSystemRenameTargetPath true true "studies/overview.md" "README.md"
+                |> expectErrorContaining protectedNameMessage
         )
 
         Vitest.test (
@@ -254,14 +504,14 @@ Vitest.describe (
                     tryBuildGenericFileSystemChildPath true zone "Entity1"
                     |> expectErrorContaining extensionRequiredMessage
 
-                    tryBuildGenericFileSystemRenameTargetPath true $"{zone}/overview.md" "Entity1"
+                    tryBuildGenericFileSystemRenameTargetPath true true $"{zone}/overview.md" "Entity1"
                     |> expectErrorContaining extensionRequiredMessage
                 )
 
                 // Existing extensionless files stay deletable and renamable to a name with an extension.
                 Vitest.expect(ArcEntityPathRules.isItemDeletePathAllowed true "studies/LICENSE").toBe (true)
 
-                match tryBuildGenericFileSystemRenameTargetPath true "studies/LICENSE" "LICENSE.md" with
+                match tryBuildGenericFileSystemRenameTargetPath true true "studies/LICENSE" "LICENSE.md" with
                 | Ok targetPath -> Vitest.expect(targetPath).toBe ("studies/LICENSE.md")
                 | Error errorMessage -> failwith errorMessage
 
@@ -283,13 +533,13 @@ Vitest.describe (
                     Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath $"{zone}/.DS_Store").toBe (true)
                     Vitest.expect(ArcEntityPathRules.isAddZoneRootChildPath $"{zone}/Entity1/notes.md").toBe (false)
 
-                    match tryBuildGenericFileSystemRenameTargetPath true $"{zone}/.DS_Store" "notes.md" with
+                    match tryBuildGenericFileSystemRenameTargetPath true true $"{zone}/.DS_Store" "notes.md" with
                     | Ok targetPath -> Vitest.expect(targetPath).toBe ($"{zone}/notes.md")
                     | Error errorMessage -> failwith errorMessage
 
                     // The file rules let a dot file become an entity-shaped path, so the extension rule
                     // is what keeps it from shadowing an entity identifier.
-                    tryBuildGenericFileSystemRenameTargetPath true $"{zone}/.DS_Store" "Entity1"
+                    tryBuildGenericFileSystemRenameTargetPath true true $"{zone}/.DS_Store" "Entity1"
                     |> expectErrorContaining extensionRequiredMessage
                 )
         )

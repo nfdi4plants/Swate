@@ -17,11 +17,15 @@ type Events =
     | Raw
     | All
 
+/// The part of fs.Stats that chokidar hands to an ignored function.
+type IWatchStats =
+    abstract member isDirectory: unit -> bool
+
 [<Pojo>]
 type WatchOptions
     (
         ?persistent: bool,
-        ?ignored: U3<string, ResizeArray<string>, string -> bool>,
+        ?ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, IWatchStats option, bool>>,
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,

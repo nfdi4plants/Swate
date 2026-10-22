@@ -274,7 +274,8 @@ module ArcEntityPathRules =
         else
             None
 
-    let private isCanonicalArcFileName (fileName: string) =
+    /// True for the file names ARCtrl reads as ARC metadata, such as `isa.assay.xlsx`, wherever they are.
+    let isCanonicalArcFileName (fileName: string) =
         PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.InvestigationFileName
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.StudyFileName
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.AssayFileName
@@ -282,9 +283,23 @@ module ArcEntityPathRules =
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.RunFileName
         || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.DataMapFileName
 
-    let private containsDisallowedGenericPathSegment (segments: string[]) =
-        segments
-        |> Array.exists (PathHelpers.pathMatchesAny disallowedGenericPathSegments)
+    /// The outdated DataMap file name. Loading an ARC renames such a file to `isa.datamap.xlsx`.
+    let legacyDataMapFileName = "isa_datamap"
+
+    let isLegacyDataMapFileName (fileName: string) =
+        PathHelpers.pathsEqual fileName legacyDataMapFileName
+
+    /// Rename and delete refuse items with these names, files and folders alike.
+    let isProtectedName (name: string) =
+        PathHelpers.pathMatchesAny protectedDeleteTargetNames name
+
+    let isArcManagedGitFileName (fileName: string) =
+        PathHelpers.pathMatchesAny protectedDeleteTargetNames fileName
+        && not (PathHelpers.pathMatchesAny creatableProtectedFileNames fileName)
+
+    /// True for a single path segment, such as `.git`, that no generic file or folder path may contain.
+    let isDisallowedGenericPathSegment (segment: string) =
+        PathHelpers.pathMatchesAny disallowedGenericPathSegments segment
 
     /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
     let tryParseCanonicalArcFileTarget (path: string) =
@@ -374,7 +389,7 @@ module ArcEntityPathRules =
             false
         else
             segments.Length >= 1
-            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (segments |> Array.exists isDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
             && not isBlockedStructuralPath
 
@@ -409,6 +424,47 @@ module ArcEntityPathRules =
     /// protected file such as `readme.md` may be created.
     let isGenericFileSystemCreateTargetAllowed (isFile: bool) (relativePath: string) =
         isGenericFileSystemPathAllowed true isFile relativePath
+
+    /// The user-facing reason why `isGenericFileSystemCreateTargetAllowed` rejects a path, or `None` when it is allowed.
+    let describeBlockedGenericCreateTarget (isFile: bool) (relativePath: string) : string option =
+        if isGenericFileSystemCreateTargetAllowed isFile relativePath then
+            None
+        else
+            let normalizedRelativePath = normalizeRelativePath relativePath
+            let segments = normalizedRelativePath |> splitPathSegments
+            let name = PathHelpers.getFileName normalizedRelativePath
+
+            let structuralPath =
+                if String.IsNullOrWhiteSpace normalizedRelativePath then
+                    StructuralArcPath.OtherPath
+                else
+                    classifyStructuralArcPath segments
+
+            let isBlockedStructuralPath =
+                match structuralPath with
+                | StructuralArcPath.EntityFolder when isFile -> false
+                | _ -> blocksGenericFileSystemTarget structuralPath
+
+            if not (String.IsNullOrWhiteSpace name) && isCanonicalArcFileName name then
+                Some $"'{name}' is reserved for ARC metadata."
+            elif isBlockedStructuralPath then
+                match structuralPath with
+                | StructuralArcPath.AddZoneRoot ->
+                    Some $"'{name}' is one of the ARC's main folders, which ARCitISA manages itself."
+                | StructuralArcPath.ProtectedEntityChildFolder ->
+                    Some $"'{name}' is a folder that ARCitISA manages inside a study or assay."
+                | _ ->
+                    Some
+                        $"'{name}' is a study, assay, workflow or run folder, which ARCitISA creates through its own dialogs."
+            elif segments |> Array.exists isDisallowedGenericPathSegment then
+                Some "'.git' is not allowed inside an ARC."
+            elif
+                not (String.IsNullOrWhiteSpace normalizedRelativePath)
+                && PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+            then
+                Some $"ARCitISA protects the name '{name}', so it could not be renamed or deleted afterwards."
+            else
+                Some "The path must stay inside the ARC."
 
     let tryNormalizeGenericFileSystemTarget (errorMessage: string) (relativePath: string) : Result<string, string> =
         let normalizedRelativePath = normalizeRelativePath relativePath
@@ -545,7 +601,7 @@ module ArcEntityPathRules =
             let structuralPath = classifyStructuralArcPath segments
 
             structuralPath <> StructuralArcPath.AddZoneRoot
-            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (segments |> Array.exists isDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
 
     /// Checks whether a new generic file or folder may be created inside `relativePath`.

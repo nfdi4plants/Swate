@@ -16,17 +16,6 @@ open VersionControlService.Abstractions
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
 
-let private shouldIgnoreDirName (name: string) = name = ".git"
-
-let private shouldIgnorePath (path: string) =
-    let normalizedPath = PathHelpers.normalizeSeparators path
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
-
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
-    || isLegacyDataMapPath normalizedPath
-
 let private tryListLargeObjects
     (repoRoot: string)
     (openSession: bool)
@@ -220,14 +209,14 @@ let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<Fi
                 let isDir = dirent.isDirectory ()
 
                 if isDir then
-                    if not (shouldIgnoreDirName name) then
+                    if not (isHiddenArcFolderName name) then
                         let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
                         entries.Add(FileEntry.create (name, fullPath, true, None))
                         stack.Add(fullPath)
                 else
                     let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
 
-                    if not (shouldIgnorePath fullPath) then
+                    if not (isHiddenArcFilePath fullPath) then
                         entries.Add(FileEntry.create (name, fullPath, false, None))
             )
 

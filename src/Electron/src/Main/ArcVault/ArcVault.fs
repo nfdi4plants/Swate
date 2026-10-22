@@ -36,6 +36,20 @@ exception ArcCreatedButClosedException of targetWindowId: int
 /// Tests shorten this delay to cover timeout behavior without waiting 30 seconds.
 let mutable closeWaitTimeoutMilliseconds = 30000
 
+/// A completed import keeps its marks until the watcher has reported none of its paths for the quiet time,
+/// and at most for the maximum time after the import completed. Polling reports a large import over many
+/// seconds, so a fixed time drops marks while events still arrive. A native watcher can miss events, so a
+/// mark must not wait for an event forever.
+let private importedPathQuietMilliseconds = 30000
+let private importedPathMaximumMilliseconds = 300000
+
+type internal ImportedPathLease = {
+    mutable Paths: string[]
+    mutable CompletedAt: float option
+    mutable LastActivity: float
+    mutable Timer: int option
+}
+
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
     Fable.Core.JS.setTimeout onElapsed suppressionMs
@@ -49,6 +63,28 @@ type WatcherMergeOutcome =
     | Deferred
     /// Snapshot loading or merging failed, so the caller can publish the tree batch after logging the error.
     | Failed of exn
+
+/// Keeps the paths that exist. It checks 64 paths at a time and logs each skipped path.
+let private filterExistingPathsAsync (windowId: int) (paths: string[]) : JS.Promise<string[]> = promise {
+    let existing = ResizeArray<string>()
+
+    for batch in Array.chunkBySize 64 paths do
+        let! results =
+            batch
+            |> Array.map (fun path -> lstatAsync path |> Promise.map (fun _ -> true) |> Promise.catch (fun _ -> false))
+            |> Promise.all
+
+        Array.iteri
+            (fun index exists ->
+                if exists then
+                    existing.Add batch.[index]
+                else
+                    swatelogfn windowId "Skipped imported item '%s' because it no longer exists." batch.[index]
+            )
+            results
+
+    return existing.ToArray()
+}
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -78,13 +114,17 @@ type ArcVault(window: BrowserWindow) =
     member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
+    member val internal watcherUsesPolling: bool = false with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     /// The barrier stays None outside tests. The watcher path awaits it between snapshot loading and the final eligibility check.
     member val internal WatcherMergeBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
-    /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
-    member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
+    /// Imported paths (lowercased absolute) mapped to the import that claimed them, and the latest claim wins.
+    /// Chokidar creation events for these paths update the tree but must not re-merge the import.
+    member val internal importedPathOwners: Dictionary<string, int> = Dictionary() with get
+    member val internal importedPathLeases: Dictionary<int, ImportedPathLease> = Dictionary() with get
+    member val internal nextImportToken: int = 0 with get, set
     member val private isBusyWritingValue: bool = false with get, set
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
@@ -290,6 +330,47 @@ module ArcVaultExtensions =
                                     fileTreeError.Message
 
                         if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
+                            this.SetFileTree(nextFileTree)
+                })
+
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
+        /// The watcher reports imported items only after its stability wait and a native watcher can miss them,
+        /// so a completed import adds them itself. Imported files are new to Git, so they have no large-object state yet.
+        /// A later watcher event for the same path replaces the entry.
+        member this.AddImportedEntriesToFileTree(folderPaths: string[], filePaths: string[]) : JS.Promise<unit> =
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            let queuedUpdate =
+                this.FileTreeUpdateTail
+                |> Promise.bind (fun () -> promise {
+                    // The existence checks run before the synchronous tree section, because a blocking check per
+                    // path would stall the main process for a large import. The import has just created these
+                    // paths, so a plain existence check is enough.
+                    let! existingFolderPaths = filterExistingPathsAsync this.window.id folderPaths
+                    let! existingFilePaths = filterExistingPathsAsync this.window.id filePaths
+
+                    match this.path with
+                    | None -> ()
+                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                    | Some _ ->
+                        // Nothing is awaited between reading the tree and replacing it, so no other update can interleave.
+                        // The tree is copied once because copying it per item is quadratic for large imports.
+                        let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+
+                        let addEntries isDirectory (importedPaths: string[]) =
+                            for importedPath in importedPaths do
+                                nextFileTree.[importedPath] <-
+                                    FileEntry.create (basename importedPath, importedPath, isDirectory, None)
+
+                        addEntries true existingFolderPaths
+                        addEntries false existingFilePaths
+
+                        if
+                            existingFolderPaths.Length + existingFilePaths.Length > 0
+                            && capturedWatcherEpoch = this.WatcherEpoch
+                        then
                             this.SetFileTree(nextFileTree)
                 })
 
@@ -554,12 +635,7 @@ module ArcVaultExtensions =
 
                 WatcherHelpers.queueFileWatcherEvent
                     (fun event ->
-                        let isImportedPath =
-                            this.importedFileWatcherPaths.Remove(
-                                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                            )
-
-                        not isImportedPath
+                        not (this.IsImportedWatcherEvent event)
                         && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
                     )
                     this.path
@@ -700,7 +776,9 @@ module ArcVaultExtensions =
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
+                    let usePolling = resolveFileWatcherPolling usePolling
+                    let watcher = createFileWatcher this.path.Value (Some usePolling)
+                    this.watcherUsesPolling <- usePolling
 
                     let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
@@ -721,7 +799,12 @@ module ArcVaultExtensions =
             this.fileWatcherReloadArcTimeout <- None
             this.fileWatcherPendingEvents.Clear()
             this.fileWatcherPendingArcMergeEvents.Clear()
-            this.importedFileWatcherPaths.Clear()
+
+            for lease in this.importedPathLeases.Values do
+                lease.Timer |> Option.iter Fable.Core.JS.clearTimeout
+
+            this.importedPathLeases.Clear()
+            this.importedPathOwners.Clear()
 
         member this.StopFileWatcher() = promise {
             match this.watcher with
@@ -735,6 +818,128 @@ module ArcVaultExtensions =
             this.watcher <- None
             this.ClearPendingFileWatcherState()
         }
+
+        member this.StartImport() : int =
+            this.nextImportToken <- this.nextImportToken + 1
+            this.nextImportToken
+
+        /// Marks the paths of the events as written by the import with this token. A later claim of the same path
+        /// takes the mark over from an earlier import.
+        member this.ClaimImportedFileEvents(token: int, events: ArcVaultFileSystemEvent seq) =
+            let keys =
+                events
+                |> Seq.map (fun event -> event.AbsolutePath.ToLowerInvariant())
+                |> Seq.toArray
+
+            for key in keys do
+                this.importedPathOwners.[key] <- token
+
+            match this.importedPathLeases.TryGetValue token with
+            | true, lease -> lease.Paths <- Array.append lease.Paths keys |> Array.distinct
+            | _ ->
+                this.importedPathLeases.[token] <- {
+                    Paths = Array.distinct keys
+                    CompletedAt = None
+                    LastActivity = Main.Bindings.Node.performanceNow ()
+                    Timer = None
+                }
+
+        member private this.ReleaseImport(token: int) =
+            match this.importedPathLeases.TryGetValue token with
+            | true, lease ->
+                lease.Timer |> Option.iter Fable.Core.JS.clearTimeout
+                lease.Timer <- None
+
+                for key in lease.Paths do
+                    match this.importedPathOwners.TryGetValue key with
+                    | true, owner when owner = token -> this.importedPathOwners.Remove key |> ignore
+                    | _ -> ()
+
+                this.importedPathLeases.Remove token |> ignore
+            | _ -> ()
+
+        member private this.ImportedLeaseDeadline(lease: ImportedPathLease) : float =
+            match lease.CompletedAt with
+            | Some completedAt ->
+                min
+                    (completedAt + float importedPathMaximumMilliseconds)
+                    ((max completedAt lease.LastActivity) + float importedPathQuietMilliseconds)
+            | None -> infinity
+
+        member private this.ArmImportRelease(token: int) =
+            match this.importedPathLeases.TryGetValue token with
+            | true, lease when lease.CompletedAt.IsSome ->
+                lease.Timer |> Option.iter Fable.Core.JS.clearTimeout
+
+                let delay =
+                    max 0.0 (this.ImportedLeaseDeadline lease - Main.Bindings.Node.performanceNow ())
+
+                lease.Timer <-
+                    Some(
+                        Fable.Core.JS.setTimeout
+                            (fun () ->
+                                match this.importedPathLeases.TryGetValue token with
+                                | true, current ->
+                                    current.Timer <- None
+
+                                    if Main.Bindings.Node.performanceNow () >= this.ImportedLeaseDeadline current then
+                                        this.ReleaseImport token
+                                    else
+                                        this.ArmImportRelease token
+                                | _ -> ()
+                            )
+                            (int delay)
+                    )
+            | _ -> ()
+
+        /// Ends the marks of an import. A completed import keeps them until the watcher has reported none of its
+        /// paths for the quiet time, and for the maximum time at the latest. A cancelled or failed import
+        /// removed what it wrote, so a later creation event for its paths does not come from the import.
+        /// If that cleanup failed, the leftover files stay unmarked.
+        member this.ReleaseImportedFileEventsAfterImport(token: int, result: Result<ImportExternalFilesResult, exn>) =
+            match result with
+            | Ok ImportExternalFilesResult.Completed ->
+                match this.importedPathLeases.TryGetValue token with
+                | true, lease when lease.CompletedAt.IsNone ->
+                    let now = Main.Bindings.Node.performanceNow ()
+                    lease.CompletedAt <- Some now
+                    lease.LastActivity <- now
+                    this.ArmImportRelease token
+                | _ -> ()
+            | _ -> this.ReleaseImport token
+
+        /// True for a creation event of a path that an import wrote. Only creation events count, so an external
+        /// edit or deletion of an imported path still merges. The mark stays after an event because an old event
+        /// must not use up the mark of a newer import of the same path. A matching call also restarts the quiet
+        /// time of its import, so call it once per watcher event.
+        member this.IsImportedWatcherEvent(event: ArcVaultFileSystemEvent) : bool =
+            let isCreation =
+                WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                || WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName
+
+            if not isCreation then
+                false
+            else
+                match this.importedPathOwners.TryGetValue(event.AbsolutePath.ToLowerInvariant()) with
+                | true, token ->
+                    match this.importedPathLeases.TryGetValue token with
+                    | true, lease ->
+                        let now = Main.Bindings.Node.performanceNow ()
+
+                        if lease.CompletedAt.IsSome && now >= this.ImportedLeaseDeadline lease then
+                            this.ReleaseImport token
+                            false
+                        else
+                            lease.LastActivity <- now
+                            true
+                    | _ -> false
+                | _ -> false
+
+        member this.WatchImportedFolders(absoluteFolderPaths: string[]) =
+            match this.watcher with
+            | Some watcher when not this.watcherUsesPolling && absoluteFolderPaths.Length > 0 ->
+                watcher.add absoluteFolderPaths
+            | _ -> ()
 
         member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()

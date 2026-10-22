@@ -248,6 +248,11 @@ let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan
             || PathHelpers.containsPathTraversalSegments normalizedName
         then
             Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
+        elif isTemporaryImportPath normalizedName then
+            Error(
+                exn
+                    "ARCitISA uses names like this for import staging folders and does not watch them, so no change in the ARC would show up."
+            )
         else
             let sourcePath = resolveAbsolutePath arcPath
             let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>
@@ -357,30 +362,43 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let isFileWatcherPathIgnored (path: string) =
+/// Decides whether the file watcher ignores a path. The watcher hides the same names as the file tree,
+/// which applies the names of hidden files (such as lock files) to files only, so a folder named like a
+/// lock file is watched like any other folder. Git metadata and staging paths are ignored for both.
+/// An unknown kind (None) is treated like a folder. Chokidar first asks without stats and repeats the
+/// question with stats before it watches a path, so a file is still judged as a file.
+let isFileWatcherPathIgnoredFor (path: string) (isDirectory: bool option) =
     let normalizedPath = PathHelpers.normalizeSeparators path
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || isGitMetadataPath normalizedPath
-    || isLegacyDataMapPath normalizedPath
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
+    isGitMetadataPath normalizedPath
+    || isTemporaryImportPath normalizedPath
+    || (isDirectory = Some false && isHiddenArcFilePath normalizedPath)
+
+/// Ignores a path known to be a file.
+let isFileWatcherPathIgnored (path: string) =
+    isFileWatcherPathIgnoredFor path (Some false)
+
+/// The function chokidar calls. It passes the stats when it has them.
+let internal isFileWatcherPathIgnoredByStats (path: string) (stats: Chokidar.IWatchStats option) =
+    stats
+    |> Option.map (fun stats -> stats.isDirectory ())
+    |> isFileWatcherPathIgnoredFor path
+
+/// Decides whether the file watcher polls. Without an explicit choice it polls on Windows only,
+/// because native Windows file events can keep handles that block app-initiated folder renames.
+let resolveFileWatcherPolling (usePolling: bool option) =
+    defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
 
 let createFileWatcher (path: string) (usePolling: bool option) =
 
-    // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling =
-        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+    let usePolling = resolveFileWatcherPolling usePolling
 
     let watcherOptions =
         if usePolling then
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^System.Func<string, Chokidar.IWatchStats option, bool>(isFileWatcherPathIgnoredByStats),
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
@@ -390,7 +408,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^System.Func<string, Chokidar.IWatchStats option, bool>(isFileWatcherPathIgnoredByStats),
                 ignoreInitial = true
             )
 

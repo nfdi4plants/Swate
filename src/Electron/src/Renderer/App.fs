@@ -305,7 +305,7 @@ let Main () =
                     (fun () -> Api.ipcArcVaultApi.getFileTree ()),
                     {
                         loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
-                        pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()
+                        pickAbsolutePaths = Api.ipcArcVaultApi.pickAbsolutePaths
                         runImport = Api.ipcArcVaultApi.tryImportExternalFiles
                         cancelImport = Api.ipcArcVaultApi.cancelImportExternalFiles
                     },

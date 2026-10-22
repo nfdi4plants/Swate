@@ -3,12 +3,14 @@ module Main.IPC.FileSystemIO
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Main.ArcVaultTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open VersionControlService.Git.TextDiff
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -45,6 +47,13 @@ module ArcPathValidation =
 
 let resolveAbsolutePath (pathValue: string) =
     pathDynamic?resolve (pathValue) |> unbox<string>
+
+let tryResolveRealPathAsync (absolutePath: string) : JS.Promise<string> = promise {
+    try
+        return! realpathAsync absolutePath
+    with _ ->
+        return absolutePath
+}
 
 let tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
     let arcRoot = resolveAbsolutePath arcPath
@@ -206,15 +215,23 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
 
-    exception private ImportCancelledException
+    exception internal ImportCancelledException
 
-    type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
+    type private ExternalFileImportEntry = {
+        SourcePath: string
+        RelativePath: string
+        IsDirectory: bool
+        IsGeneratedGitKeep: bool
+    }
 
     type private ExternalFileImportPlan = {
         TargetDirectory: string
         TemporaryDirectory: string
         Entries: ExternalFileImportEntry[]
     }
+
+    let private isTopLevelImportEntry (entry: ExternalFileImportEntry) =
+        PathHelpers.tryGetParentPath entry.RelativePath |> Option.isNone
 
     let createTemporaryImportDirectoryName () =
         let guid = Guid.NewGuid().ToString("N")
@@ -253,85 +270,445 @@ module ArcFileSystemHelper =
             return! ensureDirectory targetDirectory $"Cannot import because '{targetRelativePath}' is not a folder."
     }
 
-    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
-        let entries =
-            sourcePaths
-            |> Array.map (fun sourcePath ->
-                let absolutePath = resolveAbsolutePath sourcePath
+    let private importEntry sourcePath relativePath isDirectory = {
+        SourcePath = sourcePath
+        RelativePath = relativePath
+        IsDirectory = isDirectory
+        IsGeneratedGitKeep = false
+    }
 
-                {
-                    SourcePath = absolutePath
-                    FileName = basename absolutePath
-                }
-            )
+    let private symbolicLinkImportError path =
+        exn $"Cannot import '{path}' because it is a symbolic link."
 
-        let duplicateName =
-            entries
-            |> Array.groupBy (fun entry -> entry.FileName.ToLowerInvariant())
-            |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
+    /// Uses the strict pointer parser, so only the exact layout git-lfs writes counts as a pointer.
+    /// A text file that merely starts like a pointer passes this check and is imported with its content.
+    let private isGitLfsPointerFileAsync (absolutePath: string) = promise {
+        let! stats = statAsync absolutePath
 
-        match duplicateName with
-        | Some(_, duplicates) -> raise (exn $"Cannot import multiple files named '{duplicates.[0].FileName}'.")
-        | None -> ()
+        if stats.size > float TextDiffLfsPointer.MaximumPointerBytes then
+            return false
+        else
+            let! bytes = readFileBytesAsync absolutePath
+            return (TextDiffLfsPointer.tryParseStrict bytes).IsSome
+    }
 
-        for entry in entries do
-            let destinationPath = join [| targetDirectory; entry.FileName |]
+    let private gitLfsPointerImportError (importedPath: string) =
+        exn
+            $"Cannot import '{importedPath}' because it is only a Git LFS pointer, not the file's content. Download the file in its ARC first."
 
-            match!
-                ensureTargetDoesNotExist
-                    destinationPath
-                    $"Cannot import '{entry.FileName}' because a file with that name already exists."
-            with
-            | Ok() -> ()
-            | Error targetError -> raise targetError
+    let private rejectGitLfsPointerFileAsync (absolutePath: string) (importedPath: string) = promise {
+        let! isPointer = isGitLfsPointerFileAsync absolutePath
 
-        return {
-            TargetDirectory = targetDirectory
-            // The watcher explicitly ignores this operation-owned directory and its contents.
-            TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
-            Entries = entries
+        if isPointer then
+            raise (gitLfsPointerImportError importedPath)
+    }
+
+    /// The check opens and reads each small file, so an unbounded pass over a large folder could run out of file handles.
+    let private gitLfsPointerCheckConcurrency = 16
+
+    /// Maps items with at most `limit` mappings in flight and keeps the result order.
+    /// It raises ImportCancelledException once `isCancellationRequested` is true, and after one mapping
+    /// fails the others start no new items.
+    let internal mapWithConcurrencyAsync
+        (limit: int)
+        (isCancellationRequested: unit -> bool)
+        (mapping: 'T -> JS.Promise<'U>)
+        (items: 'T[])
+        : JS.Promise<'U[]> =
+        let results: 'U[] = Array.zeroCreate items.Length
+        let nextIndex = ref 0
+        let stopped = ref false
+
+        // The checks and the index claim run in one synchronous step, so no worker claims an index past the end
+        // after another worker took the last one.
+        let rec worker () : JS.Promise<unit> =
+            if stopped.Value then
+                Promise.lift ()
+            elif isCancellationRequested () then
+                stopped.Value <- true
+                Promise.reject ImportCancelledException
+            else
+                let index = nextIndex.Value
+
+                if index >= items.Length then
+                    Promise.lift ()
+                else
+                    nextIndex.Value <- index + 1
+
+                    mapping items.[index]
+                    |> Promise.bind (fun result ->
+                        results.[index] <- result
+                        worker ()
+                    )
+                    |> Promise.catchBind (fun error ->
+                        stopped.Value <- true
+                        Promise.reject error
+                    )
+
+        if items.Length = 0 then
+            Promise.lift results
+        else
+            Promise.all [|
+                for _ in 1 .. max 1 (min limit items.Length) -> worker ()
+            |]
+            |> Promise.map (fun _ -> results)
+
+    let private whitespaceNameImportError (path: string) =
+        exn $"Cannot import '{path}' because its name starts or ends with a space."
+
+    let private disallowedSegmentImportError (displayPath: string) (name: string) =
+        exn $"Cannot import '{displayPath}' because '{name}' is not allowed inside an ARC."
+
+    let private protectedFolderImportError (displayPath: string) (name: string) =
+        exn
+            $"Cannot import '{displayPath}' because ARCitISA protects the name '{name}', so the folder could not be renamed or deleted afterwards."
+
+    /// Decides whether the import leaves a name out. The import leaves out staging folders
+    /// (`.swate-import-<32 hex>`) and the files that the watcher ignores or the ARC manages itself, such as
+    /// Excel lock files and `.gitkeep`. A staging folder is a leftover copy from an earlier import, so it never
+    /// belongs to the imported data. A folder with any other name is user data and is imported, even one named
+    /// like a lock file or a Git LFS backup. The picked-item check rejects a name that this rule leaves out.
+    let private isLeftOutOfImport (isDirectory: bool) (relativePath: string) (name: string) =
+        if isDirectory then
+            isTemporaryImportPath name
+        else
+            Main.ArcVaultHelper.isFileWatcherPathIgnored relativePath
+            || ArcEntityPathRules.isArcManagedGitFileName name
+
+    /// Lists an imported source folder and everything inside it, every folder before its contents.
+    /// The walk rejects ARC file names, because the ARC merge would read a copy such as
+    /// `backup/assays/A/isa.assay.xlsx` as the real assay A. It rejects symbolic links, because
+    /// following one could copy data from outside the picked folder or loop forever. `createExternalFileImportPlan`
+    /// rejects Git LFS pointer files after this walk, because they only stand in for data that was never downloaded.
+    /// The walk skips the names `isLeftOutOfImport` selects and does not report them as errors.
+    /// It rejects a folder named like a protected file, such as `.gitkeep` or `README.md`, because
+    /// ARCitISA could never rename or delete it afterwards.
+    /// It also rejects names inside one folder that differ only by case, because they collide on Windows and macOS.
+    /// Every nested name passes the same name check as a picked item, so a name with a backslash, which
+    /// Linux and macOS allow, cannot become a phantom folder in the ARC. A name with leading or trailing
+    /// white space fails too, because ARCitISA trims paths when it renames or deletes.
+    let rec private collectExternalFolderEntries
+        isCancellationRequested
+        (sourceDirectory: string)
+        (relativeDirectory: string)
+        =
+        promise {
+            let! dirents = readdirWithTypesAsync sourceDirectory (ReaddirOptions(withFileTypes = true))
+            let entries = ResizeArray [ importEntry sourceDirectory relativeDirectory true ]
+            let seenNames = System.Collections.Generic.HashSet<string>()
+
+            for dirent in dirents |> Array.sortBy _.name do
+                if isCancellationRequested () then
+                    raise ImportCancelledException
+
+                let sourcePath = join [| sourceDirectory; dirent.name |]
+                let relativePath = $"{relativeDirectory}/{dirent.name}"
+
+                match validateRenameName dirent.name with
+                | Error validationError -> raise (exn $"Cannot import '{relativePath}': {validationError}")
+                | Ok trimmed when trimmed <> dirent.name -> raise (whitespaceNameImportError relativePath)
+                | Ok _ -> ()
+
+                if ArcEntityPathRules.isDisallowedGenericPathSegment dirent.name then
+                    raise (disallowedSegmentImportError relativePath dirent.name)
+                elif ArcEntityPathRules.isCanonicalArcFileName dirent.name then
+                    raise (exn $"Cannot import '{relativePath}' because '{dirent.name}' is reserved for ARC metadata.")
+                elif ArcEntityPathRules.isLegacyDataMapFileName dirent.name then
+                    raise (exn $"Cannot import '{relativePath}': {legacyDataMapNameError}")
+
+                let! isLink, isDirectory, isFile =
+                    if dirent.isSymbolicLink () then
+                        lstatAsync sourcePath
+                        |> Promise.map (fun stats -> stats.isSymbolicLink (), stats.isDirectory (), stats.isFile ())
+                    else
+                        Promise.lift (false, dirent.isDirectory (), dirent.isFile ())
+
+                if isDirectory && ArcEntityPathRules.isProtectedName dirent.name then
+                    raise (protectedFolderImportError relativePath dirent.name)
+
+                if isLeftOutOfImport isDirectory relativePath dirent.name then
+                    ()
+                elif not (seenNames.Add(dirent.name.ToLowerInvariant())) then
+                    raise (
+                        exn
+                            $"Cannot import '{relativePath}' because its folder already contains an item with the same name, ignoring case."
+                    )
+                elif isLink then
+                    raise (symbolicLinkImportError relativePath)
+                elif isDirectory then
+                    let! folderEntries = collectExternalFolderEntries isCancellationRequested sourcePath relativePath
+
+                    entries.AddRange folderEntries
+                elif isFile then
+                    entries.Add(importEntry sourcePath relativePath false)
+                else
+                    raise (exn $"Cannot import '{relativePath}' because it is neither a file nor a folder.")
+
+            return entries.ToArray()
         }
+
+    let private isImportIntoItselfAsync targetDirectory sourceDirectory = promise {
+        if PathHelpers.isSameOrDescendantPathForFsComparison targetDirectory sourceDirectory then
+            return true
+        else
+            let! realTargetDirectory = tryResolveRealPathAsync targetDirectory
+            let! realSourceDirectory = tryResolveRealPathAsync sourceDirectory
+            return PathHelpers.isSameOrDescendantPathForFsComparison realTargetDirectory realSourceDirectory
+    }
+
+    /// Checks one picked file or folder and returns its entry, without looking inside a folder.
+    /// A picked file link is followed and its content is copied. A picked folder link is rejected
+    /// like a nested one.
+    let private inspectPickedItemAsync targetRelativePath targetDirectory sourcePath = promise {
+        let absolutePath = resolveAbsolutePath sourcePath
+        let name = basename absolutePath
+
+        if System.String.IsNullOrWhiteSpace name then
+            raise (exn "Cannot import a whole drive. Pick a folder on the drive instead.")
+
+        let! sourceLinkStats = lstatAsync absolutePath
+        let isLink = sourceLinkStats.isSymbolicLink ()
+
+        let! sourceStats =
+            if isLink then
+                statAsync absolutePath
+            else
+                Promise.lift sourceLinkStats
+
+        let isDirectory = sourceStats.isDirectory ()
+
+        match validateRenameName name with
+        | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
+        | Ok trimmed when trimmed <> name -> raise (whitespaceNameImportError name)
+        | Ok _ -> ()
+
+        if ArcEntityPathRules.isDisallowedGenericPathSegment name then
+            raise (disallowedSegmentImportError name name)
+
+        if ArcEntityPathRules.isLegacyDataMapFileName name then
+            raise (exn $"Cannot import '{name}': {legacyDataMapNameError}")
+
+        if isDirectory && ArcEntityPathRules.isProtectedName name then
+            raise (protectedFolderImportError name name)
+
+        if isLeftOutOfImport isDirectory name name then
+            if not isDirectory && isOfficeLockFilePath name then
+                raise (
+                    exn
+                        $"Cannot import '{name}' because it is the lock file of a document that is open in Office or LibreOffice."
+                )
+            elif not isDirectory && ArcEntityPathRules.isArcManagedGitFileName name then
+                raise (exn $"Cannot import '{name}' because the ARC manages its own '{name}' file.")
+            elif not isDirectory && isLfsBackupPath name then
+                raise (exn $"Cannot import '{name}': {lfsBackupNameError}")
+            elif not isDirectory && isTemporaryImportPath name then
+                raise (exn $"Cannot import '{name}': {stagingFileNameError}")
+            else
+                raise (
+                    exn
+                        $"Cannot import '{name}' because ARCitISA reserves names like this for its own files, so ARCitISA would not see changes to it."
+                )
+
+        if ArcEntityPathRules.isCanonicalArcFileName name then
+            raise (exn $"Cannot import '{name}': '{name}' is reserved for ARC metadata.")
+
+        // The import checks for an existing item before the location rules, because a name such as `assays`
+        // or `dataset` is usually managed by ARCitISA at the target and already exists there.
+        match!
+            ensureTargetDoesNotExist
+                (join [| targetDirectory; name |])
+                $"Cannot import '{name}' because an item with that name already exists."
+        with
+        | Ok() -> ()
+        | Error targetError -> raise targetError
+
+        // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
+        match tryBuildGenericFileSystemChildPath (not isDirectory) targetRelativePath name with
+        | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
+        | Ok _ -> ()
+
+        if not isDirectory then
+            do! rejectGitLfsPointerFileAsync absolutePath name
+            return importEntry absolutePath name false
+        elif isLink then
+            return raise (symbolicLinkImportError name)
+        else
+            let! isIntoItself = isImportIntoItselfAsync targetDirectory absolutePath
+
+            if isIntoItself then
+                return raise (exn $"Cannot import folder '{name}' into itself.")
+            else
+                return importEntry absolutePath name true
+    }
+
+    let private createExternalFileImportPlan
+        isCancellationRequested
+        targetRelativePath
+        targetDirectory
+        (sourcePaths: string[])
+        =
+        promise {
+            let pickedEntries = ResizeArray<ExternalFileImportEntry>()
+
+            for sourcePath in sourcePaths do
+                let! pickedEntry = inspectPickedItemAsync targetRelativePath targetDirectory sourcePath
+                pickedEntries.Add pickedEntry
+
+            let duplicateName =
+                pickedEntries.ToArray()
+                |> Array.groupBy (fun entry -> entry.RelativePath.ToLowerInvariant())
+                |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
+
+            match duplicateName with
+            | Some(_, duplicates) -> raise (exn $"Cannot import multiple items named '{duplicates.[0].RelativePath}'.")
+            | None -> ()
+
+            let entries = ResizeArray<ExternalFileImportEntry>()
+
+            for pickedEntry in pickedEntries do
+                if pickedEntry.IsDirectory then
+                    let! folderEntries =
+                        collectExternalFolderEntries
+                            isCancellationRequested
+                            pickedEntry.SourcePath
+                            pickedEntry.RelativePath
+
+                    entries.AddRange folderEntries
+                else
+                    entries.Add pickedEntry
+
+            let nestedFiles =
+                entries
+                |> Seq.filter (fun entry -> not entry.IsDirectory && not (isTopLevelImportEntry entry))
+                |> Seq.toArray
+
+            let! pointerFlags =
+                nestedFiles
+                |> mapWithConcurrencyAsync
+                    gitLfsPointerCheckConcurrency
+                    isCancellationRequested
+                    (fun entry -> isGitLfsPointerFileAsync entry.SourcePath)
+
+            match Array.tryFindIndex id pointerFlags with
+            | Some index -> raise (gitLfsPointerImportError nestedFiles.[index].RelativePath)
+            | None -> ()
+
+            // Git does not track empty folders, so the import writes an empty `.gitkeep` into an imported folder
+            // that would stay empty, like ARCtrl does for its own folders. The entries come after all folders,
+            // which keeps every parent folder ahead of its contents.
+            // One pass collects every folder that holds an entry, so large imports stay linear.
+            let foldersWithContent =
+                System.Collections.Generic.HashSet<string>(
+                    entries
+                    |> Seq.choose (fun entry ->
+                        match entry.RelativePath.LastIndexOf '/' with
+                        | -1 -> None
+                        | index -> Some(entry.RelativePath.Substring(0, index))
+                    )
+                )
+
+            let emptyFolders =
+                entries
+                |> Seq.filter (fun entry -> entry.IsDirectory && not (foldersWithContent.Contains entry.RelativePath))
+                |> Seq.toArray
+
+            for folder in emptyFolders do
+                entries.Add {
+                    SourcePath = ""
+                    RelativePath = folder.RelativePath + "/.gitkeep"
+                    IsDirectory = false
+                    IsGeneratedGitKeep = true
+                }
+
+            return {
+                TargetDirectory = targetDirectory
+                // The watcher explicitly ignores this operation-owned directory and its contents.
+                TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
+                Entries = entries.ToArray()
+            }
+        }
+
+    let private importEntryPath rootDirectory (entry: ExternalFileImportEntry) =
+        Array.append [| rootDirectory |] (entry.RelativePath.Split '/') |> join
+
+    /// Creates a folder that must not exist yet, so an import never merges into an existing folder.
+    let private mkdirExclusiveAsync absolutePath = promise {
+        let! _ = Main.Bindings.Filesystem.mkdirAsync absolutePath (MkdirOptions(recursive = false))
+        return ()
     }
 
     let private copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested = promise {
         do! mkdirAsync plan.TemporaryDirectory
-        onProgress 0.0
+
+        onProgress {
+            step = FileImportStep.Copying
+            completedItems = 0
+            totalItems = plan.Entries.Length
+        }
 
         for sourceIndex, entry in plan.Entries |> Array.indexed do
             if isCancellationRequested () then
                 raise ImportCancelledException
 
-            let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
-            do! copyFileAsync entry.SourcePath temporaryPath 0
-            onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
+            let temporaryPath = importEntryPath plan.TemporaryDirectory entry
+
+            if entry.IsDirectory then
+                do! mkdirExclusiveAsync temporaryPath
+            elif entry.IsGeneratedGitKeep then
+                do! ARCtrl.FileSystemHelper.writeFileTextAsync temporaryPath ""
+            else
+                do! copyFileAsync entry.SourcePath temporaryPath 0
+
+            onProgress {
+                step = FileImportStep.Copying
+                completedItems = sourceIndex + 1
+                totalItems = plan.Entries.Length
+            }
     }
 
     let private copyTemporaryFilesIntoTarget
         (plan: ExternalFileImportPlan)
         (createdTargetPaths: ResizeArray<string>)
+        onProgress
         isCancellationRequested
         =
         promise {
-            for entry in plan.Entries do
+            onProgress {
+                step = FileImportStep.Publishing
+                completedItems = 0
+                totalItems = plan.Entries.Length
+            }
+
+            for entryIndex, entry in plan.Entries |> Array.indexed do
                 if isCancellationRequested () then
                     raise ImportCancelledException
 
-                let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
-                let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
+                let temporaryPath = importEntryPath plan.TemporaryDirectory entry
+                let destinationPath = importEntryPath plan.TargetDirectory entry
 
-                try
-                    do! linkAsync temporaryPath destinationPath
-                with _ ->
-                    // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
-                    // while preserving the no-overwrite contract if linking is unavailable or denied.
-                    do! copyFileAsync temporaryPath destinationPath copyFileExclusiveFlag
+                if entry.IsDirectory then
+                    do! mkdirExclusiveAsync destinationPath
+                else
+                    try
+                        do! linkAsync temporaryPath destinationPath
+                    with _ ->
+                        // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
+                        // while preserving the no-overwrite contract if linking is unavailable or denied.
+                        do! copyFileAsync temporaryPath destinationPath copyFileExclusiveFlag
 
-                createdTargetPaths.Add destinationPath
+                if isTopLevelImportEntry entry then
+                    createdTargetPaths.Add destinationPath
 
                 // A fallback copy cannot be interrupted. Re-check immediately afterward so a
                 // cancellation requested during the copy rolls back the registered destination.
                 if isCancellationRequested () then
                     raise ImportCancelledException
+
+                onProgress {
+                    step = FileImportStep.Publishing
+                    completedItems = entryIndex + 1
+                    totalItems = plan.Entries.Length
+                }
         }
 
     let private cleanupExternalFileImport temporaryDirectory (createdTargetPaths: ResizeArray<string>) = promise {
@@ -339,7 +716,9 @@ module ArcFileSystemHelper =
 
         for createdTargetPath in createdTargetPaths |> Seq.rev do
             match!
-                removePathWithRetriesAsync (fun path -> rmAsync path (RmOptions(force = true))) createdTargetPath
+                removePathWithRetriesAsync
+                    (fun path -> rmAsync path (RmOptions(recursive = true, force = true)))
+                    createdTargetPath
             with
             | Ok() -> ()
             | Error cleanupError -> cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
@@ -381,9 +760,10 @@ module ArcFileSystemHelper =
         (arcPath: string)
         (targetRelativePath: string)
         (sourcePaths: string[])
-        (onProgress: float -> unit)
+        (onProgress: FileImportProgress -> unit)
         (isCancellationRequested: unit -> bool)
-        (onFilesPublished: unit -> unit)
+        (onPathsPlanned: PlannedImportPaths -> unit)
+        (onPublished: string[] -> unit)
         (validateImportedFiles: unit -> JS.Promise<Result<unit, exn>>)
         : JS.Promise<Result<ImportExternalFilesResult, exn>> =
         promise {
@@ -391,13 +771,41 @@ module ArcFileSystemHelper =
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
                 try
-                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
+                    onProgress {
+                        step = FileImportStep.Scanning
+                        completedItems = 0
+                        totalItems = 0
+                    }
+
+                    let! plan =
+                        createExternalFileImportPlan
+                            isCancellationRequested
+                            targetRelativePath
+                            targetDirectory
+                            sourcePaths
+
                     let createdTargetPaths = ResizeArray<string>()
+
+                    onPathsPlanned {
+                        FolderPaths =
+                            plan.Entries
+                            |> Array.filter (fun entry -> entry.IsDirectory)
+                            |> Array.map _.RelativePath
+                        FilePaths =
+                            plan.Entries
+                            |> Array.filter (fun entry -> not entry.IsDirectory)
+                            |> Array.map _.RelativePath
+                    }
 
                     try
                         do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
-                        do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
-                        onFilesPublished ()
+                        do! copyTemporaryFilesIntoTarget plan createdTargetPaths onProgress isCancellationRequested
+
+                        // Reports the absolute paths of the imported top-level folders.
+                        plan.Entries
+                        |> Array.filter (fun entry -> entry.IsDirectory && isTopLevelImportEntry entry)
+                        |> Array.map (importEntryPath plan.TargetDirectory)
+                        |> onPublished
 
                         match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
                         | Ok() -> ()
@@ -410,8 +818,9 @@ module ArcFileSystemHelper =
                         return Ok ImportExternalFilesResult.Completed
                     with importError ->
                         return! externalFileImportFailureResult plan.TemporaryDirectory createdTargetPaths importError
-                with planError ->
-                    return Error planError
+                with
+                | ImportCancelledException -> return Ok ImportExternalFilesResult.Cancelled
+                | planError -> return Error planError
         }
 
     let importExternalFilesOnDisk =
@@ -565,6 +974,19 @@ module ArcFileSystemHelper =
             return false
     }
 
+    /// True when `relativePath` exists and is not a directory, which is how the file tree tells files from folders.
+    /// A symbolic link counts by itself, so a link to a folder is a file here.
+    let private isFileAsync (arcPath: string) (relativePath: string) : JS.Promise<bool> = promise {
+        match tryResolveArcRelativePath arcPath (relativePath |> PathHelpers.normalizeCanonicalRelativePath) with
+        | Ok absolutePath ->
+            try
+                let! stats = lstatAsync absolutePath
+                return not (stats.isDirectory ())
+            with _ ->
+                return false
+        | Error _ -> return false
+    }
+
     [<RequireQualifiedAccess>]
     type DeletePathRoute =
         | GenericItem of normalizedRelativePath: string
@@ -622,13 +1044,16 @@ module ArcFileSystemHelper =
     }
 
     let tryBuildGenericRenamePlan
+        (isFile: bool)
         (isAddZoneRootFile: bool)
         (request: RenamePathRequest)
         : Result<GenericRenamePlan, exn> =
         let requestedRelativePath =
             request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
-        match tryBuildGenericFileSystemRenameTargetPath isAddZoneRootFile requestedRelativePath request.newName with
+        match
+            tryBuildGenericFileSystemRenameTargetPath isFile isAddZoneRootFile requestedRelativePath request.newName
+        with
         | Error validationError -> Error(exn validationError)
         | Ok targetPath ->
             Ok {
@@ -641,9 +1066,15 @@ module ArcFileSystemHelper =
         (request: RenamePathRequest)
         : JS.Promise<Result<unit, exn>> =
         promise {
-            let! isAddZoneRootFile = isAddZoneRootFileAsync arcPath request.relativePath
+            let! isFile = isFileAsync arcPath request.relativePath
 
-            match tryBuildGenericRenamePlan isAddZoneRootFile request with
+            let isAddZoneRootFile =
+                isFile
+                && ArcEntityPathRules.isAddZoneRootChildPath (
+                    request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
+                )
+
+            match tryBuildGenericRenamePlan isFile isAddZoneRootFile request with
             | Error validationError -> return Error validationError
             | Ok genericRenamePlan ->
                 match resolveArcRelativePathPair arcPath genericRenamePlan.SourcePath genericRenamePlan.TargetPath with
