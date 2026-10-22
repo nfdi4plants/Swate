@@ -30,9 +30,84 @@ Vitest.describe (
             fun () ->
                 let result = validateRenameName "bad/name"
 
-                Vitest
-                    .expect(result)
-                    .toEqual (Error "The new name must not contain path separators or null characters.")
+                Vitest.expect(result).toEqual (Error "The name must not contain path separators or null characters.")
+        )
+
+        Vitest.test (
+            "validateRenameName rejects characters Windows does not allow",
+            fun () ->
+                [
+                    "a<b"
+                    "a>b"
+                    "a:b"
+                    "a\"b"
+                    "a|b"
+                    "a?b"
+                    "a*b"
+                    "a\u0001b"
+                    "a\tb"
+                ]
+                |> List.iter (fun name ->
+                    validateRenameName name
+                    |> expectErrorContaining "must not contain < > : \" | ? * or control characters"
+                )
+        )
+
+        Vitest.test (
+            "validateRenameName rejects a trailing dot",
+            fun () -> validateRenameName "trail." |> expectErrorContaining "must not end with a dot"
+        )
+
+        Vitest.test (
+            "validateRenameName rejects Windows device names",
+            fun () ->
+                [
+                    "aux", "aux"
+                    "AUX.txt", "AUX"
+                    "com1.csv", "com1"
+                    "lpt9", "lpt9"
+                    "con.txt.bak", "con"
+                    "PRN", "PRN"
+                    "nul.log", "nul"
+                    "CONIN$", "CONIN$"
+                    "conout$.txt", "conout$"
+                    "COM\u00B9", "COM\u00B9"
+                    "lpt\u00B3.txt", "lpt\u00B3"
+                    "aux .txt", "aux"
+                ]
+                |> List.iter (fun (name, baseName) ->
+                    validateRenameName name
+                    |> expectErrorContaining
+                        $"must not be '{baseName}' or start with '{baseName}.', because Windows reserves it for a device."
+                )
+        )
+
+        Vitest.test (
+            "validateRenameName accepts names that only resemble Windows restrictions",
+            fun () ->
+                [
+                    "console.txt"
+                    "auxiliary.txt"
+                    "com10.csv"
+                    "notes.v2.md"
+                    "T12-30-00.csv"
+                    "my notes. v2.txt"
+                ]
+                |> List.iter (fun name ->
+                    match validateRenameName name with
+                    | Ok normalizedName -> Vitest.expect(normalizedName).toBe (name)
+                    | Error errorMessage -> failwith errorMessage
+                )
+        )
+
+        Vitest.test (
+            "New File and Rename refuse a timestamp name with colons",
+            fun () ->
+                tryBuildGenericFileSystemChildPath true "notes" "T12:30:00.csv"
+                |> expectErrorContaining "because Windows does not allow them"
+
+                tryBuildRenameTargetPath "notes/old.csv" "T12:30:00.csv"
+                |> expectErrorContaining "because Windows does not allow them"
         )
 
         Vitest.test (

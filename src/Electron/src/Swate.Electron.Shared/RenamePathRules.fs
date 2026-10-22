@@ -6,21 +6,57 @@ open Swate.Components.Shared
 let private normalizeRelativePath (path: string) =
     path |> PathHelpers.normalizeCanonicalRelativePath
 
+let private windowsForbiddenChars = [| '<'; '>'; ':'; '"'; '|'; '?'; '*' |]
+
+let private windowsReservedDeviceNames =
+    set [
+        "CON"
+        "PRN"
+        "AUX"
+        "NUL"
+        "CONIN$"
+        "CONOUT$"
+        for i in 1..9 do
+            $"COM{i}"
+            $"LPT{i}"
+        for c in [ '\u00B9'; '\u00B2'; '\u00B3' ] do
+            $"COM{c}"
+            $"LPT{c}"
+    ]
+
+/// Rejects names Windows or git for Windows cannot check out. A device name such as AUX is reserved with any extension, so the check uses the part before the first dot.
 let validateRenameName (newName: string) =
     let normalizedNewName = newName.Trim()
 
     if String.IsNullOrWhiteSpace normalizedNewName then
-        Error "A new name is required."
+        Error "A name is required."
     elif normalizedNewName = "." || normalizedNewName = ".." then
-        Error "The new name must not be '.' or '..'."
+        Error "The name must not be '.' or '..'."
     elif
         normalizedNewName.Contains("/")
         || normalizedNewName.Contains("\\")
         || normalizedNewName.Contains("\u0000")
     then
-        Error "The new name must not contain path separators or null characters."
+        Error "The name must not contain path separators or null characters."
+    elif
+        normalizedNewName.IndexOfAny windowsForbiddenChars >= 0
+        || normalizedNewName |> Seq.exists (fun c -> int c >= 1 && int c <= 31)
+    then
+        Error "The name must not contain < > : \" | ? * or control characters, because Windows does not allow them."
+    elif normalizedNewName.EndsWith "." then
+        Error "The name must not end with a dot, because Windows does not allow it."
     else
-        Ok normalizedNewName
+        let baseName =
+            match normalizedNewName.IndexOf '.' with
+            | -1 -> normalizedNewName
+            | index -> normalizedNewName.Substring(0, index)
+            |> fun name -> name.TrimEnd(' ')
+
+        if windowsReservedDeviceNames.Contains(baseName.ToUpperInvariant()) then
+            Error
+                $"The name must not be '{baseName}' or start with '{baseName}.', because Windows reserves it for a device."
+        else
+            Ok normalizedNewName
 
 let buildRenamedSiblingPath (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath

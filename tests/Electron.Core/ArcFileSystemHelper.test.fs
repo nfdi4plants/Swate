@@ -1504,6 +1504,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "rejects a nested name Windows does not allow and writes nothing",
+            TestOptions(skip = (nodePlatform () = "win32")),
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+
+                    let! _ =
+                        fsPromisesDynamic?writeFile (join [| sourcePath; "raw"; "T12:30:00.csv" |], "x", "utf8")
+                        |> unbox<JS.Promise<obj>>
+
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let! result = importWithoutCancellation arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    result |> expectErrorContaining "Cannot import 'Run1/raw/T12:30:00.csv'"
+                    result |> expectErrorContaining "because Windows does not allow them"
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1" false
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
             "rejects a nested or picked name that ends with a space and writes nothing",
             TestOptions(skip = (nodePlatform () = "win32")),
             fun () ->
