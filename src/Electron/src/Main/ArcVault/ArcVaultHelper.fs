@@ -362,13 +362,25 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-/// Chokidar applies this to files and folders, so a folder named like a lock file is not watched.
-let isFileWatcherPathIgnored (path: string) =
+/// Decides whether the file watcher ignores a path. The watcher hides the same names as the file tree,
+/// which applies lock file, LFS backup and legacy isa_datamap names to files only, so a folder named like a
+/// lock file is watched like any other folder. Git metadata and staging paths are ignored for both.
+/// An unknown kind (None) is treated like a folder, because chokidar asks once before it has stats.
+let isFileWatcherPathIgnoredFor (path: string) (isDirectory: bool option) =
     let normalizedPath = PathHelpers.normalizeSeparators path
 
     isGitMetadataPath normalizedPath
     || isTemporaryImportPath normalizedPath
-    || isHiddenArcFilePath normalizedPath
+    || (isDirectory = Some false && isHiddenArcFilePath normalizedPath)
+
+/// Ignores a path known to be a file.
+let isFileWatcherPathIgnored (path: string) =
+    isFileWatcherPathIgnoredFor path (Some false)
+
+let private isFileWatcherPathIgnoredByStats (path: string) (stats: Chokidar.IWatchStats option) =
+    stats
+    |> Option.map (fun stats -> not (stats.isDirectory ()))
+    |> isFileWatcherPathIgnoredFor path
 
 /// Decides whether the file watcher polls. Without an explicit choice it polls on Windows only,
 /// because native Windows file events can keep handles that block app-initiated folder renames.
@@ -384,7 +396,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^System.Func<string, Chokidar.IWatchStats option, bool>(isFileWatcherPathIgnoredByStats),
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
@@ -394,7 +406,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^System.Func<string, Chokidar.IWatchStats option, bool>(isFileWatcherPathIgnoredByStats),
                 ignoreInitial = true
             )
 

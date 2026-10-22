@@ -64,6 +64,28 @@ type WatcherMergeOutcome =
     /// Snapshot loading or merging failed, so the caller can publish the tree batch after logging the error.
     | Failed of exn
 
+/// Keeps the paths that exist. It checks 64 paths at a time and logs each skipped path.
+let private filterExistingPathsAsync (windowId: int) (paths: string[]) : JS.Promise<string[]> = promise {
+    let existing = ResizeArray<string>()
+
+    for batch in Array.chunkBySize 64 paths do
+        let! results =
+            batch
+            |> Array.map (fun path -> lstatAsync path |> Promise.map (fun _ -> true) |> Promise.catch (fun _ -> false))
+            |> Promise.all
+
+        Array.iteri
+            (fun index exists ->
+                if exists then
+                    existing.Add batch.[index]
+                else
+                    swatelogfn windowId "Skipped imported item '%s' because it no longer exists." batch.[index]
+            )
+            results
+
+    return existing.ToArray()
+}
+
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
@@ -323,6 +345,12 @@ module ArcVaultExtensions =
             let queuedUpdate =
                 this.FileTreeUpdateTail
                 |> Promise.bind (fun () -> promise {
+                    // The existence checks run before the synchronous tree section, because a blocking check per
+                    // path would stall the main process for a large import. The import has just created these
+                    // paths, so a plain existence check is enough.
+                    let! existingFolderPaths = filterExistingPathsAsync this.window.id folderPaths
+                    let! existingFilePaths = filterExistingPathsAsync this.window.id filePaths
+
                     match this.path with
                     | None -> ()
                     | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
@@ -330,26 +358,19 @@ module ArcVaultExtensions =
                         // Nothing is awaited between reading the tree and replacing it, so no other update can interleave.
                         // The tree is copied once because copying it per item is quadratic for large imports.
                         let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
-                        let hasFileTreeChanges = ref false
 
                         let addEntries isDirectory (importedPaths: string[]) =
                             for importedPath in importedPaths do
-                                // The import has just created these paths, so a plain existence check is enough.
-                                if existsSync importedPath then
-                                    nextFileTree.[importedPath] <-
-                                        FileEntry.create (basename importedPath, importedPath, isDirectory, None)
+                                nextFileTree.[importedPath] <-
+                                    FileEntry.create (basename importedPath, importedPath, isDirectory, None)
 
-                                    hasFileTreeChanges.Value <- true
-                                else
-                                    swatelogfn
-                                        this.window.id
-                                        "Skipped imported item '%s' because it no longer exists."
-                                        importedPath
+                        addEntries true existingFolderPaths
+                        addEntries false existingFilePaths
 
-                        addEntries true folderPaths
-                        addEntries false filePaths
-
-                        if hasFileTreeChanges.Value && capturedWatcherEpoch = this.WatcherEpoch then
+                        if
+                            existingFolderPaths.Length + existingFilePaths.Length > 0
+                            && capturedWatcherEpoch = this.WatcherEpoch
+                        then
                             this.SetFileTree(nextFileTree)
                 })
 

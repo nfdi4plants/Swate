@@ -72,7 +72,7 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(arcNotOpenError ())
     }
 
-/// Returns the refusal for an import while the window's vault is saving, importing or closing.
+/// Returns the refusal for an import while the window's vault is busy or its window is closing.
 /// A window without a loaded vault is not busy, so the callers keep their own handling for it.
 let private tryGetImportBusyError (event: IpcMainInvokeEvent) : exn option =
     match ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event) with
@@ -549,6 +549,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                 let windowId = windowIdFromIpcEvent event
 
+                // A refusal for being busy does not use up the authorization, so it stays valid until the next pick replaces it.
                 match tryGetImportBusyError event with
                 | Some busyError -> raise busyError
                 | None -> ()

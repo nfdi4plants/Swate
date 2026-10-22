@@ -74,19 +74,21 @@ let importedAbsolutePaths arcPath targetRelativePath (plannedPaths: PlannedImpor
 
 /// Builds the watcher events of an import's planned folders and files. The polling watcher reports
 /// each new folder as addDir, and an unclaimed addDir would start a second ARC merge after the import.
-/// It builds no claim for planned paths the watcher ignores, such as a folder named like a lock file or an LFS
-/// backup. It still builds claims for the files inside such a folder. The watcher never reports those, so the
-/// lease timer frees them.
+/// It builds no claim for planned paths the watcher ignores. Those are files named like a lock file or an
+/// LFS backup, and anything below git metadata or a staging folder. A folder named like a lock file gets
+/// a claim, because the watcher reports it.
 let createImportedWatcherEvents arcPath targetRelativePath (plannedPaths: PlannedImportPaths) =
     let folderPaths, filePaths =
         importedAbsolutePaths arcPath targetRelativePath plannedPaths
 
-    let buildEvents (eventName: Chokidar.Events) (absolutePaths: string[]) =
+    let buildEvents (eventName: Chokidar.Events) (isDirectory: bool) (absolutePaths: string[]) =
         absolutePaths
         |> Array.map (fun absolutePath -> buildWatcherEvent arcPath (eventName.ToString()) absolutePath)
+        |> Array.filter (fun event ->
+            not (ArcVaultHelper.isFileWatcherPathIgnoredFor event.AbsolutePath (Some isDirectory))
+        )
 
-    Array.append (buildEvents Chokidar.Events.AddDir folderPaths) (buildEvents Chokidar.Events.Add filePaths)
-    |> Array.filter (fun event -> not (ArcVaultHelper.isFileWatcherPathIgnored event.AbsolutePath))
+    Array.append (buildEvents Chokidar.Events.AddDir true folderPaths) (buildEvents Chokidar.Events.Add false filePaths)
 
 /// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
 let queueFileWatcherEvent

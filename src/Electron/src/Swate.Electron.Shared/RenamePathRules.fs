@@ -107,13 +107,13 @@ let isLfsBackupPath (path: string) =
 let private lockFileNameError =
     "ARCitISA hides files named like the lock file of a document that is open in Office or LibreOffice, so the file would disappear from the file tree."
 
-let private lfsBackupNameError =
+let lfsBackupNameError =
     "ARCitISA uses names like this for Git LFS backups and hides them, so the file would disappear from the file tree."
 
 let private stagingFolderNameError =
     "ARCitISA uses names like this for import staging folders and does not watch them, so changes inside would not show up."
 
-let private stagingFileNameError =
+let stagingFileNameError =
     "ARCitISA uses names like this for import staging folders and does not watch them, so the file would not show changes."
 
 let private stagingParentError =

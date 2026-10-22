@@ -189,6 +189,26 @@ Vitest.describe (
                 FilePaths = filePaths
             }
 
+        Vitest.test (
+            "claims the addDir event of a folder named like a lock file and ignores such a name only for files",
+            fun () ->
+                let events =
+                    importedEvents [| "~$data.old" |] [| "~$data.old/inner.txt"; "~$lock.xlsx" |]
+
+                Vitest
+                    .expect(events |> Array.map _.RelativePath)
+                    .toEqual (
+                        [|
+                            "assays/AssayA/dataset/~$data.old"
+                            "assays/AssayA/dataset/~$data.old/inner.txt"
+                        |]
+                    )
+
+                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnoredFor "x/~$data.old" (Some true)).toBe false
+                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnoredFor "x/~$data.old" (Some false)).toBe true
+                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnoredFor "x/~$data.old" None).toBe false
+        )
+
         let advanceSeconds (seconds: int) =
             Vitest.vi.advanceTimersByTime (seconds * 1000) |> ignore
 
@@ -5342,6 +5362,7 @@ Vitest.describe (
         )
 
         Vitest.test (
+            // A backend contract. The renderer does not retry an import with the same pick today.
             "keeps the pick when the import is refused while busy",
             fun () ->
                 withImportVault

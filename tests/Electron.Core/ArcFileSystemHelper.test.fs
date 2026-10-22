@@ -354,7 +354,7 @@ let private rejectedImports = [
                 return join [| dirname arcPath; fileName |]
             }
         TargetRelativePath = "assays/AssayA/dataset"
-        ExpectedError = "reserves names like this"
+        ExpectedError = "for Git LFS backups"
         AbsentRelativePath = "assays/AssayA/dataset/data.bin.vcs-lfs-backup-" + String.replicate 32 "a"
     }
     {

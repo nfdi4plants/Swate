@@ -499,6 +499,10 @@ module ArcFileSystemHelper =
                 )
             elif not isDirectory && ArcEntityPathRules.isArcManagedGitFileName name then
                 raise (exn $"Cannot import '{name}' because the ARC manages its own '{name}' file.")
+            elif not isDirectory && isLfsBackupPath name then
+                raise (exn $"Cannot import '{name}': {lfsBackupNameError}")
+            elif not isDirectory && isTemporaryImportPath name then
+                raise (exn $"Cannot import '{name}': {stagingFileNameError}")
             else
                 raise (
                     exn
