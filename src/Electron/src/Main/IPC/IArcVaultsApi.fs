@@ -524,8 +524,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         (fun vault -> promise {
                             // The watcher ignores temporary import directories. While the import's marks last, creation
                             // events of imported files and folders start no merge. Later edits and deletions do, and so
-                            // do unrelated external ARC changes. Successful imports also replay their own events
-                            // synchronously before the refreshed tree is exposed.
+                            // do unrelated external ARC changes. A completed import adds its items to the file tree
+                            // itself before the notice closes. Later watcher events for them only update those entries.
 
                             let publisher =
                                 FileImportCoordinator.createThrottledStatePublisher
@@ -600,7 +600,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 let importedEvents = ResizeArray()
                                                 let importToken = vault.StartImport()
 
+                                                let registeredPlannedPaths: PlannedImportPaths option ref = ref None
+
                                                 let registerImportedPaths plannedPaths =
+                                                    registeredPlannedPaths.Value <- Some plannedPaths
+
                                                     importedEvents.AddRange(
                                                         WatcherHelpers.createImportedWatcherEvents
                                                             vault.path.Value
@@ -651,6 +655,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                                 )
                                                             )
                                                         |> Promise.catch Error
+
+                                                    match result, registeredPlannedPaths.Value with
+                                                    | Ok ImportExternalFilesResult.Completed, Some plannedPaths ->
+                                                        try
+                                                            let folderPaths, filePaths =
+                                                                WatcherHelpers.importedAbsolutePaths
+                                                                    vault.path.Value
+                                                                    request.targetRelativePath
+                                                                    plannedPaths
+
+                                                            do!
+                                                                vault.AddImportedEntriesToFileTree(
+                                                                    folderPaths,
+                                                                    filePaths
+                                                                )
+                                                        with fileTreeError ->
+                                                            swatelogfn
+                                                                vault.window.id
+                                                                "Unable to add imported items to the file tree: %s"
+                                                                fileTreeError.Message
+                                                    | _ -> ()
 
                                                     vault.ReleaseImportedFileEventsAfterImport(importToken, result)
 

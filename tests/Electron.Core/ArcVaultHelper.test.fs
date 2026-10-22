@@ -1642,6 +1642,83 @@ Vitest.describe (
                     })
         )
 
+
+        Vitest.test (
+            "a completed import adds its folders and files to the file tree",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let run1 = join [| arcPath; "assays"; "AssayA"; "dataset"; "Run1" |]
+                        let raw = join [| run1; "raw" |]
+                        let results = join [| raw; "results.csv" |]
+                        let notes = join [| run1; "notes.txt" |]
+                        do! mkdirWatcherDirectoryAsync raw
+                        do! writeWatcherTextFileAsync results "a,b"
+                        do! writeWatcherTextFileAsync notes "notes"
+
+                        do! vault.AddImportedEntriesToFileTree([| run1; raw |], [| results; notes |])
+
+                        for folder in [ run1; raw ] do
+                            Vitest.expect(vault.fileTree.ContainsKey(folder)).toBe (true)
+                            Vitest.expect(vault.fileTree.[folder].isDirectory).toBe (true)
+
+                        for file in [ results; notes ] do
+                            Vitest.expect(vault.fileTree.ContainsKey(file)).toBe (true)
+                            Vitest.expect(vault.fileTree.[file].isDirectory).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "skips imported paths that no longer exist",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let existing = join [| arcPath; "imported-existing.txt" |]
+                        let missing = join [| arcPath; "imported-missing.txt" |]
+                        do! writeWatcherTextFileAsync existing "here"
+
+                        do! vault.AddImportedEntriesToFileTree([||], [| existing; missing |])
+
+                        Vitest.expect(vault.fileTree.ContainsKey(existing)).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey(missing)).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "drops imported entries after the watcher state was reset",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let filePath = join [| arcPath; "imported-reset.txt" |]
+                        do! writeWatcherTextFileAsync filePath "reset"
+
+                        let mutable releaseTail = ignore
+
+                        let tailGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseTail <- fun () -> resolve ())
+
+                        vault.FileTreeUpdateTail <- tailGate
+                        let update = vault.AddImportedEntriesToFileTree([||], [| filePath |])
+
+                        vault.ClearPendingFileWatcherState()
+                        releaseTail ()
+                        do! update
+
+                        Vitest.expect(vault.fileTree.ContainsKey(filePath)).toBe (false)
+                    })
+        )
 )
 
 let private lifecycleTestWindow id isDestroyed onSend =

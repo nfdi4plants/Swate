@@ -314,6 +314,41 @@ module ArcVaultExtensions =
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
             queuedUpdate
 
+        /// The watcher reports imported items only after its stability wait and a native watcher can miss them,
+        /// so a completed import adds them itself. Later watcher events update the same entries with their full metadata.
+        member this.AddImportedEntriesToFileTree(folderPaths: string[], filePaths: string[]) : JS.Promise<unit> =
+            let capturedWatcherEpoch = this.WatcherEpoch
+
+            let queuedUpdate =
+                this.FileTreeUpdateTail
+                |> Promise.bind (fun () -> promise {
+                    match this.path with
+                    | None -> ()
+                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                    | Some _ ->
+                        let mutable nextFileTree = this.fileTree
+                        let mutable hasFileTreeChanges = false
+
+                        // The import has just created these paths, so a plain existence check is enough. The exact-name
+                        // check would list the parent folder once per item, which is slow for large folders.
+                        for importedPath in Array.append folderPaths filePaths do
+                            if existsSync importedPath then
+                                let! addedEntry = getFileEntry importedPath
+                                nextFileTree <- upsertFileEntry addedEntry nextFileTree
+                                hasFileTreeChanges <- true
+                            else
+                                swatelogfn
+                                    this.window.id
+                                    "Skipped imported item '%s' because it no longer exists."
+                                    importedPath
+
+                        if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
+                            this.SetFileTree(nextFileTree)
+                })
+
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
         /// Returns the load error to the import caller when loading fails. The import can then report that its in-memory merge did not happen.
         member this.TryTriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
             let arcEvents = WatcherHelpers.toArcMergeEvents events

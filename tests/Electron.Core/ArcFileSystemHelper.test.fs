@@ -624,6 +624,41 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "builds unfiltered absolute folder and file paths for planned paths, below the target or at the ARC root",
+            fun () ->
+                let plannedPaths = {
+                    FolderPaths = [| "Run1"; "Run1/raw" |]
+                    FilePaths = [| "Run1/raw/results.csv"; "Run1/~$tmp.xlsx" |]
+                }
+
+                let pathsFor target =
+                    Main.WatcherHelpers.importedAbsolutePaths "C:/arc" target plannedPaths
+
+                Vitest
+                    .expect(pathsFor "assays/AssayA/dataset")
+                    .toEqual (
+                        [|
+                            "C:/arc/assays/AssayA/dataset/Run1"
+                            "C:/arc/assays/AssayA/dataset/Run1/raw"
+                        |],
+                        [|
+                            "C:/arc/assays/AssayA/dataset/Run1/raw/results.csv"
+                            "C:/arc/assays/AssayA/dataset/Run1/~$tmp.xlsx"
+                        |]
+                    )
+
+                Vitest
+                    .expect(pathsFor "")
+                    .toEqual (
+                        [| "C:/arc/Run1"; "C:/arc/Run1/raw" |],
+                        [|
+                            "C:/arc/Run1/raw/results.csv"
+                            "C:/arc/Run1/~$tmp.xlsx"
+                        |]
+                    )
+        )
+
+        Vitest.test (
             "checks whether relative files and directories exist",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
