@@ -36,7 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Import files" does not import files whose name starts or ends with a space. #1429 (by @Etschbeijer)
 - New files and folders and renamed items can't be named "isa_datamap" anymore. It is the outdated name of DataMap files, and opening the ARC would turn such a file into "isa.datamap.xlsx". Existing items with that name can still be renamed, moved and deleted. #1429 (by @Etschbeijer)
 - While files or folders are imported, the notice shows the current step and how many items are done. The taskbar progress now covers the whole import, including adding the items to the ARC. #1429 (by @Etschbeijer)
-- New File and New Folder say why a name can't be used, for example for a "dataset" folder inside an assay or an ARC metadata file name. "Import files" shows the same reasons. #1429 (by @Etschbeijer)
+- Creating and renaming items says why a name can't be used, for example for a "dataset" folder inside an assay or an ARC metadata file name. "Import files" shows the same reasons. #1429 (by @Etschbeijer)
+- New files and renamed files can't get names that ARCitISA hides, such as "~$notes.md". #1429 (by @Etschbeijer)
+- New items and imports are refused inside a leftover ".swate-import-..." folder of an interrupted import, and items inside it can't be renamed. The folder itself can still be renamed or deleted. #1429 (by @Etschbeijer)
 
 ### 🐛 Fixed
 

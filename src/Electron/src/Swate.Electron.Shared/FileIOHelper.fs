@@ -23,20 +23,9 @@ let isLegacyDataMapPath (path: string) =
         String.Equals(fileName, ArcEntityPathRules.legacyDataMapFileName, StringComparison.OrdinalIgnoreCase)
     )
 
-let isOfficeLockFilePath (path: string) =
-    Text.RegularExpressions.Regex.IsMatch(
-        PathHelpers.normalizeSeparators path,
-        """(^|/)(\.?~\$[^/]*\.[^/]+|\.~lock\.[^/]+#)$"""
-    )
-
-let isTemporaryImportPath (path: string) =
-    Text.RegularExpressions.Regex.IsMatch(
-        PathHelpers.normalizeSeparators path,
-        """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
-    )
-
-let isLfsBackupPath (path: string) =
-    Text.RegularExpressions.Regex.IsMatch(PathHelpers.normalizeSeparators path, """\.vcs-lfs-backup-[0-9a-fA-F]{32}$""")
+let isOfficeLockFilePath = RenamePathRules.isOfficeLockFilePath
+let isTemporaryImportPath = RenamePathRules.isTemporaryImportPath
+let isLfsBackupPath = RenamePathRules.isLfsBackupPath
 
 let isHiddenArcFilePath (path: string) =
     isOfficeLockFilePath path || isLfsBackupPath path || isLegacyDataMapPath path

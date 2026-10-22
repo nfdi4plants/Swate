@@ -618,6 +618,52 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "an import staging folder offers no new items and no imports",
+            fun () ->
+                let path = $"data/.swate-import-{String.replicate 32 (string 'a')}"
+                let item = createFolderItem (PathHelpers.getNameFromPath path) (Some path)
+
+                let menuItemLabels =
+                    createComposedContextMenuItems (createContextMenuConfig ()) item
+                    |> groupedLabels
+
+                [
+                    "New File"
+                    "New Folder"
+                    "Import files"
+                    "Import folders"
+                ]
+                |> List.iter (fun label -> Vitest.expect(menuItemLabels).not.toContain (label))
+        )
+
+        Vitest.test (
+            "items inside an import staging folder offer no new items, imports or rename",
+            fun () ->
+                let stagingFolder = $"data/.swate-import-{String.replicate 32 (string 'b')}"
+
+                let labelsFor (item: FileItem) =
+                    createComposedContextMenuItems (createContextMenuConfig ()) item
+                    |> groupedLabels
+
+                let nestedFolder = createFolderItem "inner" (Some $"{stagingFolder}/inner")
+
+                [
+                    "New File"
+                    "New Folder"
+                    "Import files"
+                    "Import folders"
+                    "Rename"
+                ]
+                |> List.iter (fun label -> Vitest.expect(labelsFor nestedFolder).not.toContain (label))
+
+                let stagingItem =
+                    createFolderItem (PathHelpers.getNameFromPath stagingFolder) (Some stagingFolder)
+
+                Vitest.expect(labelsFor stagingItem).toContain ("Rename")
+                Vitest.expect(labelsFor stagingItem).toContain ("Delete")
+        )
+
+        Vitest.test (
             "an existing folder with the legacy DataMap name can still be renamed, deleted and filled",
             fun () ->
                 // New items may not get the name `isa_datamap`, but older ARCs must not get stuck with one.

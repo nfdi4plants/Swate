@@ -248,6 +248,11 @@ let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan
             || PathHelpers.containsPathTraversalSegments normalizedName
         then
             Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
+        elif isTemporaryImportPath normalizedName then
+            Error(
+                exn
+                    "ARCitISA uses names like this for import staging folders and does not watch them, so no change in the ARC would show up."
+            )
         else
             let sourcePath = resolveAbsolutePath arcPath
             let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>

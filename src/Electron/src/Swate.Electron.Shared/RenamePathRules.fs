@@ -88,9 +88,56 @@ let private addZoneFileNameError =
 let legacyDataMapNameError =
     $"'{ArcEntityPathRules.legacyDataMapFileName}' is the outdated DataMap name. Loading the ARC would rename it to '{ARCtrl.ArcPathHelper.DataMapFileName}'."
 
-let private validateNewItemName (targetPath: string) =
-    if ArcEntityPathRules.isLegacyDataMapFileName (PathHelpers.getFileName targetPath) then
+// These checks live here because FileIOHelper is compiled after this module. FileIOHelper re-exports them.
+let isOfficeLockFilePath (path: string) =
+    Text.RegularExpressions.Regex.IsMatch(
+        PathHelpers.normalizeSeparators path,
+        """(^|/)(\.?~\$[^/]*\.[^/]+|\.~lock\.[^/]+#)$"""
+    )
+
+let isTemporaryImportPath (path: string) =
+    Text.RegularExpressions.Regex.IsMatch(
+        PathHelpers.normalizeSeparators path,
+        """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
+    )
+
+let isLfsBackupPath (path: string) =
+    Text.RegularExpressions.Regex.IsMatch(PathHelpers.normalizeSeparators path, """\.vcs-lfs-backup-[0-9a-fA-F]{32}$""")
+
+let private lockFileNameError =
+    "ARCitISA hides files named like the lock file of a document that is open in Office or LibreOffice, so the file would disappear from the file tree."
+
+let private lfsBackupNameError =
+    "ARCitISA uses names like this for Git LFS backups and hides them, so the file would disappear from the file tree."
+
+let private stagingFolderNameError =
+    "ARCitISA uses names like this for import staging folders and does not watch them, so changes inside would not show up."
+
+let private stagingFileNameError =
+    "ARCitISA uses names like this for import staging folders and does not watch them, so the file would not show changes."
+
+let private stagingParentError =
+    "ARCitISA does not watch import staging folders, so new items inside would not show up. Delete or rename the folder first."
+
+let private stagingRenameParentError =
+    "ARCitISA does not watch import staging folders, so the renamed item would not show up. Delete or rename the staging folder first."
+
+let private validateNewItemName (isFile: bool) (targetPath: string) =
+    let name = PathHelpers.getFileName targetPath
+
+    if ArcEntityPathRules.isLegacyDataMapFileName name then
         Error legacyDataMapNameError
+    elif isFile && isOfficeLockFilePath name then
+        Error lockFileNameError
+    elif isFile && isLfsBackupPath name then
+        Error lfsBackupNameError
+    elif isTemporaryImportPath name then
+        Error(
+            if isFile then
+                stagingFileNameError
+            else
+                stagingFolderNameError
+        )
     elif ArcEntityPathRules.isNewGenericFileSystemNameAllowed targetPath |> not then
         Error addZoneFileNameError
     else
@@ -103,7 +150,9 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
         String.IsNullOrWhiteSpace normalizedParentPath
         || ArcEntityPathRules.isGenericFileSystemCreateParentAllowed isFile normalizedParentPath
 
-    if parentIsAllowed |> not then
+    if isTemporaryImportPath normalizedParentPath then
+        Error stagingParentError
+    elif parentIsAllowed |> not then
         Error "Generic file and folder creation is only allowed inside safe ARC directories."
     else
         match validateRenameName name with
@@ -117,11 +166,16 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
 
             match ArcEntityPathRules.describeBlockedGenericCreateTarget isFile targetPath with
             | Some reason -> Error reason
-            | None -> validateNewItemName targetPath
+            | None -> validateNewItemName isFile targetPath
 
-/// `isAddZoneRootFile` marks a file directly inside an add zone (for example `studies/notes.md` or
+/// `isFile` tells whether the source is a file or a folder. `isAddZoneRootFile` marks a file directly inside an add zone (for example `studies/notes.md` or
 /// `studies/.DS_Store`). Pass `false` for every other source.
-let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourcePath: string) (newName: string) =
+let tryBuildGenericFileSystemRenameTargetPath
+    (isFile: bool)
+    (isAddZoneRootFile: bool)
+    (sourcePath: string)
+    (newName: string)
+    =
     let normalizedSourcePath = normalizeRelativePath sourcePath
 
     let isTargetAllowed =
@@ -130,14 +184,25 @@ let tryBuildGenericFileSystemRenameTargetPath (isAddZoneRootFile: bool) (sourceP
         else
             ArcEntityPathRules.isGenericFileSystemTargetAllowed
 
-    if isTargetAllowed normalizedSourcePath |> not then
+    let isInsideStagingFolder =
+        PathHelpers.tryGetParentPath normalizedSourcePath
+        |> Option.exists isTemporaryImportPath
+
+    if isInsideStagingFolder then
+        Error stagingRenameParentError
+    elif isTargetAllowed normalizedSourcePath |> not then
         Error "Generic file and folder rename is only allowed for safe non-canonical paths inside the ARC."
     else
         match tryBuildRenameTargetPath normalizedSourcePath newName with
         | Error validationError -> Error validationError
         | Ok targetPath ->
             if isTargetAllowed targetPath |> not then
-                Error
-                    "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
+                match ArcEntityPathRules.describeBlockedGenericCreateTarget isFile targetPath with
+                | Some reason -> Error reason
+                | None ->
+                    // Creating a protected name such as README.md is allowed, renaming to it is not.
+                    let name = PathHelpers.getFileName targetPath
+
+                    Error $"ARCitISA protects the name '{name}', so it could not be renamed or deleted afterwards."
             else
-                validateNewItemName targetPath
+                validateNewItemName isFile targetPath

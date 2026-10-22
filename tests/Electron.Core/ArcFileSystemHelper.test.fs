@@ -2277,6 +2277,72 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "rejects renaming a file to a name the file tree hides",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! writeRelativeFileAsync arcPath "assays/AssayA/report.xlsx" "report"
+
+                    let! result =
+                        ArcFileSystemHelper.renameGenericFileSystemItemOnDisk
+                            arcPath
+                            (renameRequest "assays/AssayA/report.xlsx" "~$report.xlsx")
+
+                    expectErrorContaining "lock file of a document that is open in Office or LibreOffice" result
+                    do! expectRelativePathExists arcPath "assays/AssayA/report.xlsx" true
+                    do! expectRelativePathExists arcPath "assays/AssayA/~$report.xlsx" false
+                })
+        )
+
+        Vitest.test (
+            "renames a folder to a name that looks like a lock file",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/archive"
+
+                    do! renameItemOrFail arcPath (renameRequest "assays/AssayA/archive" "~$archive.old")
+
+                    do! expectRelativePathExists arcPath "assays/AssayA/archive" false
+                    do! expectRelativePathExists arcPath "assays/AssayA/~$archive.old" true
+                })
+        )
+
+        Vitest.test (
+            "rejects renaming a folder to an import staging folder name",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/archive"
+                    let stagingName = ".swate-import-" + String.replicate 32 "a"
+
+                    let! result =
+                        ArcFileSystemHelper.renameGenericFileSystemItemOnDisk
+                            arcPath
+                            (renameRequest "assays/AssayA/archive" stagingName)
+
+                    expectErrorContaining "import staging folders" result
+                    do! expectRelativePathExists arcPath "assays/AssayA/archive" true
+                    do! expectRelativePathExists arcPath $"assays/AssayA/{stagingName}" false
+                })
+        )
+
+        Vitest.test (
+            "rejects creating items inside an import staging folder",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let stagingSuffix = String.replicate 32 "a"
+                    let stagingFolder = $"assays/AssayA/.swate-import-{stagingSuffix}"
+                    do! createRelativeDirectoryAsync arcPath stagingFolder
+
+                    let! result =
+                        ArcFileSystemHelper.createFileSystemItemOnDisk
+                            arcPath
+                            (createItemRequest stagingFolder "notes.txt" FileSystemItemKind.File)
+
+                    expectErrorContaining "does not watch import staging folders" result
+                    do! expectRelativePathExists arcPath $"{stagingFolder}/notes.txt" false
+                })
+        )
+
+        Vitest.test (
             "deletes generic files while leaving the ARC entity intact",
             fun () ->
                 withAssayArc (fun arcPath -> promise {

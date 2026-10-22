@@ -966,6 +966,19 @@ module ArcFileSystemHelper =
             return false
     }
 
+    /// True when `relativePath` exists and is not a directory, which is how the file tree tells files from folders.
+    /// A symbolic link counts by itself, so a link to a folder is a file here.
+    let private isFileAsync (arcPath: string) (relativePath: string) : JS.Promise<bool> = promise {
+        match tryResolveArcRelativePath arcPath (relativePath |> PathHelpers.normalizeCanonicalRelativePath) with
+        | Ok absolutePath ->
+            try
+                let! stats = lstatAsync absolutePath
+                return not (stats.isDirectory ())
+            with _ ->
+                return false
+        | Error _ -> return false
+    }
+
     [<RequireQualifiedAccess>]
     type DeletePathRoute =
         | GenericItem of normalizedRelativePath: string
@@ -1023,13 +1036,16 @@ module ArcFileSystemHelper =
     }
 
     let tryBuildGenericRenamePlan
+        (isFile: bool)
         (isAddZoneRootFile: bool)
         (request: RenamePathRequest)
         : Result<GenericRenamePlan, exn> =
         let requestedRelativePath =
             request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
-        match tryBuildGenericFileSystemRenameTargetPath isAddZoneRootFile requestedRelativePath request.newName with
+        match
+            tryBuildGenericFileSystemRenameTargetPath isFile isAddZoneRootFile requestedRelativePath request.newName
+        with
         | Error validationError -> Error(exn validationError)
         | Ok targetPath ->
             Ok {
@@ -1042,9 +1058,15 @@ module ArcFileSystemHelper =
         (request: RenamePathRequest)
         : JS.Promise<Result<unit, exn>> =
         promise {
-            let! isAddZoneRootFile = isAddZoneRootFileAsync arcPath request.relativePath
+            let! isFile = isFileAsync arcPath request.relativePath
 
-            match tryBuildGenericRenamePlan isAddZoneRootFile request with
+            let isAddZoneRootFile =
+                isFile
+                && ArcEntityPathRules.isAddZoneRootChildPath (
+                    request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
+                )
+
+            match tryBuildGenericRenamePlan isFile isAddZoneRootFile request with
             | Error validationError -> return Error validationError
             | Ok genericRenamePlan ->
                 match resolveArcRelativePathPair arcPath genericRenamePlan.SourcePath genericRenamePlan.TargetPath with
