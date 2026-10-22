@@ -5306,6 +5306,86 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "does not open the import dialog while the vault is busy",
+            fun () ->
+                withImportVault
+                    None
+                    (fun vault api _ _ _ -> promise {
+                        let dialogCalls = ref 0
+
+                        setShowOpenDialog (fun _ _ ->
+                            dialogCalls.Value <- dialogCalls.Value + 1
+                            createObj [ "canceled" ==> true; "filePaths" ==> [||] ]
+                        )
+
+                        let releaseBusy = ref ignore
+
+                        let busyGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseBusy.Value <- fun () -> resolve ())
+
+                        let busyScope = vault.WithBusyWritingScope(fun () -> busyGate)
+
+                        match! api.pickAbsolutePaths FileSystemItemKind.Folder with
+                        | Error error ->
+                            Vitest
+                                .expect(error.Message)
+                                .toBe (
+                                    "ARCitISA is still saving another change or importing. Try again when it is done."
+                                )
+                        | other -> failwithf "Expected the busy error, received %A." other
+
+                        Vitest.expect(dialogCalls.Value).toBe 0
+
+                        releaseBusy.Value()
+                        do! busyScope
+                    })
+        )
+
+        Vitest.test (
+            "keeps the pick when the import is refused while busy",
+            fun () ->
+                withImportVault
+                    None
+                    (fun vault api _ arcPath _ -> promise {
+                        match! api.pickAbsolutePaths FileSystemItemKind.Folder with
+                        | Ok(Some authorizationId) ->
+                            let request = {
+                                requestId = "import-busy"
+                                targetRelativePath = importTarget
+                                authorizationId = authorizationId
+                            }
+
+                            let releaseBusy = ref ignore
+
+                            let busyGate =
+                                JS.Constructors.Promise.Create(fun resolve _ ->
+                                    releaseBusy.Value <- fun () -> resolve ()
+                                )
+
+                            let busyScope = vault.WithBusyWritingScope(fun () -> busyGate)
+
+                            match! api.tryImportExternalFiles request with
+                            | Error error -> Vitest.expect(error.Message).toContain ("still saving another change")
+                            | other -> failwithf "Expected the busy error, received %A." other
+
+                            releaseBusy.Value()
+                            do! busyScope
+
+                            match! api.tryImportExternalFiles request with
+                            | Ok ImportExternalFilesResult.Completed -> ()
+                            | other -> failwithf "Expected Completed, received %A." other
+
+                            let! notes =
+                                ARCtrl.FileSystemHelper.readFileTextAsync (
+                                    join [| arcPath; importTarget; "Run1"; "notes.txt" |]
+                                )
+
+                            Vitest.expect(notes).toBe "run notes"
+                        | other -> failwithf "Expected an authorization, received %A." other
+                    })
+        )
+
+        Vitest.test (
             "imports a picked folder through the IPC handler and marks its paths",
             fun () ->
                 withImportVault

@@ -462,6 +462,10 @@ module ArcFileSystemHelper =
     let private inspectPickedItemAsync targetRelativePath targetDirectory sourcePath = promise {
         let absolutePath = resolveAbsolutePath sourcePath
         let name = basename absolutePath
+
+        if System.String.IsNullOrWhiteSpace name then
+            raise (exn "Cannot import a whole drive. Pick a folder on the drive instead.")
+
         let! sourceLinkStats = lstatAsync absolutePath
         let isLink = sourceLinkStats.isSymbolicLink ()
 

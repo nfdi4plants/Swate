@@ -72,6 +72,18 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(arcNotOpenError ())
     }
 
+/// Returns the refusal for an import while the window's vault is saving, importing or closing.
+/// A window without a loaded vault is not busy, so the callers keep their own handling for it.
+let private tryGetImportBusyError (event: IpcMainInvokeEvent) : exn option =
+    match ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event) with
+    | Some vault when
+        vault.isBusyWriting
+        || vault.activeFileImport.IsSome
+        || vault.isWaitingForImportCleanup
+        ->
+        Some(exn "ARCitISA is still saving another change or importing. Try again when it is done.")
+    | _ -> None
+
 let private tryResolveExistingArcRelativePath
     (arcPath: string)
     (relativePath: string)
@@ -471,24 +483,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     pickAbsolutePaths =
         fun kind -> promise {
             try
-                let pickProperty =
-                    match kind with
-                    | FileSystemItemKind.File -> Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    | FileSystemItemKind.Folder -> Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                match tryGetImportBusyError event with
+                | Some busyError -> return Error busyError
+                | None ->
+                    let pickProperty =
+                        match kind with
+                        | FileSystemItemKind.File -> Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                        | FileSystemItemKind.Folder -> Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
 
-                let properties = [|
-                    pickProperty
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
+                    let properties = [|
+                        pickProperty
+                        Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                    |]
 
-                let window = dialogParentFromIpcEvent event
-                let! result = dialog.showOpenDialog (?window = window, properties = properties)
+                    let window = dialogParentFromIpcEvent event
+                    let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
-                if result.canceled then
-                    issue (windowIdFromIpcEvent event) [||] |> ignore
-                    return Ok None
-                else
-                    return Ok(Some(issue (windowIdFromIpcEvent event) result.filePaths))
+                    if result.canceled then
+                        issue (windowIdFromIpcEvent event) [||] |> ignore
+                        return Ok None
+                    else
+                        return Ok(Some(issue (windowIdFromIpcEvent event) result.filePaths))
             with e ->
                 return Error(exn $"Could not pick items to import: {e.Message}")
         }
@@ -533,6 +548,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     raise (exn "Import request ID must not be empty.")
 
                 let windowId = windowIdFromIpcEvent event
+
+                match tryGetImportBusyError event with
+                | Some busyError -> raise busyError
+                | None -> ()
 
                 let sourceAbsolutePaths =
                     match consume windowId request.authorizationId with

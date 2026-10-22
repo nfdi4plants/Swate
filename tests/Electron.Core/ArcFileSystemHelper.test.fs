@@ -1227,6 +1227,35 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "rejects a picked drive root with a clear message and writes nothing",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! entriesBefore =
+                        Main.Bindings.Filesystem.readdirAsync (absoluteArcPath arcPath "assays/AssayA/dataset")
+
+                    let rec rootOf path =
+                        let parent = dirname path
+                        if parent = path then path else rootOf parent
+
+                    match! importWithoutCancellation arcPath "assays/AssayA/dataset" [| rootOf arcPath |] with
+                    | Error error ->
+                        Vitest
+                            .expect(error.Message)
+                            .toBe ("Cannot import a whole drive. Pick a folder on the drive instead.")
+                    | Ok _ -> failwith "Expected the drive root to be rejected."
+
+                    let! targetEntries =
+                        Main.Bindings.Filesystem.readdirAsync (absoluteArcPath arcPath "assays/AssayA/dataset")
+
+                    Vitest.expect(targetEntries).toEqual entriesBefore
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                    do! expectNoTemporaryImportDirectory arcPath "assays/AssayA"
+                })
+        )
+
+        Vitest.test (
             "leaves lock files, staging leftovers and the ARC's own git files out of an imported folder, but keeps README files",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
