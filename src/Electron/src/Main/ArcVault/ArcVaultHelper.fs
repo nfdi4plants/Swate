@@ -363,9 +363,10 @@ let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
 /// Decides whether the file watcher ignores a path. The watcher hides the same names as the file tree,
-/// which applies lock file, LFS backup and legacy isa_datamap names to files only, so a folder named like a
+/// which applies the names of hidden files (such as lock files) to files only, so a folder named like a
 /// lock file is watched like any other folder. Git metadata and staging paths are ignored for both.
-/// An unknown kind (None) is treated like a folder, because chokidar asks once before it has stats.
+/// An unknown kind (None) is treated like a folder. Chokidar first asks without stats and repeats the
+/// question with stats before it watches a path, so a file is still judged as a file.
 let isFileWatcherPathIgnoredFor (path: string) (isDirectory: bool option) =
     let normalizedPath = PathHelpers.normalizeSeparators path
 

@@ -478,7 +478,7 @@ let private rejectedImports = [
         AbsentRelativePath = "Run1"
     }
     {
-        // The watcher ignores folders with this name too, so they would never be watched.
+        // New Folder rejects this name too, so the import follows the same rule.
         Description = "a folder that contains a folder with the legacy DataMap name"
         PrepareSource =
             fun arcPath -> promise {
