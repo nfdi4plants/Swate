@@ -209,6 +209,24 @@ Vitest.describe (
                 Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnoredFor "x/~$data.old" None).toBe false
         )
 
+        Vitest.test (
+            "the function chokidar calls ignores lock names for files and watches folders with such names",
+            fun () ->
+                let statsOf (isDirectory: bool) =
+                    { new Main.Bindings.Chokidar.IWatchStats with
+                        member _.isDirectory() = isDirectory
+                    }
+
+                let ignored path stats =
+                    Main.ArcVaultHelper.isFileWatcherPathIgnoredByStats path stats
+
+                Vitest.expect(ignored "x/~$data.old" (Some(statsOf true))).toBe false
+                Vitest.expect(ignored "x/~$data.old/inner.txt" (Some(statsOf false))).toBe false
+                Vitest.expect(ignored "x/~$lock.xlsx" (Some(statsOf false))).toBe true
+                Vitest.expect(ignored "x/~$lock.xlsx" None).toBe false
+                Vitest.expect(ignored "x/.swate-import-0123456789abcdef0123456789abcdef" (Some(statsOf true))).toBe true
+        )
+
         let advanceSeconds (seconds: int) =
             Vitest.vi.advanceTimersByTime (seconds * 1000) |> ignore
 

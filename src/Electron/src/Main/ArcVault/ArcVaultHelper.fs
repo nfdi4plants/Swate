@@ -378,9 +378,10 @@ let isFileWatcherPathIgnoredFor (path: string) (isDirectory: bool option) =
 let isFileWatcherPathIgnored (path: string) =
     isFileWatcherPathIgnoredFor path (Some false)
 
-let private isFileWatcherPathIgnoredByStats (path: string) (stats: Chokidar.IWatchStats option) =
+/// The function chokidar calls. It passes the stats when it has them.
+let internal isFileWatcherPathIgnoredByStats (path: string) (stats: Chokidar.IWatchStats option) =
     stats
-    |> Option.map (fun stats -> not (stats.isDirectory ()))
+    |> Option.map (fun stats -> stats.isDirectory ())
     |> isFileWatcherPathIgnoredFor path
 
 /// Decides whether the file watcher polls. Without an explicit choice it polls on Windows only,
