@@ -682,7 +682,7 @@ Vitest.describe (
                     let sourcePath = join [| dirname arcPath; "external.txt" |]
                     do! writeRelativeFileAsync (dirname arcPath) "external.txt" "imported content"
 
-                    let progress = ResizeArray<float>()
+                    let progress = ResizeArray<FileImportProgress>()
 
                     match!
                         ArcFileSystemHelper.importExternalFilesOnDisk
@@ -704,9 +704,18 @@ Vitest.describe (
                             fsPromisesDynamic?readFile (importedPath, "utf8") |> unbox<JS.Promise<string>>
 
                         Vitest.expect(importedContent).toBe ("imported content")
-                        Vitest.expect(progress.Count).toBe (2)
-                        Vitest.expect(progress.[0]).toBe (0.0)
-                        Vitest.expect(progress.[1]).toBe (1.0)
+
+                        Vitest
+                            .expect(progress |> Seq.map _.step |> Seq.toArray)
+                            .toEqual (
+                                [|
+                                    FileImportStep.Scanning
+                                    FileImportStep.Copying
+                                    FileImportStep.Copying
+                                    FileImportStep.Publishing
+                                    FileImportStep.Publishing
+                                |]
+                            )
                 })
         )
 
@@ -718,9 +727,9 @@ Vitest.describe (
                     do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
                     let mutable cancelRequested = false
 
-                    // The first progress report comes after the first entry is staged.
+                    // The first Copying report with a count comes after the first entry is staged.
                     let onProgress progress =
-                        if progress > 0.0 then
+                        if progress.step = FileImportStep.Copying && progress.completedItems > 0 then
                             cancelRequested <- true
 
                     match!
@@ -755,7 +764,7 @@ Vitest.describe (
                     let mutable cancelRequested = false
 
                     let onProgress progress =
-                        if progress > 0.0 then
+                        if progress.step = FileImportStep.Copying && progress.completedItems > 0 then
                             cancelRequested <- true
 
                     match!
@@ -1003,6 +1012,54 @@ Vitest.describe (
                         Vitest.expect(results).toBe ("a,b")
                         Vitest.expect(emptyFolderExists).toBe (true)
                         do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "reports scanning, then copying and publishing progress for every item",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    let updates = ResizeArray<FileImportProgress>()
+                    let mutable plannedCount = 0
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA/dataset"
+                            [| sourcePath |]
+                            updates.Add
+                            (fun () -> false)
+                            (fun planned -> plannedCount <- planned.FolderPaths.Length + planned.FilePaths.Length)
+                            ignore
+                            acceptImportedFiles
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
+                    | Ok ImportExternalFilesResult.Completed ->
+                        let expected = [|
+                            {
+                                step = FileImportStep.Scanning
+                                completedItems = 0
+                                totalItems = 0
+                            }
+                            for i in 0..plannedCount do
+                                {
+                                    step = FileImportStep.Copying
+                                    completedItems = i
+                                    totalItems = plannedCount
+                                }
+                            for i in 0..plannedCount do
+                                {
+                                    step = FileImportStep.Publishing
+                                    completedItems = i
+                                    totalItems = plannedCount
+                                }
+                        |]
+
+                        Vitest.expect(plannedCount).toBe (5)
+                        Vitest.expect(updates.ToArray()).toEqual (expected)
                 })
         )
 

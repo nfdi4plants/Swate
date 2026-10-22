@@ -454,6 +454,11 @@ Vitest.describe (
                         Some {
                             requestId = "coordinated-import"
                             phase = FileImportPhase.Copying
+                            progress = {
+                                step = FileImportStep.Scanning
+                                completedItems = 0
+                                totalItems = 0
+                            }
                         }
                     )
 
@@ -4105,6 +4110,11 @@ Vitest.describe (
                         State = {
                             requestId = "failed-rollback"
                             phase = FileImportPhase.Copying
+                            progress = {
+                                step = FileImportStep.Scanning
+                                completedItems = 0
+                                totalItems = 0
+                            }
                         }
                         AbortController = abortController
                         Completion = JS.Constructors.Promise.resolve (Error(exn "EPERM during rollback"))
@@ -4961,4 +4971,74 @@ Vitest.describe (
                 Vitest.expect(error.Message).toContain ("window 42")
         )
 
+)
+
+Vitest.describe (
+    "File import state publisher",
+    fun () ->
+        let importAt step completed total : FileImportCoordinator.ActiveFileImport = {
+            State = {
+                requestId = "throttled"
+                phase = FileImportPhase.Copying
+                progress = {
+                    step = step
+                    completedItems = completed
+                    totalItems = total
+                }
+            }
+            AbortController = Abort.AbortController.create ()
+            Completion = JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed)
+        }
+
+        let withFakeTimers (body: ResizeArray<int> -> FileImportCoordinator.ThrottledStatePublisher -> unit) =
+            Vitest.vi.useFakeTimers () |> ignore
+
+            try
+                let published = ResizeArray<int>()
+
+                let publisher =
+                    FileImportCoordinator.createThrottledStatePublisher
+                        100
+                        (fun activeImport -> published.Add activeImport.State.progress.completedItems)
+
+                body published publisher
+            finally
+                Vitest.vi.useRealTimers () |> ignore
+
+        Vitest.test (
+            "publishes the first report of a burst at once and the latest one after the interval",
+            fun () ->
+                withFakeTimers (fun published publisher ->
+                    publisher.Report(importAt FileImportStep.Copying 1 100)
+                    publisher.Report(importAt FileImportStep.Copying 2 100)
+                    publisher.Report(importAt FileImportStep.Copying 3 100)
+                    Vitest.expect(published.ToArray() |> Array.map string).toEqual ([| 1 |] |> Array.map string)
+                    Vitest.vi.advanceTimersByTime 100 |> ignore
+                    Vitest.expect(published.ToArray() |> Array.map string).toEqual ([| 1; 3 |] |> Array.map string)
+                    Vitest.vi.advanceTimersByTime 500 |> ignore
+                    Vitest.expect(published.ToArray() |> Array.map string).toEqual ([| 1; 3 |] |> Array.map string)
+                )
+        )
+
+        Vitest.test (
+            "publishes a step change at once",
+            fun () ->
+                withFakeTimers (fun published publisher ->
+                    publisher.Report(importAt FileImportStep.Copying 1 100)
+                    publisher.Report(importAt FileImportStep.Publishing 2 100)
+                    Vitest.expect(published.ToArray() |> Array.map string).toEqual ([| 1; 2 |] |> Array.map string)
+                )
+        )
+
+        Vitest.test (
+            "drops a pending publish after Stop",
+            fun () ->
+                withFakeTimers (fun published publisher ->
+                    publisher.Report(importAt FileImportStep.Copying 1 100)
+                    publisher.Report(importAt FileImportStep.Copying 2 100)
+                    publisher.Stop()
+                    Vitest.vi.advanceTimersByTime 500 |> ignore
+                    Vitest.expect(published.ToArray() |> Array.map string).toEqual ([| 1 |] |> Array.map string)
+                )
+        )
 )

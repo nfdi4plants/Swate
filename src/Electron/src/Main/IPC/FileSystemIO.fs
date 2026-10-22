@@ -600,7 +600,12 @@ module ArcFileSystemHelper =
 
     let private copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested = promise {
         do! mkdirAsync plan.TemporaryDirectory
-        onProgress 0.0
+
+        onProgress {
+            step = FileImportStep.Copying
+            completedItems = 0
+            totalItems = plan.Entries.Length
+        }
 
         for sourceIndex, entry in plan.Entries |> Array.indexed do
             if isCancellationRequested () then
@@ -613,16 +618,27 @@ module ArcFileSystemHelper =
             else
                 do! copyFileAsync entry.SourcePath temporaryPath 0
 
-            onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
+            onProgress {
+                step = FileImportStep.Copying
+                completedItems = sourceIndex + 1
+                totalItems = plan.Entries.Length
+            }
     }
 
     let private copyTemporaryFilesIntoTarget
         (plan: ExternalFileImportPlan)
         (createdTargetPaths: ResizeArray<string>)
+        onProgress
         isCancellationRequested
         =
         promise {
-            for entry in plan.Entries do
+            onProgress {
+                step = FileImportStep.Publishing
+                completedItems = 0
+                totalItems = plan.Entries.Length
+            }
+
+            for entryIndex, entry in plan.Entries |> Array.indexed do
                 if isCancellationRequested () then
                     raise ImportCancelledException
 
@@ -646,6 +662,12 @@ module ArcFileSystemHelper =
                 // cancellation requested during the copy rolls back the registered destination.
                 if isCancellationRequested () then
                     raise ImportCancelledException
+
+                onProgress {
+                    step = FileImportStep.Publishing
+                    completedItems = entryIndex + 1
+                    totalItems = plan.Entries.Length
+                }
         }
 
     let private cleanupExternalFileImport temporaryDirectory (createdTargetPaths: ResizeArray<string>) = promise {
@@ -697,7 +719,7 @@ module ArcFileSystemHelper =
         (arcPath: string)
         (targetRelativePath: string)
         (sourcePaths: string[])
-        (onProgress: float -> unit)
+        (onProgress: FileImportProgress -> unit)
         (isCancellationRequested: unit -> bool)
         (onPathsPlanned: PlannedImportPaths -> unit)
         (onPublished: string[] -> unit)
@@ -708,6 +730,12 @@ module ArcFileSystemHelper =
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
                 try
+                    onProgress {
+                        step = FileImportStep.Scanning
+                        completedItems = 0
+                        totalItems = 0
+                    }
+
                     let! plan =
                         createExternalFileImportPlan
                             isCancellationRequested
@@ -730,7 +758,7 @@ module ArcFileSystemHelper =
 
                     try
                         do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
-                        do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                        do! copyTemporaryFilesIntoTarget plan createdTargetPaths onProgress isCancellationRequested
 
                         // Reports the absolute paths of the imported top-level folders.
                         plan.Entries

@@ -43,9 +43,6 @@ let mutable closeWaitTimeoutMilliseconds = 30000
 let private importedPathQuietMilliseconds = 30000
 let private importedPathMaximumMilliseconds = 300000
 
-[<Emit("performance.now()")>]
-let private currentTimeMilliseconds () : float = jsNative
-
 type internal ImportedPathLease = {
     mutable Paths: string[]
     mutable CompletedAt: float option
@@ -780,7 +777,7 @@ module ArcVaultExtensions =
                 this.importedPathLeases.[token] <- {
                     Paths = Array.distinct keys
                     CompletedAt = None
-                    LastActivity = currentTimeMilliseconds ()
+                    LastActivity = Main.Bindings.Node.performanceNow ()
                     Timer = None
                 }
 
@@ -811,7 +808,8 @@ module ArcVaultExtensions =
             | true, lease when lease.CompletedAt.IsSome ->
                 lease.Timer |> Option.iter Fable.Core.JS.clearTimeout
 
-                let delay = max 0.0 (this.ImportedLeaseDeadline lease - currentTimeMilliseconds ())
+                let delay =
+                    max 0.0 (this.ImportedLeaseDeadline lease - Main.Bindings.Node.performanceNow ())
 
                 lease.Timer <-
                     Some(
@@ -821,7 +819,7 @@ module ArcVaultExtensions =
                                 | true, current ->
                                     current.Timer <- None
 
-                                    if currentTimeMilliseconds () >= this.ImportedLeaseDeadline current then
+                                    if Main.Bindings.Node.performanceNow () >= this.ImportedLeaseDeadline current then
                                         this.ReleaseImport token
                                     else
                                         this.ArmImportRelease token
@@ -840,7 +838,7 @@ module ArcVaultExtensions =
             | Ok ImportExternalFilesResult.Completed ->
                 match this.importedPathLeases.TryGetValue token with
                 | true, lease when lease.CompletedAt.IsNone ->
-                    let now = currentTimeMilliseconds ()
+                    let now = Main.Bindings.Node.performanceNow ()
                     lease.CompletedAt <- Some now
                     lease.LastActivity <- now
                     this.ArmImportRelease token
@@ -863,7 +861,7 @@ module ArcVaultExtensions =
                 | true, token ->
                     match this.importedPathLeases.TryGetValue token with
                     | true, lease ->
-                        let now = currentTimeMilliseconds ()
+                        let now = Main.Bindings.Node.performanceNow ()
 
                         if lease.CompletedAt.IsSome && now >= this.ImportedLeaseDeadline lease then
                             this.ReleaseImport token

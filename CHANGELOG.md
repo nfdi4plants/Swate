@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. Lock files of open Office documents, such as "~$Book1.xlsx", Git LFS pointer files and files whose name starts or ends with a space can't be imported either. For a pointer file, download the file in its ARC first. #1429 (by @Etschbeijer)
 - New files and folders and renamed items can't be named "isa_datamap" anymore. It is the outdated name of DataMap files, and opening the ARC would turn such a file into "isa.datamap.xlsx". Existing items with that name can still be renamed, moved and deleted. #1429 (by @Etschbeijer)
+- While files or folders are imported, the notice shows the current step and how many items are done. The taskbar progress now covers the whole import, including adding the items to the ARC. #1429 (by @Etschbeijer)
 
 ### 🐛 Fixed
 

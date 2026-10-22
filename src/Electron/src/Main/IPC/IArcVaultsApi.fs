@@ -527,21 +527,59 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             // do unrelated external ARC changes. Successful imports also replay their own events
                             // synchronously before the refreshed tree is exposed.
 
-                            let reportImportProgress progress =
-                                if progress <= 0.0 then
+                            let publisher =
+                                FileImportCoordinator.createThrottledStatePublisher
+                                    100
+                                    (fun activeImport ->
+                                        FileImportCoordinator.publishState vault.window (Some activeImport)
+                                    )
+
+                            let reportImportProgress (progress: FileImportProgress) =
+                                let fractionDone =
+                                    if progress.totalItems <= 0 then
+                                        0.0
+                                    else
+                                        float progress.completedItems / float progress.totalItems
+
+                                match progress.step with
+                                | FileImportStep.Scanning ->
                                     vault.window.setProgressBar (
                                         0.0,
                                         BrowserWindow.SetProgressBar.Options(
                                             Enums.BrowserWindow.SetProgressBar.Options.Mode.Indeterminate
                                         )
                                     )
-                                else
+                                | FileImportStep.Copying ->
                                     vault.window.setProgressBar (
-                                        progress,
+                                        0.5 * fractionDone,
                                         BrowserWindow.SetProgressBar.Options(
                                             Enums.BrowserWindow.SetProgressBar.Options.Mode.Normal
                                         )
                                     )
+                                | FileImportStep.Publishing ->
+                                    vault.window.setProgressBar (
+                                        0.5 + 0.5 * fractionDone,
+                                        BrowserWindow.SetProgressBar.Options(
+                                            Enums.BrowserWindow.SetProgressBar.Options.Mode.Normal
+                                        )
+                                    )
+
+                                match vault.activeFileImport with
+                                | Some activeImport when
+                                    activeImport.State.requestId = request.requestId
+                                    && activeImport.State.phase = FileImportPhase.Copying
+                                    ->
+                                    let updatedImport = {
+                                        activeImport with
+                                            State = {
+                                                activeImport.State with
+                                                    progress = progress
+                                            }
+                                    }
+
+                                    vault.activeFileImport <- Some updatedImport
+                                    publisher.Report updatedImport
+                                | _ -> ()
 
                             return!
                                 IPCHelper.withExclusiveBusyWriting
@@ -574,47 +612,52 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     // releases the busy flag, so ownership must outlive the write itself.
                                                     vault.ClaimImportedFileEvents(importToken, importedEvents)
 
-                                                let! result =
-                                                    ArcFileSystemHelper.importExternalFilesOnDisk
-                                                        vault.path.Value
-                                                        request.targetRelativePath
-                                                        sourceAbsolutePaths
-                                                        reportImportProgress
-                                                        (fun () -> abortSignal.aborted)
-                                                        registerImportedPaths
-                                                        (fun publishedFolders ->
-                                                            vault.WatchImportedFolders publishedFolders
+                                                try
+                                                    let! result =
+                                                        ArcFileSystemHelper.importExternalFilesOnDisk
+                                                            vault.path.Value
+                                                            request.targetRelativePath
+                                                            sourceAbsolutePaths
+                                                            reportImportProgress
+                                                            (fun () -> abortSignal.aborted)
+                                                            registerImportedPaths
+                                                            (fun publishedFolders ->
+                                                                publisher.Stop()
+                                                                vault.WatchImportedFolders publishedFolders
 
-                                                            match vault.activeFileImport with
-                                                            | Some activeImport when
-                                                                activeImport.State.requestId = request.requestId
-                                                                ->
-                                                                let finalizingImport = {
-                                                                    activeImport with
-                                                                        State = {
-                                                                            activeImport.State with
-                                                                                phase = FileImportPhase.Finalizing
-                                                                        }
-                                                                }
+                                                                match vault.activeFileImport with
+                                                                | Some activeImport when
+                                                                    activeImport.State.requestId = request.requestId
+                                                                    ->
+                                                                    let finalizingImport = {
+                                                                        activeImport with
+                                                                            State = {
+                                                                                activeImport.State with
+                                                                                    phase =
+                                                                                        FileImportPhase.Finalizing
+                                                                            }
+                                                                    }
 
-                                                                vault.activeFileImport <- Some finalizingImport
+                                                                    vault.activeFileImport <- Some finalizingImport
 
-                                                                FileImportCoordinator.publishState
-                                                                    vault.window
-                                                                    (Some finalizingImport)
-                                                            | _ -> ()
-                                                        )
-                                                        (fun () ->
-                                                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
-                                                                importedEvents |> Seq.toList
+                                                                    FileImportCoordinator.publishState
+                                                                        vault.window
+                                                                        (Some finalizingImport)
+                                                                | _ -> ()
                                                             )
-                                                        )
-                                                    |> Promise.catch Error
+                                                            (fun () ->
+                                                                vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
+                                                                    importedEvents |> Seq.toList
+                                                                )
+                                                            )
+                                                        |> Promise.catch Error
 
-                                                vault.ReleaseImportedFileEventsAfterImport(importToken, result)
+                                                    vault.ReleaseImportedFileEventsAfterImport(importToken, result)
 
-                                                vault.window.setProgressBar -1.0
-                                                return result
+                                                    vault.window.setProgressBar -1.0
+                                                    return result
+                                                finally
+                                                    publisher.Stop()
                                             })
                                     )
                         })

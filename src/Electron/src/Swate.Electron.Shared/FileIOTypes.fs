@@ -115,7 +115,20 @@ type FileImportPhase =
     | Copying
     | Finalizing
 
+[<RequireQualifiedAccess>]
+type FileImportStep =
+    | Scanning
+    | Copying
+    | Publishing
+
+type FileImportProgress = {
+    step: FileImportStep
+    completedItems: int
+    totalItems: int
+}
+
 type ActiveFileImportState = {
     requestId: string
     phase: FileImportPhase
+    progress: FileImportProgress
 }
