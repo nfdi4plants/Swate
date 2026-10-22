@@ -1034,7 +1034,19 @@ Vitest.describe (
                                 absoluteArcPath arcPath "assays/AssayA/dataset/Run1/empty"
                             )
 
-                        Vitest.expect(plannedFiles).toEqual ([| "Run1/notes.txt"; "Run1/raw/results.csv" |])
+                        let! generatedGitKeep =
+                            readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/empty/.gitkeep"
+
+                        Vitest
+                            .expect(plannedFiles)
+                            .toEqual (
+                                [|
+                                    "Run1/notes.txt"
+                                    "Run1/raw/results.csv"
+                                    "Run1/empty/.gitkeep"
+                                |]
+                            )
+
                         Vitest.expect(plannedFolders).toEqual ([| "Run1"; "Run1/empty"; "Run1/raw" |])
                         Vitest.expect(lifecycleOrder |> Seq.toArray).toEqual ([| "planned"; "published" |])
 
@@ -1046,7 +1058,62 @@ Vitest.describe (
                         Vitest.expect(notes).toBe ("run notes")
                         Vitest.expect(results).toBe ("a,b")
                         Vitest.expect(emptyFolderExists).toBe (true)
+                        Vitest.expect(generatedGitKeep).toBe ("")
                         do! expectNoTemporaryImportDirectory arcPath "assays/AssayA/dataset"
+                })
+        )
+
+        Vitest.test (
+            "writes a .gitkeep into an imported folder whose only content is left out",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync sourcePath "locked"
+                    do! writeRelativeFileAsync sourcePath "locked/~$lock.xlsx" "Excel lock file"
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! plannedFiles = importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [| sourcePath |]
+
+                    let! gitKeep = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/locked/.gitkeep"
+
+                    Vitest.expect(plannedFiles |> Array.contains "Run1/locked/.gitkeep").toBe (true)
+                    Vitest.expect(gitKeep).toBe ("")
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1/locked/~$lock.xlsx" false
+                })
+        )
+
+        Vitest.test (
+            "writes a .gitkeep into a picked empty folder",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    do! createRelativeDirectoryAsync (dirname arcPath) "emptyPick"
+
+                    let! plannedFiles =
+                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
+                            join [| dirname arcPath; "emptyPick" |]
+                        |]
+
+                    let! gitKeep = readRelativeFileAsync arcPath "assays/AssayA/dataset/emptyPick/.gitkeep"
+
+                    Vitest.expect(plannedFiles).toEqual ([| "emptyPick/.gitkeep" |])
+                    Vitest.expect(gitKeep).toBe ("")
+                })
+        )
+
+        Vitest.test (
+            "does not write a .gitkeep into an imported folder that has content",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! sourcePath = createExternalRunFolderAsync arcPath
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    do!
+                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [| sourcePath |]
+                        |> Promise.map ignore
+
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1/.gitkeep" false
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/Run1/raw/.gitkeep" false
                 })
         )
 
@@ -1093,7 +1160,7 @@ Vitest.describe (
                                 }
                         |]
 
-                        Vitest.expect(plannedCount).toBe (5)
+                        Vitest.expect(plannedCount).toBe (6)
                         Vitest.expect(updates.ToArray()).toEqual (expected)
                 })
         )
@@ -1107,7 +1174,7 @@ Vitest.describe (
                     do! writeRelativeFileAsync sourcePath "raw/~$results.xlsx" "Excel lock file"
                     do! writeRelativeFileAsync sourcePath "raw/.~lock.results.csv#" "LibreOffice lock file"
                     do! writeRelativeFileAsync sourcePath "raw/.gitattributes" "*.csv filter=lfs"
-                    do! writeRelativeFileAsync sourcePath "empty/.gitkeep" ""
+                    do! writeRelativeFileAsync sourcePath "empty/.gitkeep" "source content"
                     do! writeRelativeFileAsync sourcePath "raw/.GITKEEP" ""
                     // README files share the protected list with the git files, but "New File" may create them.
                     do! writeRelativeFileAsync sourcePath "raw/README.md" "about the raw data"
@@ -1125,15 +1192,19 @@ Vitest.describe (
                                 "Run1/notes.txt"
                                 "Run1/raw/README.md"
                                 "Run1/raw/results.csv"
+                                "Run1/empty/.gitkeep"
                             |]
                         )
+
+                    // The import writes its own empty file, not the source one.
+                    let! generatedGitKeep = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/empty/.gitkeep"
+                    Vitest.expect(generatedGitKeep).toBe ("")
 
                     for skippedPath in
                         [
                             "raw/~$results.xlsx"
                             "raw/.~lock.results.csv#"
                             "raw/.gitattributes"
-                            "empty/.gitkeep"
                             "raw/.GITKEEP"
                             $"raw/results.csv.vcs-lfs-backup-{guidSuffix}"
                             $".swate-import-{guidSuffix}"
@@ -1448,6 +1519,7 @@ Vitest.describe (
                                 "Run1/notes.txt"
                                 "Run1/raw/results.csv"
                                 "Run2/notes.txt"
+                                "Run1/empty/.gitkeep"
                             |]
                         )
 

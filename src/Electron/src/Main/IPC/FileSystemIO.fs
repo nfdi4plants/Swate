@@ -221,6 +221,7 @@ module ArcFileSystemHelper =
         SourcePath: string
         RelativePath: string
         IsDirectory: bool
+        IsGeneratedGitKeep: bool
     }
 
     type private ExternalFileImportPlan = {
@@ -273,6 +274,7 @@ module ArcFileSystemHelper =
         SourcePath = sourcePath
         RelativePath = relativePath
         IsDirectory = isDirectory
+        IsGeneratedGitKeep = false
     }
 
     let private symbolicLinkImportError path =
@@ -581,6 +583,33 @@ module ArcFileSystemHelper =
             | Some index -> raise (gitLfsPointerImportError nestedFiles.[index].RelativePath)
             | None -> ()
 
+            // Git does not track empty folders, so the import writes an empty `.gitkeep` into an imported folder
+            // that would stay empty, like ARCtrl does for its own folders. The entries come after all folders,
+            // which keeps every parent folder ahead of its contents.
+            // One pass collects every folder that holds an entry, so large imports stay linear.
+            let foldersWithContent =
+                System.Collections.Generic.HashSet<string>(
+                    entries
+                    |> Seq.choose (fun entry ->
+                        match entry.RelativePath.LastIndexOf '/' with
+                        | -1 -> None
+                        | index -> Some(entry.RelativePath.Substring(0, index))
+                    )
+                )
+
+            let emptyFolders =
+                entries
+                |> Seq.filter (fun entry -> entry.IsDirectory && not (foldersWithContent.Contains entry.RelativePath))
+                |> Seq.toArray
+
+            for folder in emptyFolders do
+                entries.Add {
+                    SourcePath = ""
+                    RelativePath = folder.RelativePath + "/.gitkeep"
+                    IsDirectory = false
+                    IsGeneratedGitKeep = true
+                }
+
             return {
                 TargetDirectory = targetDirectory
                 // The watcher explicitly ignores this operation-owned directory and its contents.
@@ -615,6 +644,8 @@ module ArcFileSystemHelper =
 
             if entry.IsDirectory then
                 do! mkdirExclusiveAsync temporaryPath
+            elif entry.IsGeneratedGitKeep then
+                do! ARCtrl.FileSystemHelper.writeFileTextAsync temporaryPath ""
             else
                 do! copyFileAsync entry.SourcePath temporaryPath 0
 

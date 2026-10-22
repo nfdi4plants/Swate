@@ -18,7 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added
 
-- Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. A folder is not imported if an item with the same name already exists there, if its name starts or ends with a space, or if the folder itself is a symbolic link. It is also not imported if it contains a ".git" folder, a symbolic link, an ARC metadata file such as "isa.assay.xlsx", an item named "isa_datamap", a Git LFS pointer file (which stands in for a large file that was not downloaded), a name with a backslash, a name Windows does not allow (such as one with a colon or ending with a dot), a name that starts or ends with a space, or two names in the same folder that differ only in case. Lock files of open Office documents, such as "~$Book1.xlsx", and ".gitkeep" and ".gitattributes" files inside the folder are left out. A folder named ".gitkeep", ".gitattributes" or "README.md" is not imported either, whether you pick it or it sits inside a picked folder, because ARCitISA could not rename or delete it afterwards. #1429 (by @Etschbeijer)
+- Right-clicking a folder or the ARC name offers "Import folders", which copies the folders you pick, with everything inside them. It is available wherever "New Folder" is. #1429 (by @Etschbeijer)
+- "Import folders" does not import a folder if an item with the same name already exists there or if the folder itself is a symbolic link. #1429 (by @Etschbeijer)
+- "Import folders" stops with a message if a folder contains a ".git" folder, a symbolic link, an ARC metadata file such as "isa.assay.xlsx" or an item named "isa_datamap". #1429 (by @Etschbeijer)
+- "Import folders" stops with a message if a folder contains a Git LFS pointer file, which stands in for a large file that was not downloaded. Download the file in its ARC first. #1429 (by @Etschbeijer)
+- "Import folders" stops with a message if a name does not work on every system: a backslash, a character or ending Windows does not allow (such as a colon or a dot at the end), a space at the start or end, or two names in the same folder that differ only in case. This applies to the picked folder and to everything inside it. #1429 (by @Etschbeijer)
+- "Import folders" stops with a message for a folder named ".gitkeep", ".gitattributes" or "README.md", picked or inside a picked folder, because ARCitISA could not rename or delete it afterwards. #1429 (by @Etschbeijer)
+- "Import folders" leaves out lock files of open Office documents, such as "~$Book1.xlsx", and ".gitkeep" and ".gitattributes" files inside the imported folders. #1429 (by @Etschbeijer)
+- Imported folders that would stay empty get an empty ".gitkeep" file, so they are kept when the ARC is uploaded. #1429 (by @Etschbeijer)
 
 ### 🔄 Changed
 
