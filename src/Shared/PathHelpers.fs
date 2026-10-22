@@ -425,6 +425,47 @@ module ArcEntityPathRules =
     let isGenericFileSystemCreateTargetAllowed (isFile: bool) (relativePath: string) =
         isGenericFileSystemPathAllowed true isFile relativePath
 
+    /// The user-facing reason why `isGenericFileSystemCreateTargetAllowed` rejects a path, or `None` when it is allowed.
+    let describeBlockedGenericCreateTarget (isFile: bool) (relativePath: string) : string option =
+        if isGenericFileSystemCreateTargetAllowed isFile relativePath then
+            None
+        else
+            let normalizedRelativePath = normalizeRelativePath relativePath
+            let segments = normalizedRelativePath |> splitPathSegments
+            let name = PathHelpers.getFileName normalizedRelativePath
+
+            let structuralPath =
+                if String.IsNullOrWhiteSpace normalizedRelativePath then
+                    StructuralArcPath.OtherPath
+                else
+                    classifyStructuralArcPath segments
+
+            let isBlockedStructuralPath =
+                match structuralPath with
+                | StructuralArcPath.EntityFolder when isFile -> false
+                | _ -> blocksGenericFileSystemTarget structuralPath
+
+            if not (String.IsNullOrWhiteSpace name) && isCanonicalArcFileName name then
+                Some $"'{name}' is reserved for ARC metadata."
+            elif isBlockedStructuralPath then
+                match structuralPath with
+                | StructuralArcPath.AddZoneRoot ->
+                    Some $"'{name}' is one of the ARC's main folders, which ARCitISA manages itself."
+                | StructuralArcPath.ProtectedEntityChildFolder ->
+                    Some $"'{name}' is a folder that ARCitISA manages inside a study or assay."
+                | _ ->
+                    Some
+                        $"'{name}' is a study, assay, workflow or run folder, which ARCitISA creates through its own dialogs."
+            elif segments |> Array.exists isDisallowedGenericPathSegment then
+                Some "'.git' is not allowed inside an ARC."
+            elif
+                not (String.IsNullOrWhiteSpace normalizedRelativePath)
+                && PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+            then
+                Some $"ARCitISA protects the name '{name}', so it could not be renamed or deleted afterwards."
+            else
+                Some "The path must stay inside the ARC."
+
     let tryNormalizeGenericFileSystemTarget (errorMessage: string) (relativePath: string) : Result<string, string> =
         let normalizedRelativePath = normalizeRelativePath relativePath
 

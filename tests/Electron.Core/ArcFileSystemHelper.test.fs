@@ -214,9 +214,52 @@ let private rejectedImports = [
                 return join [| dirname arcPath; "isa.investigation.xlsx" |]
             }
         TargetRelativePath = "assays/AssayA/dataset"
-        ExpectedError =
-            "Cannot import 'isa.investigation.xlsx': Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+        ExpectedError = "Cannot import 'isa.investigation.xlsx': 'isa.investigation.xlsx' is reserved for ARC metadata."
         AbsentRelativePath = "assays/AssayA/dataset/isa.investigation.xlsx"
+    }
+    {
+        Description = "a folder named like a main ARC folder that exists in the target"
+        PrepareSource =
+            fun arcPath -> promise {
+                let sourceRoot = dirname arcPath
+                do! createRelativeDirectoryAsync sourceRoot "external/assays/raw"
+                return absoluteArcPath sourceRoot "external/assays"
+            }
+        TargetRelativePath = ""
+        ExpectedError = "Cannot import 'assays' because an item with that name already exists."
+        AbsentRelativePath = "assays/raw"
+    }
+    {
+        Description = "a folder named like a managed assay folder that exists in the target"
+        PrepareSource =
+            fun arcPath -> promise {
+                let sourceRoot = dirname arcPath
+                do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                do! createRelativeDirectoryAsync sourceRoot "external/dataset/raw"
+                return absoluteArcPath sourceRoot "external/dataset"
+            }
+        TargetRelativePath = "assays/AssayA"
+        ExpectedError = "Cannot import 'dataset' because an item with that name already exists."
+        AbsentRelativePath = "assays/AssayA/dataset/raw"
+    }
+    {
+        Description = "a folder named like a managed assay folder that is missing in the target"
+        PrepareSource =
+            fun arcPath -> promise {
+                let sourceRoot = dirname arcPath
+
+                do!
+                    Main.Bindings.Filesystem.rmAsync
+                        (absoluteArcPath arcPath "assays/AssayA/protocols")
+                        (Main.Bindings.Filesystem.RmOptions(recursive = true, force = true))
+
+                do! createRelativeDirectoryAsync sourceRoot "external/protocols/raw"
+                return absoluteArcPath sourceRoot "external/protocols"
+            }
+        TargetRelativePath = "assays/AssayA"
+        ExpectedError =
+            "Cannot import 'protocols': 'protocols' is a folder that ARCitISA manages inside a study or assay."
+        AbsentRelativePath = "assays/AssayA/protocols"
     }
     {
         Description = "a folder that contains a .git folder"
@@ -1102,6 +1145,24 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "writes a .gitkeep only into the innermost empty folder of nested empty folders",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+                    do! createRelativeDirectoryAsync (dirname arcPath) "nestedPick/a/b"
+
+                    let! plannedFiles =
+                        importCollectingPlannedFiles arcPath "assays/AssayA/dataset" [|
+                            join [| dirname arcPath; "nestedPick" |]
+                        |]
+
+                    Vitest.expect(plannedFiles).toEqual ([| "nestedPick/a/b/.gitkeep" |])
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/nestedPick/a/b/.gitkeep" true
+                    do! expectRelativePathExists arcPath "assays/AssayA/dataset/nestedPick/a/.gitkeep" false
+                })
+        )
+
+        Vitest.test (
             "does not write a .gitkeep into an imported folder that has content",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
@@ -1196,7 +1257,7 @@ Vitest.describe (
                             |]
                         )
 
-                    // The import writes its own empty file, not the source one.
+                    // The import writes its own empty file and skips the source file.
                     let! generatedGitKeep = readRelativeFileAsync arcPath "assays/AssayA/dataset/Run1/empty/.gitkeep"
                     Vitest.expect(generatedGitKeep).toBe ("")
 
@@ -1669,6 +1730,53 @@ Vitest.describe (
             )
 
         Vitest.test (
+            "rejects a picked .gitattributes file into a folder that has one and keeps the existing file",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! writeRelativeFileAsync arcPath ".gitattributes" "existing attributes"
+                    do! writeRelativeFileAsync (dirname arcPath) ".gitattributes" "copied attributes"
+                    let! before = readRelativeFileAsync arcPath ".gitattributes"
+
+                    let! result =
+                        importWithoutCancellation arcPath "" [| join [| dirname arcPath; ".gitattributes" |] |]
+
+                    result
+                    |> expectErrorContaining
+                        "Cannot import '.gitattributes' because the ARC manages its own '.gitattributes' file."
+
+                    let! after = readRelativeFileAsync arcPath ".gitattributes"
+                    Vitest.expect(after).toBe (before)
+                    Vitest.expect(after).toBe ("existing attributes")
+                    do! expectNoTemporaryImportDirectory arcPath ""
+                })
+        )
+
+        Vitest.test (
+            "rejects a picked ARC metadata file into the ARC root and keeps the existing workbook",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! writeRelativeFileAsync (dirname arcPath) "isa.investigation.xlsx" "copied workbook"
+
+                    let readWorkbookBytes () =
+                        Main.Bindings.Filesystem.readFileBytesAsync (absoluteArcPath arcPath "isa.investigation.xlsx")
+
+                    let! before = readWorkbookBytes ()
+
+                    let! result =
+                        importWithoutCancellation arcPath "" [| join [| dirname arcPath; "isa.investigation.xlsx" |] |]
+
+                    result
+                    |> expectErrorContaining
+                        "Cannot import 'isa.investigation.xlsx': 'isa.investigation.xlsx' is reserved for ARC metadata."
+
+                    let! after = readWorkbookBytes ()
+                    Vitest.expect(before.Length).toBeGreaterThan (0)
+                    Vitest.expect(after).toEqual (before)
+                    do! expectNoTemporaryImportDirectory arcPath ""
+                })
+        )
+
+        Vitest.test (
             "rolls back every imported folder when post-import validation fails",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
@@ -1952,7 +2060,7 @@ Vitest.describe (
                             arcPath
                             (createItemRequest "assays" "isa.assay.xlsx" FileSystemItemKind.File)
 
-                    expectErrorContaining "must not target canonical ARC files" canonicalFileResult
+                    expectErrorContaining "is reserved for ARC metadata" canonicalFileResult
                     do! expectRelativePathExists arcPath "assays/isa.assay.xlsx" false
 
                     let! extensionlessFileResult =

@@ -23,16 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Import folders" stops with a message if a folder contains a ".git" folder, a symbolic link, an ARC metadata file such as "isa.assay.xlsx" or an item named "isa_datamap". #1429 (by @Etschbeijer)
 - "Import folders" stops with a message if a folder contains a Git LFS pointer file, which stands in for a large file that was not downloaded. Download the file in its ARC first. #1429 (by @Etschbeijer)
 - "Import folders" stops with a message if a name does not work on every system: a backslash, a character or ending Windows does not allow (such as a colon or a dot at the end), a space at the start or end, or two names in the same folder that differ only in case. This applies to the picked folder and to everything inside it. #1429 (by @Etschbeijer)
-- "Import folders" stops with a message for a folder named ".gitkeep", ".gitattributes" or "README.md", picked or inside a picked folder, because ARCitISA could not rename or delete it afterwards. #1429 (by @Etschbeijer)
-- "Import folders" leaves out lock files of open Office documents, such as "~$Book1.xlsx", and ".gitkeep" and ".gitattributes" files inside the imported folders. #1429 (by @Etschbeijer)
+- "Import folders" stops with a message for a folder named like a protected file, such as ".gitkeep" or "README.md", picked or inside a picked folder, because ARCitISA could not rename or delete it afterwards. #1429 (by @Etschbeijer)
+- "Import folders" leaves out lock files of open Office documents, such as "~$Book1.xlsx", and the ".gitkeep" and ".gitattributes" files of the source folders. #1429 (by @Etschbeijer)
+- "Import folders" stops with a message for a folder that ARCitISA manages at the target, such as "dataset" inside an assay or "assays" at the ARC root. #1429 (by @Etschbeijer)
 - Imported folders that would stay empty get an empty ".gitkeep" file, so they are kept when the ARC is uploaded. #1429 (by @Etschbeijer)
 
 ### 🔄 Changed
 
 - New files and folders and renamed items can't use names that Windows does not allow, such as names with : ? * or a dot at the end, or names like CON and AUX, so the ARC can also be downloaded and used on Windows. #1429 (by @Etschbeijer)
-- "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. Lock files of open Office documents, such as "~$Book1.xlsx", Git LFS pointer files and files whose name starts or ends with a space can't be imported either. For a pointer file, download the file in its ARC first. #1429 (by @Etschbeijer)
+- "Import files" follows the same rules as "New File": a file placed directly in the studies, assays, workflows or runs folder needs a file extension, and ARC metadata files such as "isa.investigation.xlsx" can't be imported. #1429 (by @Etschbeijer)
+- "Import files" does not import lock files of open Office documents, such as "~$Book1.xlsx", or Git LFS pointer files. For a pointer file, download the file in its ARC first. #1429 (by @Etschbeijer)
+- "Import files" does not import files whose name starts or ends with a space. #1429 (by @Etschbeijer)
 - New files and folders and renamed items can't be named "isa_datamap" anymore. It is the outdated name of DataMap files, and opening the ARC would turn such a file into "isa.datamap.xlsx". Existing items with that name can still be renamed, moved and deleted. #1429 (by @Etschbeijer)
 - While files or folders are imported, the notice shows the current step and how many items are done. The taskbar progress now covers the whole import, including adding the items to the ARC. #1429 (by @Etschbeijer)
+- New File and New Folder say why a name can't be used, for example for a "dataset" folder inside an assay or an ARC metadata file name. "Import files" shows the same reasons. #1429 (by @Etschbeijer)
 
 ### 🐛 Fixed
 

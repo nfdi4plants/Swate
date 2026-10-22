@@ -5,6 +5,16 @@ open Swate.Components.Shared
 open Vitest
 
 let private targetRejectedMessage = "must not target canonical ARC files"
+
+let private mainFolderMessage =
+    "is one of the ARC's main folders, which ARCitISA manages itself."
+
+let private reservedMetadataMessage = "is reserved for ARC metadata."
+
+let private protectedNameMessage =
+    "so it could not be renamed or deleted afterwards."
+
+let private gitFolderMessage = "'.git' is not allowed inside an ARC."
 let private extensionRequiredMessage = "file extension"
 
 let private addZones = [ "studies"; "assays"; "workflows"; "runs" ]
@@ -254,11 +264,11 @@ Vitest.describe (
                 | Error errorMessage -> failwith errorMessage
 
                 let rejectedRootTargets = [
-                    yield! addZones |> List.map (fun zone -> zone, targetRejectedMessage)
-                    "isa.investigation.xlsx", targetRejectedMessage
-                    ".git", targetRejectedMessage
-                    ".gitattributes", targetRejectedMessage
-                    ".gitkeep", targetRejectedMessage
+                    yield! addZones |> List.map (fun zone -> zone, mainFolderMessage)
+                    "isa.investigation.xlsx", reservedMetadataMessage
+                    ".git", gitFolderMessage
+                    ".gitattributes", protectedNameMessage
+                    ".gitkeep", protectedNameMessage
                     "../escape", "path separators"
                 ]
 
@@ -270,6 +280,35 @@ Vitest.describe (
                         |> expectErrorContaining expectedMessagePart
                     )
                 )
+        )
+
+        Vitest.test (
+            "New File and New Folder name the cause when a target is blocked",
+            fun () ->
+                tryBuildGenericFileSystemChildPath false "assays/AssayA" "dataset"
+                |> expectErrorContaining "'dataset' is a folder that ARCitISA manages inside a study or assay."
+
+                tryBuildGenericFileSystemChildPath false "" "assays"
+                |> expectErrorContaining "'assays' is one of the ARC's main folders, which ARCitISA manages itself."
+
+                tryBuildGenericFileSystemChildPath true "data" "isa.investigation.xlsx"
+                |> expectErrorContaining "'isa.investigation.xlsx' is reserved for ARC metadata."
+
+                tryBuildGenericFileSystemChildPath true "data" ".gitkeep"
+                |> expectErrorContaining
+                    "ARCitISA protects the name '.gitkeep', so it could not be renamed or deleted afterwards."
+
+                tryBuildGenericFileSystemChildPath false "data" ".git"
+                |> expectErrorContaining gitFolderMessage
+
+                Vitest
+                    .expect(ArcEntityPathRules.describeBlockedGenericCreateTarget false "assays/AssayB")
+                    .toEqual (
+                        Some
+                            "'AssayB' is a study, assay, workflow or run folder, which ARCitISA creates through its own dialogs."
+                    )
+
+                Vitest.expect(ArcEntityPathRules.describeBlockedGenericCreateTarget true "data/notes.md").toEqual (None)
         )
 
         Vitest.test (
@@ -295,7 +334,7 @@ Vitest.describe (
                 )
 
                 tryBuildGenericFileSystemChildPath false "" "README.md"
-                |> expectErrorContaining targetRejectedMessage
+                |> expectErrorContaining protectedNameMessage
 
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "README.md").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/AssayA/README.md").toBe (false)
@@ -317,7 +356,7 @@ Vitest.describe (
                     |> expectErrorContaining "only allowed inside safe ARC directories"
 
                     tryBuildGenericFileSystemChildPath true zone ".gitkeep"
-                    |> expectErrorContaining targetRejectedMessage
+                    |> expectErrorContaining protectedNameMessage
                 )
         )
 

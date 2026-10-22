@@ -115,14 +115,9 @@ let tryBuildGenericFileSystemChildPath (isFile: bool) (parentPath: string) (name
                 else
                     $"{normalizedParentPath}/{normalizedName}"
 
-            if
-                ArcEntityPathRules.isGenericFileSystemCreateTargetAllowed isFile targetPath
-                |> not
-            then
-                Error
-                    "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
-            else
-                validateNewItemName targetPath
+            match ArcEntityPathRules.describeBlockedGenericCreateTarget isFile targetPath with
+            | Some reason -> Error reason
+            | None -> validateNewItemName targetPath
 
 /// `isAddZoneRootFile` marks a file directly inside an add zone (for example `studies/notes.md` or
 /// `studies/.DS_Store`). Pass `false` for every other source.

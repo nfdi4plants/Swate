@@ -501,6 +501,19 @@ module ArcFileSystemHelper =
                         $"Cannot import '{name}' because ARCitISA reserves names like this for its own files, so ARCitISA would not see changes to it."
                 )
 
+        if ArcEntityPathRules.isCanonicalArcFileName name then
+            raise (exn $"Cannot import '{name}': '{name}' is reserved for ARC metadata.")
+
+        // The import checks for an existing item before the location rules, because a name such as `assays`
+        // or `dataset` is usually managed by ARCitISA at the target and already exists there.
+        match!
+            ensureTargetDoesNotExist
+                (join [| targetDirectory; name |])
+                $"Cannot import '{name}' because an item with that name already exists."
+        with
+        | Ok() -> ()
+        | Error targetError -> raise targetError
+
         // An imported item follows the same rules as one created with "New File" or "New Folder" in the target.
         match tryBuildGenericFileSystemChildPath (not isDirectory) targetRelativePath name with
         | Error validationError -> raise (exn $"Cannot import '{name}': {validationError}")
@@ -541,17 +554,6 @@ module ArcFileSystemHelper =
             match duplicateName with
             | Some(_, duplicates) -> raise (exn $"Cannot import multiple items named '{duplicates.[0].RelativePath}'.")
             | None -> ()
-
-            for entry in pickedEntries do
-                let destinationPath = join [| targetDirectory; entry.RelativePath |]
-
-                match!
-                    ensureTargetDoesNotExist
-                        destinationPath
-                        $"Cannot import '{entry.RelativePath}' because an item with that name already exists."
-                with
-                | Ok() -> ()
-                | Error targetError -> raise targetError
 
             let entries = ResizeArray<ExternalFileImportEntry>()
 
