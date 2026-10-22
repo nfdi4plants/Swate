@@ -525,7 +525,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             // The watcher ignores temporary import directories. While the import's marks last, creation
                             // events of imported files and folders start no merge. Later edits and deletions do, and so
                             // do unrelated external ARC changes. A completed import adds its items to the file tree
-                            // itself before the notice closes. Later watcher events for them only update those entries.
+                            // itself before the notice closes. Later watcher events for them replace or remove those entries.
 
                             let publisher =
                                 FileImportCoordinator.createThrottledStatePublisher

@@ -1693,6 +1693,68 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "imported entries are added next to the existing tree entries",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let! existingTree = Main.FileTreeCreator.getFileTree arcPath
+                        vault.SetFileTree existingTree
+                        Vitest.expect(existingTree.Count).toBeGreaterThan 0
+
+                        let filePath = join [| arcPath; "imported-next.txt" |]
+                        do! writeWatcherTextFileAsync filePath "next"
+                        do! vault.AddImportedEntriesToFileTree([||], [| filePath |])
+
+                        for key in existingTree.Keys do
+                            Vitest.expect(vault.fileTree.ContainsKey key).toBe true
+
+                        Vitest.expect(vault.fileTree.ContainsKey filePath).toBe true
+                    })
+        )
+
+        Vitest.test (
+            "imported entries and a queued watcher update both reach the tree",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let! existingTree = Main.FileTreeCreator.getFileTree arcPath
+                        vault.SetFileTree existingTree
+
+                        let watcherFile = join [| arcPath; "watcher-added.txt" |]
+                        let importedFile = join [| arcPath; "imported-after.txt" |]
+                        do! writeWatcherTextFileAsync watcherFile "watcher"
+                        do! writeWatcherTextFileAsync importedFile "imported"
+
+                        let mutable releaseTail = ignore
+
+                        let tailGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseTail <- fun () -> resolve ())
+
+                        vault.FileTreeUpdateTail <- tailGate
+
+                        let watcherUpdate =
+                            vault.ApplyWatcherFileTreeEvents [ watcherEvent arcPath "add" "watcher-added.txt" ]
+
+                        let importUpdate = vault.AddImportedEntriesToFileTree([||], [| importedFile |])
+
+                        releaseTail ()
+                        do! watcherUpdate
+                        do! importUpdate
+
+                        Vitest.expect(vault.fileTree.ContainsKey watcherFile).toBe true
+                        Vitest.expect(vault.fileTree.ContainsKey importedFile).toBe true
+                    })
+        )
+
+        Vitest.test (
             "drops imported entries after the watcher state was reset",
             fun () ->
                 withTempArc
@@ -5117,5 +5179,294 @@ Vitest.describe (
                     Vitest.vi.advanceTimersByTime 500 |> ignore
                     Vitest.expect(published.ToArray() |> Array.map string).toEqual ([| 1 |] |> Array.map string)
                 )
+        )
+)
+
+let private importWindowId = ref 9000
+let private importTarget = "assays/AssayA/dataset"
+
+let private importPlannedPaths: PlannedImportPaths = {
+    FolderPaths = [| "Run1"; "Run1/raw" |]
+    FilePaths = [| "Run1/notes.txt"; "Run1/raw/results.csv" |]
+}
+
+/// Registers a loaded vault whose window records its messages, with the source folder Run1 next to the ARC.
+/// The optional extra file is written into Run1.
+let private withImportVault
+    (extraFile: (string * string) option)
+    (testBody: ArcVault -> IArcVaultsApi -> TestWindowState -> string -> string -> JS.Promise<unit>)
+    =
+    withTempArc
+        ignore
+        (fun arcPath -> promise {
+            importWindowId.Value <- importWindowId.Value + 1
+            let windowId = importWindowId.Value
+            let windowState = createTestWindow (testWindowOptions windowId)
+            windowState.Window?setProgressBar <- emitJsExpr () "((..._args) => {})"
+
+            let sourcePath = join [| dirname arcPath; "external"; "Run1" |]
+            do! mkdirWatcherDirectoryAsync (join [| sourcePath; "raw" |])
+            do! mkdirWatcherDirectoryAsync (join [| arcPath; importTarget |])
+            do! writeWatcherTextFileAsync (join [| sourcePath; "notes.txt" |]) "run notes"
+            do! writeWatcherTextFileAsync (join [| sourcePath; "raw"; "results.csv" |]) "a,b"
+
+            match extraFile with
+            | Some(relativePath, content) ->
+                do! writeWatcherTextFileAsync (join [| sourcePath; relativePath |]) content
+            | None -> ()
+
+            let! loadedArc = TestHelpers.loadArcAsync arcPath
+            let vault = ArcVault(windowState.Window)
+            vault.path <- Some arcPath
+            vault.SetArc loadedArc
+            ARC_VAULTS.Vaults.Add(windowId, vault)
+            setBrowserWindowFromWebContents (fun _ -> windowState.Window :> obj)
+            setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| sourcePath |] ])
+
+            let cleanup () = promise {
+                ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                vault.ClearPendingFileWatcherState()
+                resetElectronMock ()
+            }
+
+            let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+            return! withAsyncCleanup cleanup (fun () -> testBody vault api windowState arcPath sourcePath)
+        })
+
+let private pickAndImport (api: IArcVaultsApi) requestId = promise {
+    match! api.pickAbsolutePaths FileSystemItemKind.Folder with
+    | Ok(Some authorizationId) ->
+        return!
+            api.tryImportExternalFiles {
+                requestId = requestId
+                targetRelativePath = importTarget
+                authorizationId = authorizationId
+            }
+    | other -> return failwithf "Expected an authorization, received %A." other
+}
+
+let private importStatesOf (windowState: TestWindowState) =
+    windowState.SentMessages
+    |> Seq.filter (fun args -> args.Length > 0 && (string args.[0]).Contains("fileImportStateUpdate"))
+    |> Seq.map (fun args ->
+        if args.Length < 2 || isNull args.[1] then
+            None
+        else
+            Some(unbox<ActiveFileImportState> args.[1])
+    )
+    |> Seq.toArray
+
+Vitest.describe (
+    "File import IPC",
+    fun () ->
+        Vitest.afterEach (fun () -> resetElectronMock ())
+
+        Vitest.test (
+            "the import dialog picks folders for Import folders and files for Import files",
+            fun () -> promise {
+                let windowId = 9100
+                let window = (createTestWindow (testWindowOptions windowId)).Window
+                let optionsByCall = ResizeArray<string[]>()
+
+                setBrowserWindowFromWebContents (fun _ -> window :> obj)
+
+                setShowOpenDialog (fun _ options ->
+                    optionsByCall.Add(unbox<string[]> options?properties)
+                    createObj [ "canceled" ==> false; "filePaths" ==> [| "C:/picked" |] ]
+                )
+
+                let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                for kind, expectedProperty in
+                    [
+                        FileSystemItemKind.Folder, "openDirectory"
+                        FileSystemItemKind.File, "openFile"
+                    ] do
+                    match! api.pickAbsolutePaths kind with
+                    | Ok(Some authorizationId) -> Vitest.expect(authorizationId.Length).toBeGreaterThan 0
+                    | other -> failwithf "Expected an authorization, received %A." other
+
+                    let properties = optionsByCall.[optionsByCall.Count - 1]
+                    Vitest.expect(properties).toContain expectedProperty
+                    Vitest.expect(properties).toContain "multiSelections"
+
+                Vitest.expect(optionsByCall.Count).toBe 2
+            }
+        )
+
+        Vitest.test (
+            "imports a picked folder through the IPC handler and marks its paths",
+            fun () ->
+                withImportVault
+                    None
+                    (fun vault api windowState arcPath _ -> promise {
+                        match! pickAndImport api "import-1" with
+                        | Ok ImportExternalFilesResult.Completed -> ()
+                        | other -> failwithf "Expected Completed, received %A." other
+
+                        let targetPath = join [| arcPath; importTarget; "Run1" |]
+                        let! notes = ARCtrl.FileSystemHelper.readFileTextAsync (join [| targetPath; "notes.txt" |])
+
+                        let! results =
+                            ARCtrl.FileSystemHelper.readFileTextAsync (join [| targetPath; "raw"; "results.csv" |])
+
+                        Vitest.expect(notes).toBe "run notes"
+                        Vitest.expect(results).toBe "a,b"
+                        Vitest.expect(vault.activeFileImport.IsNone).toBe true
+
+                        // The full scan defines the key format. The vault starts with an empty tree.
+                        let! scanned = Main.FileTreeCreator.getFileTree arcPath
+
+                        let importedKeys =
+                            scanned.Keys
+                            |> Seq.filter (fun key -> (PathHelpers.normalizePath key).Contains "dataset/Run1")
+                            |> Seq.toArray
+
+                        Vitest.expect(importedKeys.Length).toBe 4
+                        Vitest.expect(vault.fileTree.Count).toBe 4
+
+                        for key in importedKeys do
+                            Vitest.expect(vault.fileTree.ContainsKey key).toBe true
+
+                        let importedRelativeKeys = [
+                            "assays/AssayA/dataset/Run1"
+                            "assays/AssayA/dataset/Run1/raw"
+                            "assays/AssayA/dataset/Run1/notes.txt"
+                            "assays/AssayA/dataset/Run1/raw/results.csv"
+                        ]
+
+                        let sentMessages = windowState.SentMessages |> Seq.toArray
+
+                        let treeMessageIndex =
+                            sentMessages
+                            |> Array.tryFindIndex (fun args ->
+                                args.Length > 1
+                                && (string args.[0]).Contains("fileTreeUpdate")
+                                && (let sentTree =
+                                        unbox<System.Collections.Generic.Dictionary<string, FileEntry>> args.[1]
+
+                                    importedRelativeKeys |> List.forall sentTree.ContainsKey)
+                            )
+
+                        let finalStateIndex =
+                            sentMessages
+                            |> Array.findIndexBack (fun args ->
+                                args.Length > 0 && (string args.[0]).Contains("fileImportStateUpdate")
+                            )
+
+                        Vitest.expect(treeMessageIndex.IsSome).toBe true
+                        Vitest.expect(treeMessageIndex.Value < finalStateIndex).toBe true
+
+                        let events =
+                            WatcherHelpers.createImportedWatcherEvents arcPath importTarget importPlannedPaths
+
+                        let eventFor name suffix =
+                            events
+                            |> Array.find (fun (e: ArcVaultFileSystemEvent) ->
+                                e.EventName = name && e.RelativePath.EndsWith(suffix: string)
+                            )
+
+                        Vitest.expect(vault.IsImportedWatcherEvent(eventFor "add" "Run1/notes.txt")).toBe true
+                        Vitest.expect(vault.IsImportedWatcherEvent(eventFor "addDir" "dataset/Run1")).toBe true
+
+                        let states = importStatesOf windowState
+                        Vitest.expect(states.[states.Length - 1].IsNone).toBe true
+
+                        let copyingSteps =
+                            states
+                            |> Array.choose id
+                            |> Array.filter (fun s -> s.phase = FileImportPhase.Copying)
+                            |> Array.map (fun s -> s.progress.step)
+                            |> Array.distinct
+
+                        Vitest
+                            .expect(copyingSteps |> Array.map string)
+                            .toEqual (
+                                [|
+                                    FileImportStep.Scanning
+                                    FileImportStep.Copying
+                                    FileImportStep.Publishing
+                                |]
+                                |> Array.map string
+                            )
+
+                        let finalizingIndex =
+                            states
+                            |> Array.findIndex (fun s ->
+                                s |> Option.exists (fun state -> state.phase = FileImportPhase.Finalizing)
+                            )
+
+                        Vitest.expect(finalizingIndex).toBe (states.Length - 2)
+                    })
+        )
+
+        Vitest.test (
+            "releases the import's marks at once when the import fails",
+            fun () ->
+                withImportVault
+                    None
+                    (fun vault api windowState arcPath sourcePath -> promise {
+                        let leaseCountDuringImport = ref -1
+
+                        // The first Normal-mode progress call is the Copying step, after the paths are planned and
+                        // claimed. Removing a source file there makes the staging copy fail.
+                        windowState.Window?setProgressBar <-
+                            (fun (_: float) (options: obj) ->
+                                if leaseCountDuringImport.Value < 0 && string options?mode = "normal" then
+                                    leaseCountDuringImport.Value <- vault.importedPathLeases.Count
+                                    unlinkSync (join [| sourcePath; "raw"; "results.csv" |])
+                            )
+
+                        match! pickAndImport api "import-2" with
+                        | Error _ -> ()
+                        | other -> failwithf "Expected an error, received %A." other
+
+                        Vitest.expect(leaseCountDuringImport.Value).toBe 1
+
+                        let! written = TestHelpers.pathExistsAsync (join [| arcPath; importTarget; "Run1" |])
+                        Vitest.expect(written).toBe false
+
+                        Vitest.expect(vault.fileTree.Keys |> Seq.exists (fun key -> key.Contains "Run1")).toBe false
+
+                        let events =
+                            WatcherHelpers.createImportedWatcherEvents arcPath importTarget importPlannedPaths
+
+                        for event in events do
+                            Vitest.expect(vault.IsImportedWatcherEvent event).toBe false
+
+                        Vitest.expect(vault.importedPathLeases.Count).toBe 0
+                    })
+        )
+
+        Vitest.test (
+            "adds only the top-level imported folders to a native watcher",
+            fun () ->
+                let addedPaths = ResizeArray<string>()
+
+                let watcher =
+                    { new Main.Bindings.Chokidar.IWatcher with
+                        member _.close() = Promise.lift ()
+                        member _.add(path: string) = addedPaths.Add path
+                        member _.add(paths: string[]) = addedPaths.AddRange paths
+                        member _.unwatch(_: string) = Promise.lift ()
+                        member _.unwatch(_: string[]) = Promise.lift ()
+                        member this.on(_: Main.Bindings.Chokidar.Events, _: string -> unit) = this
+                        member this.on(_: Main.Bindings.Chokidar.Events, _: string -> string -> unit) = this
+                        member _.getWatched() = unbox null
+                    }
+
+                withImportVault
+                    None
+                    (fun vault api _ arcPath _ -> promise {
+                        vault.watcher <- Some watcher
+                        vault.watcherUsesPolling <- false
+
+                        match! pickAndImport api "import-3" with
+                        | Ok ImportExternalFilesResult.Completed -> ()
+                        | other -> failwithf "Expected Completed, received %A." other
+
+                        Vitest.expect(addedPaths.ToArray()).toEqual [| join [| arcPath; importTarget; "Run1" |] |]
+                    })
         )
 )

@@ -315,7 +315,8 @@ module ArcVaultExtensions =
             queuedUpdate
 
         /// The watcher reports imported items only after its stability wait and a native watcher can miss them,
-        /// so a completed import adds them itself. Later watcher events update the same entries with their full metadata.
+        /// so a completed import adds them itself. Imported files are new to Git, so they have no large-object state yet.
+        /// A later watcher event for the same path replaces the entry.
         member this.AddImportedEntriesToFileTree(folderPaths: string[], filePaths: string[]) : JS.Promise<unit> =
             let capturedWatcherEpoch = this.WatcherEpoch
 
@@ -326,23 +327,29 @@ module ArcVaultExtensions =
                     | None -> ()
                     | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
                     | Some _ ->
-                        let mutable nextFileTree = this.fileTree
-                        let mutable hasFileTreeChanges = false
+                        // Nothing is awaited between reading the tree and replacing it, so no other update can interleave.
+                        // The tree is copied once because copying it per item is quadratic for large imports.
+                        let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
+                        let hasFileTreeChanges = ref false
 
-                        // The import has just created these paths, so a plain existence check is enough. The exact-name
-                        // check would list the parent folder once per item, which is slow for large folders.
-                        for importedPath in Array.append folderPaths filePaths do
-                            if existsSync importedPath then
-                                let! addedEntry = getFileEntry importedPath
-                                nextFileTree <- upsertFileEntry addedEntry nextFileTree
-                                hasFileTreeChanges <- true
-                            else
-                                swatelogfn
-                                    this.window.id
-                                    "Skipped imported item '%s' because it no longer exists."
-                                    importedPath
+                        let addEntries isDirectory (importedPaths: string[]) =
+                            for importedPath in importedPaths do
+                                // The import has just created these paths, so a plain existence check is enough.
+                                if existsSync importedPath then
+                                    nextFileTree.[importedPath] <-
+                                        FileEntry.create (basename importedPath, importedPath, isDirectory, None)
 
-                        if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
+                                    hasFileTreeChanges.Value <- true
+                                else
+                                    swatelogfn
+                                        this.window.id
+                                        "Skipped imported item '%s' because it no longer exists."
+                                        importedPath
+
+                        addEntries true folderPaths
+                        addEntries false filePaths
+
+                        if hasFileTreeChanges.Value && capturedWatcherEpoch = this.WatcherEpoch then
                             this.SetFileTree(nextFileTree)
                 })
 
