@@ -332,6 +332,15 @@ module FileExplorerLogic =
         |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
         |> Set.ofList
 
+    /// The folders to open so the item can be seen: its parent folders, and the item itself when it is a folder.
+    let private revealedIdsFromPath itemId items =
+        let ownId =
+            match FileTree.findItem itemId items with
+            | Some item when item.IsDirectory && item.Children.IsSome -> Set.singleton item.Id
+            | _ -> Set.empty
+
+        expandedIdsFromPath itemId items |> Set.union ownId
+
     let rec private collectExpandedIds acc items =
         items
         |> List.fold
@@ -366,7 +375,7 @@ module FileExplorerLogic =
     type Msg =
         | SetExpanded of itemId: string * isExpanded: bool
         | SelectItem of string
-        | UpdateItems of FileItem list * selectedItemId: string option option
+        | UpdateItems of FileItem list * selectedItemId: string option option * revealItemId: string option
 
     let init items = {
         Items = items
@@ -398,7 +407,7 @@ module FileExplorerLogic =
                     SelectedPath = path
             }
 
-        | UpdateItems(items, selectedItemId) ->
+        | UpdateItems(items, selectedItemId, revealItemId) ->
             let validIds = collectIds Set.empty items
 
             let persistedExpanded =
@@ -429,10 +438,18 @@ module FileExplorerLogic =
                 else
                     Set.empty
 
+            let expandedFromReveal =
+                revealItemId
+                |> Option.map (fun itemId -> revealedIdsFromPath itemId items)
+                |> Option.defaultValue Set.empty
+
             {
                 model with
                     Items = items
                     SelectedId = nextSelectedId
                     SelectedPath = selectedPath
-                    ExpandedIds = persistedExpanded |> Set.union expandedFromSelection
+                    ExpandedIds =
+                        persistedExpanded
+                        |> Set.union expandedFromSelection
+                        |> Set.union expandedFromReveal
             }

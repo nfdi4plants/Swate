@@ -117,6 +117,9 @@ type FileExplorer =
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
+            // Opens the folders down to this item without selecting it. Pass it for one render only, or the
+            // user cannot close those folders while it is set.
+            ?revealItemId: string,
             ?onDirectoryExpansionChange: FileItem -> bool -> unit,
             ?onExpansionChange: FileItem -> bool -> unit,
             ?delegateHorizontalScrollToParent: bool,
@@ -165,8 +168,10 @@ type FileExplorer =
                 "swt:w-full swt:min-w-max swt:list-none swt:m-0 swt:p-0"
 
         React.useEffect (
-            (fun () -> dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems [], selectedItemId))),
-            [| box initialItems; box selectedItemId |]
+            (fun () ->
+                dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems [], selectedItemId, revealItemId))
+            ),
+            [| box initialItems; box selectedItemId; box revealItemId |]
         )
 
         let setExpanded (item: FileItem) (willExpand: bool) =
