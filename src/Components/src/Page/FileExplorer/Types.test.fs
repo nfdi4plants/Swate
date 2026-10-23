@@ -3,22 +3,23 @@ module internal Swate.Components.Page.FileExplorer.TypesTests
 open Swate.Components.Page.FileExplorer.Types
 open Vitest
 
-let private file (path: string) =
-    {
-        FileTree.createFile (path.Split('/') |> Array.last) (Some path) FileItemIcon.Document with
-            Id = path
-    }
+let private file (path: string) = {
+    FileTree.createFile (path.Split('/') |> Array.last) (Some path) FileItemIcon.Document with
+        Id = path
+}
 
-let private folder (path: string) (children: FileItem list) =
-    {
-        FileTree.createFolder (path.Split('/') |> Array.last) (Some path) FileItemIcon.Folder with
-            Id = path
-            Children = Some children
-    }
+let private folder (path: string) (children: FileItem list) = {
+    FileTree.createFolder (path.Split('/') |> Array.last) (Some path) FileItemIcon.Folder with
+        Id = path
+        Children = Some children
+}
 
 let private items = [
     folder "studies" [
-        folder "studies/s1" [ file "studies/s1/isa.study.xlsx"; folder "studies/s1/resources" [] ]
+        folder "studies/s1" [
+            file "studies/s1/isa.study.xlsx"
+            folder "studies/s1/resources" []
+        ]
     ]
     folder "assays" [ file "assays/notes.md" ]
 ]
@@ -52,7 +53,8 @@ Vitest.describe (
         Vitest.test (
             "revealing an item that is not in the tree opens nothing",
             fun () ->
-                let model = FileExplorerLogic.init items |> updateItems (Some "runs/r1/isa.run.xlsx")
+                let model =
+                    FileExplorerLogic.init items |> updateItems (Some "runs/r1/isa.run.xlsx")
 
                 Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([])
         )
