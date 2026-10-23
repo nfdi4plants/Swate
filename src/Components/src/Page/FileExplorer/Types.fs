@@ -370,6 +370,8 @@ module FileExplorerLogic =
         SelectedId: string option
         SelectedPath: FileItem list
         ExpandedIds: Set<string>
+        /// The reveal id whose folders are already open. It stays None while the current id waits for its item.
+        LastRevealId: string option
     }
 
     type Msg =
@@ -382,6 +384,7 @@ module FileExplorerLogic =
         SelectedId = None
         SelectedPath = []
         ExpandedIds = collectExpandedIds Set.empty items
+        LastRevealId = None
     }
 
     let update msg model =
@@ -438,14 +441,17 @@ module FileExplorerLogic =
                 else
                     Set.empty
 
-            let expandedFromReveal =
-                revealItemId
-                |> Option.map (fun itemId -> revealedIdsFromPath itemId items)
-                |> Option.defaultValue Set.empty
+            let expandedFromReveal, lastRevealId =
+                match revealItemId with
+                | Some itemId when model.LastRevealId = Some itemId -> Set.empty, Some itemId
+                | Some itemId when (FileTree.findItem itemId items).IsSome ->
+                    revealedIdsFromPath itemId items, Some itemId
+                | _ -> Set.empty, None
 
             {
                 model with
                     Items = items
+                    LastRevealId = lastRevealId
                     SelectedId = nextSelectedId
                     SelectedPath = selectedPath
                     ExpandedIds =

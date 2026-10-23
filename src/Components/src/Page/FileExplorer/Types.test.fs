@@ -24,6 +24,17 @@ let private items = [
     folder "assays" [ file "assays/notes.md" ]
 ]
 
+let private changedItems = [
+    folder "studies" [
+        folder "studies/s1" [
+            file "studies/s1/isa.study.xlsx"
+            folder "studies/s1/resources" []
+        ]
+        file "studies/notes.txt"
+    ]
+    folder "assays" [ file "assays/notes.md" ]
+]
+
 let private updateItems revealItemId model =
     FileExplorerLogic.update (FileExplorerLogic.UpdateItems(items, None, revealItemId)) model
 
@@ -69,5 +80,86 @@ Vitest.describe (
                     |> updateItems None
 
                 Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([ "studies/s1" ])
+        )
+
+        Vitest.test (
+            "keeping the reveal id set does not reopen a folder the user closed",
+            fun () ->
+                let target = Some "studies/s1/isa.study.xlsx"
+
+                let model =
+                    FileExplorerLogic.init items
+                    |> updateItems target
+                    |> FileExplorerLogic.update (FileExplorerLogic.SetExpanded("studies", false))
+                    |> FileExplorerLogic.update (FileExplorerLogic.UpdateItems(changedItems, None, target))
+
+                Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([ "studies/s1" ])
+        )
+
+        Vitest.test (
+            "revealing another id in between lets the first id reveal again",
+            fun () ->
+                let study = Some "studies/s1/isa.study.xlsx"
+
+                let model =
+                    FileExplorerLogic.init items
+                    |> updateItems study
+                    |> FileExplorerLogic.update (FileExplorerLogic.SetExpanded("studies", false))
+                    |> updateItems (Some "assays/notes.md")
+                    |> updateItems study
+
+                Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([ "assays"; "studies"; "studies/s1" ])
+        )
+
+        Vitest.test (
+            "revealing a folder whose children are not loaded opens its parents but not the folder",
+            fun () ->
+                let unloaded = [
+                    folder "studies" [
+                        {
+                            folder "studies/s2" [] with
+                                Children = None
+                        }
+                    ]
+                ]
+
+                let model =
+                    FileExplorerLogic.update
+                        (FileExplorerLogic.UpdateItems(unloaded, None, Some "studies/s2"))
+                        (FileExplorerLogic.init unloaded)
+
+                Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([ "studies" ])
+        )
+
+        Vitest.test (
+            "revealing the same id again after it was cleared opens the folders again",
+            fun () ->
+                let target = Some "studies/s1/isa.study.xlsx"
+
+                let model =
+                    FileExplorerLogic.init items
+                    |> updateItems target
+                    |> FileExplorerLogic.update (FileExplorerLogic.SetExpanded("studies", false))
+                    |> updateItems None
+                    |> updateItems target
+
+                Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([ "studies"; "studies/s1" ])
+        )
+
+        Vitest.test (
+            "a reveal id for an item that arrives later opens its folders once the item is there",
+            fun () ->
+                let target = Some "studies/s1/isa.study.xlsx"
+
+                let before =
+                    FileExplorerLogic.update
+                        (FileExplorerLogic.UpdateItems([ folder "assays" [ file "assays/notes.md" ] ], None, target))
+                        (FileExplorerLogic.init [])
+
+                Vitest.expect(before.ExpandedIds |> Set.toList).toEqual ([])
+
+                let model = updateItems target before
+
+                Vitest.expect(model.ExpandedIds |> Set.toList).toEqual ([ "studies"; "studies/s1" ])
         )
 )

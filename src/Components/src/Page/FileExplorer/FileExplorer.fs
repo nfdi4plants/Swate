@@ -117,8 +117,11 @@ type FileExplorer =
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
-            // Opens the folders down to this item without selecting it. Pass it for one render only, or the
-            // user cannot close those folders while it is set.
+            // Opens the folders down to this item once per id, without selecting it. While the same id stays
+            // set, the user can close those folders again. Clearing the prop or passing another id lets an id
+            // reveal again. An id whose item is not in the items yet applies when the item arrives. A folder
+            // target opens itself only if its children are loaded at that moment. The component does not call
+            // onDirectoryExpansionChange for the folders it opens.
             ?revealItemId: string,
             ?onDirectoryExpansionChange: FileItem -> bool -> unit,
             ?onExpansionChange: FileItem -> bool -> unit,
