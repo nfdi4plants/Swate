@@ -54,6 +54,14 @@ let private FileImportProbe (onImport: ActiveFileImportState option -> unit) =
 
     Html.none
 
+[<ReactComponent>]
+let private FileStateProbe (onController: FileStateController -> unit) =
+    let fileStateCtx = useFileStateCtx ()
+
+    React.useEffect ((fun () -> onController fileStateCtx), [| box fileStateCtx |])
+
+    Html.none
+
 let private createSnapshot () =
     let snapshot = Dictionary<string, FileEntry>()
     snapshot.Add("", FileEntry.create ("arc", "", true, None))
@@ -71,6 +79,50 @@ let private fileImportApi loadActiveImport = {
     pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok None)
     runImport = fun _ -> JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed)
     cancelImport = fun _ -> JS.Constructors.Promise.resolve (Ok())
+}
+
+// The unsubscribe callback must be a plain JS function. A curried F# lambda here made the unmount cleanup throw
+// "clo is not a function".
+let private noDispose: unit -> unit = Fable.Core.JsInterop.emitJsExpr () "() => {}"
+
+/// Mounts the provider with the given import api and returns the result of one importExternalFiles call.
+let private runImportExternalFiles (importApi: FileImportApi) = promise {
+    let fileTreeBridgeName = bridgeName "IFileTreeRendererApi"
+    let importBridgeName = bridgeName "IFileImportRendererApi"
+    let controllers = ResizeArray<FileStateController>()
+    let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
+    document.body.appendChild container |> ignore
+    let root = ReactDOM.createRoot container
+
+    try
+        setBridgeProperty
+            fileTreeBridgeName
+            (createObj [
+                "fileTreeUpdate" ==> fun (_: Dictionary<string, FileEntry> -> unit) -> noDispose
+            ])
+
+        setBridgeProperty
+            importBridgeName
+            (createObj [
+                "fileImportStateUpdate"
+                ==> fun (_: ActiveFileImportState option -> unit) -> noDispose
+            ])
+
+        root.render (
+            FileStateCtxProviderWithSnapshots(
+                (fun () -> JS.Constructors.Promise.resolve (Ok(createSnapshot ()))),
+                importApi,
+                FileStateProbe controllers.Add
+            )
+        )
+
+        do! waitForEffect (fun () -> controllers.Count > 0)
+        return! controllers.[controllers.Count - 1].importExternalFiles "assays/assay-1"
+    finally
+        root.unmount ()
+        container.remove ()
+        clearBridgeProperty fileTreeBridgeName
+        clearBridgeProperty importBridgeName
 }
 
 Vitest.describe (
@@ -213,6 +265,82 @@ Vitest.describe (
                     container.remove ()
                     clearBridgeProperty fileTreeBridgeName
                     clearBridgeProperty importBridgeName
+            }
+        )
+)
+
+Vitest.describe (
+    "FileStateContext importExternalFiles",
+    fun () ->
+        Vitest.test (
+            "returns Ok None when the picker is closed",
+            fun () -> promise {
+                let! result =
+                    runImportExternalFiles (fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)))
+
+                Vitest.expect(result).toEqual (Ok None)
+            }
+        )
+
+        Vitest.test (
+            "returns the completed result when the import completes",
+            fun () -> promise {
+                let api = {
+                    fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)) with
+                        pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok(Some "auth-1"))
+                }
+
+                let! result = runImportExternalFiles api
+
+                Vitest.expect(result).toEqual (Ok(Some ImportExternalFilesResult.Completed))
+            }
+        )
+
+        Vitest.test (
+            "returns the error when the picker fails",
+            fun () -> promise {
+                let api = {
+                    fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)) with
+                        pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Error(exn "picker failed"))
+                }
+
+                let! result = runImportExternalFiles api
+
+                match result with
+                | Error ex -> Vitest.expect(ex.Message).toBe ("picker failed")
+                | Ok _ -> failwith "Expected the picker error."
+            }
+        )
+
+        Vitest.test (
+            "returns the error when the import fails",
+            fun () -> promise {
+                let api = {
+                    fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)) with
+                        pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok(Some "auth-1"))
+                        runImport = fun _ -> JS.Constructors.Promise.resolve (Error(exn "import failed"))
+                }
+
+                let! result = runImportExternalFiles api
+
+                match result with
+                | Error ex -> Vitest.expect(ex.Message).toBe ("import failed")
+                | Ok _ -> failwith "Expected the import error."
+            }
+        )
+
+        Vitest.test (
+            "returns the cancelled result when the import is cancelled",
+            fun () -> promise {
+                let api = {
+                    fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)) with
+                        pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok(Some "auth-1"))
+                        runImport = fun _ -> JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Cancelled)
+                }
+
+                let! result = runImportExternalFiles api
+
+                Vitest.expect(result).toEqual (Ok(Some ImportExternalFilesResult.Cancelled))
             }
         )
 )
