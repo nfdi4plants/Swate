@@ -27,7 +27,7 @@ module private FileTreeHelper =
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
-    /// A created item whose folders open once the file watcher shows it.
+    /// A created or imported item whose folders open once the file watcher shows it.
     type PendingReveal = {
         ArcScopeId: string option
         Path: string
@@ -502,6 +502,15 @@ type FileTree =
             | Error errorMessage -> return Error errorMessage
         }
 
+        let importExternalFiles (targetRelativePath: string) = promise {
+            match! fileStateCtx.importExternalFiles targetRelativePath with
+            | Ok(Some ImportExternalFilesResult.Completed) ->
+                revealInTree targetRelativePath
+                return Ok()
+            | Ok _ -> return Ok()
+            | Error exn -> return Error exn
+        }
+
         let contextMenuConfig: ContextMenuConfig = {
             openItem = openPreview true
             arcRootPath = appStateCtx
@@ -515,7 +524,7 @@ type FileTree =
             pathActionConfig = {
                 openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
-                importExternalFiles = fileStateCtx.importExternalFiles
+                importExternalFiles = importExternalFiles
                 enqueueError = errorModal.enqueue
             }
             enqueueError = errorModal.enqueue
