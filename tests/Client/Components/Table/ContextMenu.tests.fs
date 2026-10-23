@@ -12,7 +12,6 @@ open global.Swate.Components.Composite.DataMapTable.ClipboardTarget
 open global.Swate.Components.Composite.Table
 open global.Swate.Components.Composite.Table.Types
 open global.Swate.Components.Primitive.ContextMenu.Types
-open Browser.Types
 
 [<Emit("Object.defineProperty($0, 'clipboard', { configurable: true, value: $1 })")>]
 let private setNavigatorClipboard
@@ -43,7 +42,7 @@ type TestCases =
         item.onClick
         |> Option.iter (fun onClick ->
             onClick {|
-                buttonEvent = unbox<MouseEvent> null
+                buttonEvent = null
                 spawnData = box spawnData
             |}
         )

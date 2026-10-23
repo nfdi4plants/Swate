@@ -8,23 +8,6 @@ open Swate.Components
 open Swate.Components.Primitive
 open Swate.Components.Primitive.ContextMenu.Types
 
-module private ContextMenuDom =
-
-    let tryGetEventTargetElement (e: Event) : Element option =
-        let targetObj: obj = box e.target
-
-        if isNullOrUndefined targetObj then
-            None
-        elif isNullOrUndefined targetObj?closest then
-            let parentElement: obj = targetObj?parentElement
-
-            if isNullOrUndefined parentElement then
-                None
-            else
-                Some(unbox<Element> parentElement)
-        else
-            Some(unbox<Element> targetObj)
-
 [<Erase>]
 [<Mangle(false)>]
 type ContextMenu =
@@ -178,7 +161,7 @@ type ContextMenu =
 
                             let isInsideContextMenuScope =
                                 e
-                                |> ContextMenuDom.tryGetEventTargetElement
+                                |> BrowserEvent.tryGetTargetElement
                                 |> Option.exists (fun target -> scopedElement.contains target)
 
                             if isInsideContextMenuScope then
@@ -249,7 +232,7 @@ type ContextMenu =
                                                 let triggerEvent =
                                                     fun (e: Browser.Types.MouseEvent) ->
                                                         let data = {|
-                                                            buttonEvent = e
+                                                            buttonEvent = unbox<ContextMenuClickEvent> e
                                                             spawnData = spawnData
                                                         |}
 
@@ -361,7 +344,7 @@ type ContextMenu =
                         (fun e ->
                             let tableCell =
                                 e
-                                |> ContextMenuDom.tryGetEventTargetElement
+                                |> BrowserEvent.tryGetTargetElement
                                 |> Option.bind (fun target -> target.closest ("[data-row][data-column]"))
 
                             match tableCell with

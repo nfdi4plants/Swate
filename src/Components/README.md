@@ -1,5 +1,31 @@
 # Components
 
+## Tree contracts
+
+`Tree` supports controlled `selectedIds` or uncontrolled `defaultSelectedIds`.
+Single selection displays the last ID. In controlled mode, changing the mode only
+normalizes the effective selection rendered by the Tree: the parent array is not
+rewritten and no selection callback is emitted. Switching back to Multiple can
+therefore display those parent-owned IDs again. In uncontrolled mode, switching
+to Single cleans the stored selection and reports the change once.
+
+Keep `dataSource.getTreeItems` stable (`useCallback`), or give inline callbacks a
+stable `dataSource.cacheKey`. Recreating the wrapper object alone does not clear
+the cache. Changing the callback identity (without a key) or the key replaces the
+source and resets its cache. `ref.invalidateAll()` reloads the current source while
+preserving applicable static/default expansion; `invalidateNode` is a no-op for
+fully static branches. Supplied non-empty root items take precedence over a cached
+lazy root. Lazy-root failures show an error and a Retry button.
+
+Renderer callbacks participate in memoization so changed closures refresh their
+output. Use `useCallback` for selective row rendering with otherwise stable
+callbacks. `renderProps.select(event)` accepts React synthetic or native mouse
+events and focuses the owning row by ID, including after an awaited operation.
+
+`viewportClassName` sets the virtualized scroll container's height classes,
+replacing the default `swt:max-h-96`. Context-menu `spawnData` is an `{ event, item }`
+object; `buttonEvent` is the shared ContextMenu's React synthetic click event.
+
 ## Local Dev
 
 ### Tests

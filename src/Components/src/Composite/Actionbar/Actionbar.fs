@@ -91,7 +91,8 @@ type Actionbar =
                     Html.li [ prop.text (Option.defaultValue "" button.toolTip) ],
                     Actionbar.MaterialIcon(button.icon),
                     ?label = button.toolTip,
-                    onClick = (fun event -> button.onClick event.buttonEvent)
+                    // ButtonInfo follows Feliz's legacy Browser.MouseEvent annotation for synthetic events.
+                    onClick = (fun event -> button.onClick (unbox event.buttonEvent))
                 )
             )
             |> List.ofArray
