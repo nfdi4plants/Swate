@@ -27,7 +27,8 @@ type FileStateController = {
     updateSelection: (ArcSelection -> ArcSelection) -> unit
     activeFileImport: ActiveFileImportState option
     isCancellingFileImport: bool
-    importExternalFiles: string -> JS.Promise<Result<unit, exn>>
+    /// Returns `None` when no import ran, for example when the picker was closed.
+    importExternalFiles: string -> JS.Promise<Result<ImportExternalFilesResult option, exn>>
     cancelFileImport: unit -> JS.Promise<Result<unit, exn>>
 }
 
@@ -41,7 +42,7 @@ let FileStateCtx =
             updateSelection = ignore
             activeFileImport = None
             isCancellingFileImport = false
-            importExternalFiles = fun _ -> JS.Constructors.Promise.resolve (Ok())
+            importExternalFiles = fun _ -> JS.Constructors.Promise.resolve (Ok None)
             cancelFileImport = fun () -> JS.Constructors.Promise.resolve (Ok())
         }
     )
@@ -124,14 +125,14 @@ let FileStateCtxProviderWithSnapshots
 
     let importExternalFiles targetRelativePath = promise {
         if activeFileImport.state.IsSome || isFilePickerOpenRef.current then
-            return Ok()
+            return Ok None
         else
             isFilePickerOpenRef.current <- true
 
             try
                 match! fileImportApi.pickAbsolutePaths () with
                 | Error ex -> return Error ex
-                | Ok None -> return Ok()
+                | Ok None -> return Ok None
                 | Ok(Some authorizationId) ->
                     let requestId = System.Guid.NewGuid().ToString()
 
@@ -143,8 +144,7 @@ let FileStateCtxProviderWithSnapshots
                         }
                     with
                     | Error ex -> return Error ex
-                    | Ok ImportExternalFilesResult.Completed
-                    | Ok ImportExternalFilesResult.Cancelled -> return Ok()
+                    | Ok result -> return Ok(Some result)
             finally
                 isFilePickerOpenRef.current <- false
     }
