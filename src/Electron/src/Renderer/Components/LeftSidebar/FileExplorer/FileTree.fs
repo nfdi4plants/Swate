@@ -138,7 +138,11 @@ type FileTree =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
         let reconciledMaterializedState =
-            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
+            reconcileMaterializedState
+                arcScopeId
+                (Option.toList fileStateCtx.state.Selection.TreePath)
+                fileTree
+                materializedState
 
         React.useEffect (
             (fun () ->
