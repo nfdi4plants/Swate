@@ -27,13 +27,8 @@ module private FileTreeHelper =
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
-    /// A created or imported item whose folders open once the file watcher shows it.
-    type PendingReveal = {
-        ArcScopeId: string option
-        Path: string
-    }
-
 open FileTreeHelper
+open FileTreeCreateWorkflow
 
 [<Erase; Mangle(false)>]
 type FileTree =
@@ -147,25 +142,15 @@ type FileTree =
         // unsaved work.
         let pendingReveal, setPendingReveal = React.useState<PendingReveal option> None
 
-        let revealPath =
-            pendingReveal
-            |> Option.filter (fun reveal -> reveal.ArcScopeId = arcScopeId)
-            |> Option.map _.Path
-
-        // The create call can return before the file watcher has sent the new item, so the folders only open
-        // once the tree contains it.
-        let visibleRevealPath =
-            revealPath
-            |> Option.bind (fun path ->
-                fileStateCtx.state.FileTree
-                |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
-                |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
-            )
+        let resolution = resolveReveal pendingReveal arcScopeId fileStateCtx.state.FileTree
 
         let reconciledMaterializedState =
             reconcileMaterializedState
                 arcScopeId
-                (List.choose id [ fileStateCtx.state.Selection.TreePath; revealPath ])
+                (List.choose id [
+                    fileStateCtx.state.Selection.TreePath
+                    resolution.RevealPath
+                ])
                 fileTree
                 materializedState
 
@@ -178,9 +163,9 @@ type FileTree =
                         reconciledMaterializedState
                 )
 
-                // The explorer opens the folders in this render, so the reveal is done. Clearing it lets the user
-                // close them again.
-                if pendingReveal.IsSome && (visibleRevealPath.IsSome || revealPath.IsNone) then
+                // The explorer applied the reveal in its own effect, which runs before this one. Clearing it lets
+                // a later reveal of the same path open the folders again. It also drops a reveal from another ARC.
+                if resolution.ShouldClear then
                     setPendingReveal None
             ),
             [|
@@ -192,10 +177,7 @@ type FileTree =
         )
 
         let revealInTree (path: string) =
-            let path = PathHelpers.normalizePath path
-
-            if not (System.String.IsNullOrWhiteSpace path) then
-                setPendingReveal (Some { ArcScopeId = arcScopeId; Path = path })
+            tryCreatePendingReveal arcScopeId path |> Option.iter (Some >> setPendingReveal)
 
         let fileItem =
             fileTree
@@ -408,25 +390,15 @@ type FileTree =
                 match tryBuildArcCreateDraft kind identifier existingPaths with
                 | Error errorMessage -> applyCreateError errorMessage
                 | Ok draft ->
-                    setIsDialogBusy true
-
-                    promise {
-                        let! createResult =
-                            ArcFileApiHelper.withArcFileRequest draft.ArcFile Api.ipcArcVaultApi.addArcFile
-
-                        match createResult with
-                        | Error exn ->
-                            setIsDialogBusy false
-                            applyCreateError exn.Message
-                        | Ok() ->
-                            revealInTree draft.Path
-                            closeDialog ()
-                    }
-                    |> Promise.catch (fun exn ->
-                        setIsDialogBusy false
-                        applyCreateError exn.Message
-                    )
-                    |> Promise.start
+                    FileTreeCreateWorkflow.createArcEntry
+                        {
+                            setIsCreating = setIsDialogBusy
+                            applyError = applyCreateError
+                            revealInTree = revealInTree
+                            closeCreateModal = closeDialog
+                        }
+                        Api.ipcArcVaultApi.addArcFile
+                        draft
 
         let createFileSystemItem (name: string) =
             if not isDialogBusy then
@@ -436,38 +408,30 @@ type FileTree =
                     match draft.Parent.Path |> Option.map PathHelpers.normalizeCanonicalRelativePath with
                     | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
                     | Some parentPath ->
-                        setIsDialogBusy true
-
-                        promise {
-                            let! createResult =
-                                Api.ipcArcVaultApi.createFileSystemItem {
-                                    parentPath = parentPath
-                                    name = name
-                                    kind = draft.Kind
-                                }
-
-                            match createResult with
-                            | Error exn -> applyFileSystemCreateError exn.Message
-                            | Ok createdPath ->
-                                revealInTree createdPath
-                                closeDialog ()
-                        }
-                        |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
-                        |> Promise.map (fun _ -> setIsDialogBusy false)
-                        |> Promise.start
+                        FileTreeCreateWorkflow.createFileSystemItem
+                            {
+                                setIsCreating = setIsDialogBusy
+                                applyError = applyFileSystemCreateError
+                                revealInTree = revealInTree
+                                closeCreateModal = closeDialog
+                            }
+                            Api.ipcArcVaultApi.createFileSystemItem
+                            {
+                                parentPath = parentPath
+                                name = name
+                                kind = draft.Kind
+                            }
 
         let createDataMap (parentInfo: DatamapParentInfo) =
-            promise {
-                match!
-                    ArcFileApiHelper.withArcFileRequest
-                        (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
-                        Api.ipcArcVaultApi.addArcFile
-                with
-                | Error exn -> applyCreateError exn.Message
-                | Ok() -> revealInTree (DatamapParentInfo.toPath parentInfo)
-            }
-            |> Promise.catch (fun exn -> applyCreateError exn.Message)
-            |> Promise.start
+            FileTreeCreateWorkflow.createDataMap
+                {
+                    setIsCreating = ignore
+                    applyError = applyCreateError
+                    revealInTree = revealInTree
+                    closeCreateModal = ignore
+                }
+                Api.ipcArcVaultApi.addArcFile
+                parentInfo
 
         let tryFindDataMapItemByPath path =
             fileStateCtx.state.FileTree
@@ -503,12 +467,9 @@ type FileTree =
         }
 
         let importExternalFiles (targetRelativePath: string) = promise {
-            match! fileStateCtx.importExternalFiles targetRelativePath with
-            | Ok(Some ImportExternalFilesResult.Completed) ->
-                revealInTree targetRelativePath
-                return Ok()
-            | Ok _ -> return Ok()
-            | Error exn -> return Error exn
+            let! result = fileStateCtx.importExternalFiles targetRelativePath
+            importRevealPath result targetRelativePath |> Option.iter revealInTree
+            return result |> Result.map ignore
         }
 
         let contextMenuConfig: ContextMenuConfig = {
@@ -645,7 +606,7 @@ type FileTree =
                                 ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
-                            ?revealItemId = visibleRevealPath,
+                            ?revealItemId = resolution.VisiblePath,
                             includeDefaultContextMenuItems = false,
                             delegateHorizontalScrollToParent = true,
                             truncateOverflowingItemNames = true
