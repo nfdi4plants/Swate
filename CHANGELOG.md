@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+- Creating a file, folder, study, assay, workflow, run or DataMap in the File Explorer now opens the folders that lead to it, so you can see it right away. The new item is no longer opened, so the table you are working on stays open. (by @Etschbeijer)
+
 ## 3.1.0 - 2026-10-21
 
 ### ✨ Added
