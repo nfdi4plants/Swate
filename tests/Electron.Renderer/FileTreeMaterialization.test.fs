@@ -143,9 +143,37 @@ Vitest.describe (
                 }
 
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
+                    reconcileMaterializedState (Some "C:/arc") [ "arc/selected/selected.txt" ] (Some root) current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
+        )
+
+        Vitest.test (
+            "reconciliation materializes the folders down to every required item",
+            fun () ->
+                let selected =
+                    directoryNode "selected" "arc/selected" [ fileNode "selected.txt" "arc/selected/selected.txt" ]
+
+                let created =
+                    directoryNode "studies" "arc/studies" [
+                        directoryNode "s1" "arc/studies/s1" [ fileNode "isa.study.xlsx" "arc/studies/s1/isa.study.xlsx" ]
+                    ]
+
+                let other =
+                    directoryNode "other" "arc/other" [ fileNode "other.txt" "arc/other/other.txt" ]
+
+                let root = directoryNode "arc" "arc" [ selected; created; other ]
+
+                let reconciled =
+                    reconcileMaterializedState
+                        (Some "C:/arc")
+                        [ "arc/selected/selected.txt"; "arc/studies/s1/isa.study.xlsx" ]
+                        (Some root)
+                        { empty with ArcScopeId = Some "C:/arc" }
+
+                Vitest.expect(reconciled.Paths |> Set.toList).toEqual (
+                    [ "arc"; "arc/selected"; "arc/studies"; "arc/studies/s1" ]
+                )
         )
 
         Vitest.test (
@@ -162,7 +190,7 @@ Vitest.describe (
                 }
 
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) current
+                    reconcileMaterializedState (Some "C:/new-arc") [] (Some root) current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])

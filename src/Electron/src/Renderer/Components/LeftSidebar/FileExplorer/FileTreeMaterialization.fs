@@ -25,9 +25,11 @@ let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<
     else
         directoryPaths
 
+/// `requiredItemPaths` are the items that must stay reachable, such as the selection. Every folder on the way
+/// to them is materialized.
 let reconcileMaterializedState
     (arcScopeId: string option)
-    (selectedTreeItemPath: string option)
+    (requiredItemPaths: string list)
     (root: FileTreeNode option)
     (current: MaterializedState)
     =
@@ -40,12 +42,11 @@ let reconcileMaterializedState
         let validDirectoryPaths = collectDirectoryPaths root Set.empty
 
         let requiredPaths =
-            selectedTreeItemPath
-            |> Option.map (fun selectedPath ->
-                validDirectoryPaths
-                |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
+            validDirectoryPaths
+            |> Set.filter (fun directoryPath ->
+                requiredItemPaths
+                |> List.exists (fun itemPath -> PathHelpers.isSameOrDescendantPath itemPath directoryPath)
             )
-            |> Option.defaultValue Set.empty
             |> fun paths ->
                 if root.isDirectory then
                     paths.Add(PathHelpers.normalizePath root.path)
