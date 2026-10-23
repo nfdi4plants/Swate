@@ -156,7 +156,9 @@ Vitest.describe (
 
                 let created =
                     directoryNode "studies" "arc/studies" [
-                        directoryNode "s1" "arc/studies/s1" [ fileNode "isa.study.xlsx" "arc/studies/s1/isa.study.xlsx" ]
+                        directoryNode "s1" "arc/studies/s1" [
+                            fileNode "isa.study.xlsx" "arc/studies/s1/isa.study.xlsx"
+                        ]
                     ]
 
                 let other =
@@ -167,13 +169,19 @@ Vitest.describe (
                 let reconciled =
                     reconcileMaterializedState
                         (Some "C:/arc")
-                        [ "arc/selected/selected.txt"; "arc/studies/s1/isa.study.xlsx" ]
+                        [
+                            "arc/selected/selected.txt"
+                            "arc/studies/s1/isa.study.xlsx"
+                        ]
                         (Some root)
-                        { empty with ArcScopeId = Some "C:/arc" }
+                        {
+                            empty with
+                                ArcScopeId = Some "C:/arc"
+                        }
 
-                Vitest.expect(reconciled.Paths |> Set.toList).toEqual (
-                    [ "arc"; "arc/selected"; "arc/studies"; "arc/studies/s1" ]
-                )
+                Vitest
+                    .expect(reconciled.Paths |> Set.toList)
+                    .toEqual ([ "arc"; "arc/selected"; "arc/studies"; "arc/studies/s1" ])
         )
 
         Vitest.test (
