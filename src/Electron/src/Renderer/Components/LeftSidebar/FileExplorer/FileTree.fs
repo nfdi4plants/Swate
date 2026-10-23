@@ -27,6 +27,12 @@ module private FileTreeHelper =
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
+    /// A created item whose folders open once the file watcher shows it.
+    type PendingReveal = {
+        ArcScopeId: string option
+        Path: string
+    }
+
 open FileTreeHelper
 
 [<Erase; Mangle(false)>]
@@ -137,10 +143,29 @@ type FileTree =
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
+        // New items open their folders but are not selected, so the open view, such as a table, keeps its
+        // unsaved work.
+        let pendingReveal, setPendingReveal = React.useState<PendingReveal option> None
+
+        let revealPath =
+            pendingReveal
+            |> Option.filter (fun reveal -> reveal.ArcScopeId = arcScopeId)
+            |> Option.map _.Path
+
+        // The create call can return before the file watcher has sent the new item, so the folders only open
+        // once the tree contains it.
+        let visibleRevealPath =
+            revealPath
+            |> Option.bind (fun path ->
+                fileStateCtx.state.FileTree
+                |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
+                |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
+            )
+
         let reconciledMaterializedState =
             reconcileMaterializedState
                 arcScopeId
-                (Option.toList fileStateCtx.state.Selection.TreePath)
+                (List.choose id [ fileStateCtx.state.Selection.TreePath; revealPath ])
                 fileTree
                 materializedState
 
@@ -152,13 +177,25 @@ type FileTree =
                     else
                         reconciledMaterializedState
                 )
+
+                // The explorer opens the folders in this render, so the reveal is done. Clearing it lets the user
+                // close them again.
+                if pendingReveal.IsSome && (visibleRevealPath.IsSome || revealPath.IsNone) then
+                    setPendingReveal None
             ),
             [|
                 box arcScopeId
                 box fileTree
                 box fileStateCtx.state.Selection.TreePath
+                box pendingReveal
             |]
         )
+
+        let revealInTree (path: string) =
+            let path = PathHelpers.normalizePath path
+
+            if not (System.String.IsNullOrWhiteSpace path) then
+                setPendingReveal (Some { ArcScopeId = arcScopeId; Path = path })
 
         let fileItem =
             fileTree
@@ -374,19 +411,15 @@ type FileTree =
                     setIsDialogBusy true
 
                     promise {
-                        let! createResult = ArcFileApiHelper.addArcFileAndOpen draft.ArcFile
+                        let! createResult =
+                            ArcFileApiHelper.withArcFileRequest draft.ArcFile Api.ipcArcVaultApi.addArcFile
 
                         match createResult with
                         | Error exn ->
                             setIsDialogBusy false
                             applyCreateError exn.Message
-                        | Ok createdArcFileDto ->
-                            let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
-                            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                            let pageState = Renderer.Types.PageState.fromFileContentDTO createdArcFileDto
-                            pageStateCtx.setState (Some pageState)
-
+                        | Ok() ->
+                            revealInTree draft.Path
                             closeDialog ()
                     }
                     |> Promise.catch (fun exn ->
@@ -416,24 +449,7 @@ type FileTree =
                             match createResult with
                             | Error exn -> applyFileSystemCreateError exn.Message
                             | Ok createdPath ->
-                                let selectedPath = PathHelpers.normalizePath createdPath
-                                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                                match draft.Kind with
-                                | FileSystemItemKind.File ->
-                                    let! openResult = Api.ipcArcVaultApi.openFile selectedPath
-
-                                    match openResult with
-                                    | Ok dto ->
-                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
-                                        pageStateCtx.setState (Some pageState)
-                                    | Error _ ->
-                                        let dto = FileContentDTO.create FileContentType.PlainText "" selectedPath
-
-                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
-                                        pageStateCtx.setState (Some pageState)
-                                | FileSystemItemKind.Folder -> pageStateCtx.setState None
-
+                                revealInTree createdPath
                                 closeDialog ()
                         }
                         |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
@@ -448,7 +464,7 @@ type FileTree =
                         Api.ipcArcVaultApi.addArcFile
                 with
                 | Error exn -> applyCreateError exn.Message
-                | Ok _ -> ()
+                | Ok() -> revealInTree (DatamapParentInfo.toPath parentInfo)
             }
             |> Promise.catch (fun exn -> applyCreateError exn.Message)
             |> Promise.start
@@ -620,6 +636,7 @@ type FileTree =
                                 ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
+                            ?revealItemId = visibleRevealPath,
                             includeDefaultContextMenuItems = false,
                             delegateHorizontalScrollToParent = true,
                             truncateOverflowingItemNames = true
